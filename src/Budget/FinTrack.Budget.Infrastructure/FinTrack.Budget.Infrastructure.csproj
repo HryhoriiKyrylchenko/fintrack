@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../Shared/FinTrack.Shared.Infrastructure/FinTrack.Shared.Infrastructure.csproj" />
+    <ProjectReference Include="../FinTrack.Budget.Application/FinTrack.Budget.Application.csproj" />
+  </ItemGroup>
+</Project>
