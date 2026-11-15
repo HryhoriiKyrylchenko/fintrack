@@ -119,12 +119,13 @@ Every step is one branch `stage-0/NN-short-name` and one pull request into `main
 - **Notes:** `Api`, `Web` and the two integration test projects are created in the steps that give them content, so no project sits empty.
 - **Result:** six libraries and three test projects, 62 tests. The rules live in `tests/FinTrack.Shared.Tests/Architecture/ArchitectureRules.cs` (project references by role, package allow-list per role, packages forbidden everywhere: MediatR, FluentAssertions, Cosmos DB) and are tested as a table, including the not-yet-existing Api, Web and a second context. Compiled-assembly checks (`tests/Common/AssemblyGraph.cs`) cover the kernel, Budget Domain and Budget Application. Projects get packages only in the step that first uses them, so the kernel has no FluentResults reference yet. Verified: a forbidden project reference and a forbidden package used in code each fail the tests; both were reverted.
 
-### [ ] Step 4. CI: build and test (R)
+### [x] Step 4. CI: build and test (R)
 - **Goal:** every push and pull request is built and tested.
 - **What we do:** `.github/workflows/ci.yml`: checkout, `setup-dotnet` from `global.json`, NuGet cache, `dotnet build -c Release`, `dotnet test -c Release`.
 - **Done when:** the workflow is green on this step's pull request; the CI job is then added as a required status check in the existing protection rule for `main`; a deliberately failing test on a throwaway branch shows the merge button blocked (branch deleted afterwards).
 - **Depends on:** 3.
 - **Notes:** GitHub lists a status check for selection only after it has run once, which is why the rule can be completed only here. Steps 1 to 3 are merged through pull requests without a required check. MongoDB is added to the workflow in step 10. Selecting the check is a repository setting: you do it in the GitHub UI, or Claude does it through `gh` if you ask.
+- **Result:** `.github/workflows/ci.yml` runs on pull requests, pushes to `main` and on demand (step branches are covered by their pull request, so pushes to them do not start a second run). First run on PR #4: SDK from `global.json`, 0 warnings, 62 tests passed on `ubuntu-latest` in 31 s. Protection is the repository ruleset "Protect main - Require CI Checks", which had been created with enforcement disabled and a required check named `tests` that no job produces; it was changed to require `Build and test` and set to active (other rules unchanged: no deletion, no force push, pull request required with 0 approvals, branch up to date before merging). Verified with throwaway PR #5 (a test that always fails): CI failed and the ready-for-review PR showed `BLOCKED` while PR #4 showed `CLEAN`; PR #5 was closed and its branch deleted. actionlint was not run (the Docker image was not permitted).
 
 ### [ ] Step 5. Shared kernel: IDs and clock (R)
 - **Goal:** UUIDv7 identifiers and time abstraction.
