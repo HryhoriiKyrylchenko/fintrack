@@ -1,5 +1,7 @@
 using CsCheck;
 using FinTrack.Shared.Kernel.Ids;
+using FinTrack.Shared.Kernel.Results;
+using FinTrack.Tests.Common;
 
 namespace FinTrack.Shared.Tests.Ids;
 
@@ -32,8 +34,7 @@ public class ClientIdTests
     {
         var result = StronglyTypedId.FromClient<TestId>(Guid.Parse(value));
 
-        result.IsFailed.ShouldBeTrue();
-        result.Errors.ShouldHaveSingleItem().Message.ShouldBe(StronglyTypedId.InvalidIdCode);
+        result.ShouldFailWith(ErrorCodes.IdInvalid, ErrorKind.Validation).Parameters.ShouldBeEmpty();
     }
 
     [Fact]
