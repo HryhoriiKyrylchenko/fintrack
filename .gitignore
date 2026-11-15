@@ -1,0 +1,236 @@
+# =========================================================
+# FinTrack .gitignore
+# .NET 10, Azure Functions, Blazor WASM, MongoDB, Azurite
+# IDEs: JetBrains Rider (primary), Visual Studio, VS Code
+# =========================================================
+
+# ---------------------------------------------------------
+# 1. Secrets and local configuration (never commit)
+# ---------------------------------------------------------
+# Azure Functions local settings. Commit local.settings.example.json instead.
+local.settings.json
+**/local.settings.json
+!**/local.settings.example.json
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local overrides of app settings
+appsettings.*.local.json
+appsettings.Local.json
+**/wwwroot/appsettings.Local.json
+
+# Certificates and keys
+*.pfx
+*.p12
+*.pem
+*.key
+*.snk
+*.publishsettings
+*.azurePubxml
+*.pubxml
+*.pubxml.user
+
+# ---------------------------------------------------------
+# 2. Financial data (never commit)
+# ---------------------------------------------------------
+# Local MongoDB data, if mongod is pointed inside the repo by mistake
+/data/
+/db/
+/mongo-data/
+**/mongo-data/
+
+# Backups and dumps
+/backup/
+/backups/
+**/dump/
+*.bson
+*.archive
+*.gz
+
+# Exports from the app and imported statements
+/exports/
+/imports/
+/statements/
+*.export.json
+*.export.csv
+
+# Scratch files with real numbers
+/scratch/
+/private/
+
+# ---------------------------------------------------------
+# 3. Azurite (storage emulator)
+# ---------------------------------------------------------
+__azurite_db_*.json
+__blobstorage__/
+__queuestorage__/
+__tablestorage__/
+.azurite/
+AzuriteConfig
+
+# ---------------------------------------------------------
+# 4. Build output
+# ---------------------------------------------------------
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+publish/
+out/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+
+# Azure Functions build and deploy
+.azurefunctions/
+appsettings.json.user
+*.zip
+
+# Blazor WASM
+**/wwwroot/_framework/
+**/wwwroot/_content/
+
+# NuGet
+*.nupkg
+*.snupkg
+**/packages/*
+!**/packages/build/
+.nuget/
+project.lock.json
+project.fragment.lock.json
+
+# ---------------------------------------------------------
+# 5. Tests and coverage
+# ---------------------------------------------------------
+[Tt]est[Rr]esult*/
+TestResults/
+*.trx
+coverage/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.coveragexml
+lcov.info
+.coverage/
+StrykerOutput/
+BenchmarkDotNet.Artifacts/
+
+# ---------------------------------------------------------
+# 6. JetBrains Rider
+# ---------------------------------------------------------
+.idea/
+*.sln.iml
+*.DotSettings.user
+_ReSharper*/
+*.[Rr]e[Ss]harper
+.idea_modules/
+# Shared run configurations are kept in .run/ and committed.
+# Shared code style lives in .editorconfig and <Solution>.sln.DotSettings (committed).
+
+# ---------------------------------------------------------
+# 7. Visual Studio
+# ---------------------------------------------------------
+.vs/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.rsuser
+*.userprefs
+*.vspscc
+*.vssscc
+*.ncb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+*.psess
+*.vsp
+*.vspx
+*.sap
+ipch/
+*.tlog
+*.ilk
+*.pdb
+*.meta
+*.obj
+*.iobj
+*.ipdb
+*.pgc
+*.pgd
+*.rsp
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+*.log
+*.binlog
+UpgradeLog*.XML
+UpgradeLog*.htm
+Backup*/
+_UpgradeReport_Files/
+
+# ---------------------------------------------------------
+# 8. VS Code
+# ---------------------------------------------------------
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+*.code-workspace
+
+# ---------------------------------------------------------
+# 9. Node tooling (if any front-end tooling is added)
+# ---------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-store/
+
+# ---------------------------------------------------------
+# 10. Infrastructure (Bicep, Azure CLI)
+# ---------------------------------------------------------
+infra/**/*.parameters.local.json
+infra/**/*.local.bicepparam
+.azure/
+
+# ---------------------------------------------------------
+# 11. Operating systems
+# ---------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+# Linux
+*~
+.directory
+.Trash-*
+
+# ---------------------------------------------------------
+# 12. Misc
+# ---------------------------------------------------------
+*.bak
+*.orig
+*.rej
+*.swp
+*.swo
+.claude/settings.local.json
+CLAUDE.local.md
+**/CLAUDE.local.md

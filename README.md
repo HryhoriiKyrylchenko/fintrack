@@ -1,0 +1,59 @@
+# FinTrack
+
+A personal finance tracker for planning savings and tracking investments. Money is split into buckets (emergency cushion, car, vacation, investments), each with contribution plans, limits and self-loans. Investment buckets track crypto first, then stocks and ETFs.
+
+FinTrack runs entirely on your own machine. The cloud deployment is optional.
+
+> **Status:** early development (phase 0, foundation). Not usable yet.
+
+## Principles
+
+- **Your data stays yours.** Everything is stored in your own database. The app only calls the internet for exchange rates and asset prices.
+- **History is never lost.** Every operation is written to an append-only journal; mistakes are fixed by reversal entries, not by editing.
+- **Manual first.** You enter your data yourself. Read-only imports from exchanges and brokers are planned.
+- **Free to run.** Local use costs nothing; the cloud version is designed to stay within free tiers.
+
+## Planned features
+
+- Buckets in any currency, totals in a reporting currency of your choice
+- Monthly contribution plans with carry-over of shortfalls, pauses and limits
+- Self-loans between buckets with repayment plans
+- Crypto portfolio: sections (core, active, reserve), positions, average price, profit and loss, target levels
+- Stocks and ETFs
+- Charts and reports: net worth over time, plan versus actual, portfolio value versus amount invested
+- Later: read-only imports, AI-assisted analysis of your own portfolio
+
+The full specification is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). UI rules are in [docs/DESIGN.md](docs/DESIGN.md).
+
+## Tech stack
+
+.NET 10, Azure Functions (isolated worker), Blazor WebAssembly with MudBlazor, MongoDB.
+
+## Running locally
+
+Prerequisites:
+
+- .NET 10 SDK
+- Azure Functions Core Tools
+- MongoDB Community, running as a single-node replica set
+- Azurite (Azure Storage emulator)
+
+Setup instructions will be added as the project takes shape.
+
+Keep your database and backups outside the repository folder.
+
+## Disclaimer
+
+FinTrack is a tracking and planning tool. Nothing it shows is financial, investment or tax advice. Prices and exchange rates come from third-party sources and may be delayed or wrong. Use at your own risk.
+
+## Contributing
+
+Bug reports and ideas are welcome as issues. Pull requests are not accepted yet.
+
+## License
+
+Copyright (C) 2026 Hryhorii Kyrylchenko
+
+FinTrack is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, version 3. See [LICENSE](LICENSE).
+
+In short: you may use, study, modify and share it. If you run a modified version as a service for other people, you must make your modified source code available to them under the same license.
