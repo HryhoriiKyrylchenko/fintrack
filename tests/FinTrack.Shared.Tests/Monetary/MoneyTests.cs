@@ -1,4 +1,6 @@
 using FinTrack.Shared.Kernel.Monetary;
+using FinTrack.Shared.Kernel.Results;
+using FinTrack.Tests.Common;
 
 namespace FinTrack.Shared.Tests.Monetary;
 
@@ -35,8 +37,9 @@ public class MoneyTests
     {
         var result = Money.Create(decimal.Parse(amount, System.Globalization.CultureInfo.InvariantCulture), Currency.Pln);
 
-        result.IsFailed.ShouldBeTrue();
-        result.Errors.ShouldHaveSingleItem().Message.ShouldBe(Money.TooManyDecimalsCode);
+        // The amount itself is deliberately not a parameter: error parameters may end up in logs.
+        result.ShouldFailWith(ErrorCodes.MoneyTooManyDecimals, ErrorKind.Validation)
+            .Parameters.ShouldBe(new Dictionary<string, object> { ["currency"] = "PLN", ["maxDecimalPlaces"] = 2 });
     }
 
     [Fact]

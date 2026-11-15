@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using FinTrack.Shared.Kernel.Results;
 using FluentResults;
 
 namespace FinTrack.Shared.Kernel.Monetary;
@@ -14,9 +15,6 @@ public sealed record Currency
 {
     /// <summary>The largest precision a currency may have (crypto quantities, ARCHITECTURE section 3).</summary>
     public const int MaxDecimalPlaces = 18;
-
-    /// <summary>Error code for a currency code that is not registered.</summary>
-    public const string UnknownCurrencyCode = "currency.unknown";
 
     private const int MinCodeLength = 2;
     private const int MaxCodeLength = 10;
@@ -55,12 +53,20 @@ public sealed record Currency
 
     /// <summary>
     /// Finds a registered currency by its exact code (upper case, no spaces).
-    /// Fails with <see cref="UnknownCurrencyCode"/> for anything else.
+    /// Fails with <see cref="ErrorCodes.CurrencyUnknown"/> for anything else; the code as sent
+    /// is the parameter <c>currency</c> (absent when the code is null).
     /// </summary>
-    public static Result<Currency> FromCode(string? code) =>
-        code is not null && Registered.TryGetValue(code, out var currency)
+    public static Result<Currency> FromCode(string? code)
+    {
+        if (code is null)
+        {
+            return Result.Fail<Currency>(AppError.Validation(ErrorCodes.CurrencyUnknown));
+        }
+
+        return Registered.TryGetValue(code, out var currency)
             ? Result.Ok(currency)
-            : Result.Fail<Currency>(new Error(UnknownCurrencyCode));
+            : Result.Fail<Currency>(AppError.Validation(ErrorCodes.CurrencyUnknown, ("currency", code)));
+    }
 
     /// <inheritdoc />
     public override string ToString() => Code;

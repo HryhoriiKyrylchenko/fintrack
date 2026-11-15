@@ -1,4 +1,5 @@
 using System.Globalization;
+using FinTrack.Shared.Kernel.Results;
 using FluentResults;
 
 namespace FinTrack.Shared.Kernel.Monetary;
@@ -19,9 +20,6 @@ namespace FinTrack.Shared.Kernel.Monetary;
 /// </remarks>
 public sealed record Money
 {
-    /// <summary>Error code for an amount with more decimal places than its currency allows.</summary>
-    public const string TooManyDecimalsCode = "money.too_many_decimals";
-
     private Money(decimal amount, Currency currency)
     {
         Amount = amount;
@@ -36,8 +34,9 @@ public sealed record Money
 
     /// <summary>
     /// Creates an amount from an untrusted value, for example user input.
-    /// Fails with <see cref="TooManyDecimalsCode"/> when the value has more decimal places than
-    /// the currency allows; it is never rounded silently. Trailing zeros do not count.
+    /// Fails with <see cref="ErrorCodes.MoneyTooManyDecimals"/> when the value has more decimal
+    /// places than the currency allows; it is never rounded silently. Trailing zeros do not count.
+    /// The amount itself is not an error parameter, because parameters may end up in logs.
     /// </summary>
     public static Result<Money> Create(decimal amount, Currency currency)
     {
@@ -45,7 +44,10 @@ public sealed record Money
 
         return FitsPrecision(amount, currency)
             ? Result.Ok(new Money(amount, currency))
-            : Result.Fail<Money>(new Error(TooManyDecimalsCode));
+            : Result.Fail<Money>(AppError.Validation(
+                ErrorCodes.MoneyTooManyDecimals,
+                ("currency", currency.Code),
+                ("maxDecimalPlaces", currency.DecimalPlaces)));
     }
 
     /// <summary>

@@ -1,4 +1,6 @@
 using FinTrack.Shared.Kernel.Monetary;
+using FinTrack.Shared.Kernel.Results;
+using FinTrack.Tests.Common;
 
 namespace FinTrack.Shared.Tests.Monetary;
 
@@ -30,12 +32,14 @@ public class CurrencyTests
     {
         var result = Currency.FromCode(code);
 
-        result.IsFailed.ShouldBeTrue();
-        result.Errors.ShouldHaveSingleItem().Message.ShouldBe(Currency.UnknownCurrencyCode);
+        result.ShouldFailWith(ErrorCodes.CurrencyUnknown, ErrorKind.Validation)
+            .Parameters.ShouldBe(new Dictionary<string, object> { ["currency"] = code });
     }
 
     [Fact]
-    public void FromCode_Null_Fails() => Currency.FromCode(null).IsFailed.ShouldBeTrue();
+    public void FromCode_Null_Fails() =>
+        Currency.FromCode(null).ShouldFailWith(ErrorCodes.CurrencyUnknown, ErrorKind.Validation)
+            .Parameters.ShouldBeEmpty();
 
     [Fact]
     public void Equality_IsByCodeAndPrecision()
