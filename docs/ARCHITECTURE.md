@@ -20,7 +20,7 @@ Priority tags: **[P1]** build first, **[P2]** next, **[Later]** deferred but the
 
 - **Front end**: Blazor WebAssembly, hosted as a static site. Installable as a PWA later (this replaces a separate mobile app).
 - **Back end**: Azure Functions, .NET 10 (LTS), isolated worker model. Each function is one small endpoint or job: HTTP-triggered (`AddDeposit`, `PausePlan`, `GetBalances`), timer-triggered (price refresh, outbox sweep, valuation snapshot). A function only parses input, calls one mediator handler and maps the `Result` to a response. No business logic in functions.
-- **Code organization**: bounded contexts as class libraries: `Budget`, `Investments`, `Integrations`, plus `Shared` (kernel). Each context has `Domain`, `Application` (CQRS through the source-generated `Mediator` library, Result pattern), `Infrastructure` and a small `Contracts` project. A context may reference only another context's `Contracts`, never its Domain or Infrastructure.
+- **Code organization**: bounded contexts as class libraries: `Budget`, `Investments`, `Integrations`, plus `Shared` (kernel). Each context has `Domain`, `Application` (CQRS through the source-generated `Mediator` library, Result pattern), `Infrastructure` and a small `Contracts` project. A context may reference only another context's `Contracts`, never its Domain or Infrastructure. `Shared` is two projects: `FinTrack.Shared.Kernel` (plain types and abstractions; its only package is FluentResults, so every Domain project can reference it) and `FinTrack.Shared.Infrastructure` (the MongoDB adapter, the outbox dispatcher and the mediator pipeline behaviours; never referenced by Domain or Application). Context projects are created in the phase that first needs them.
 - **Deployment units**: **one Function App (`Api`) that hosts the functions of all contexts**, grouped by folder. This is serverless: it scales to zero and is billed per execution. One app means one deployment, one cold start, and atomic operations inside one process. Because contexts are isolated by references, splitting into one Function App per context later is a move of folders, not a redesign. Do not build a long-running ASP.NET host.
 
 ### 2.2 Storage: MongoDB (decided)
@@ -29,7 +29,11 @@ Priority tags: **[P1]** build first, **[P2]** next, **[Later]** deferred but the
 - Why MongoDB and not Cosmos DB (final): the app must be able to live on a local machine forever. MongoDB is a real database that can be installed and self-hosted; Cosmos DB cannot. Locally Cosmos exists only as an emulator, which is a development tool (the current one is a Docker-only preview with a subset of features) and not a place to keep real financial data for years. MongoDB also gives the same engine and the same code locally and in the cloud, real multi-document transactions and no lock-in. Cosmos DB for MongoDB limits transactions to a single unsharded collection, which does not fit. If the app is deployed to Azure, the Atlas cluster can be created in an Azure region next to the functions.
 - Transactions require a replica set, so the local `mongod` runs with `--replSet` (one node is enough).
 - Each context owns its collections. No cross-context queries or joins. Aggregates are stored as documents.
-- Every document carries: `Id` (client-generated UUIDv7), `OwnerId`, `SchemaVersion`, `Version` (optimistic concurrency), `CreatedAt`, `UpdatedAt`, soft-delete flag where deletion is allowed at all.
+- Every document carries `Id` (client-generated UUIDv7), `OwnerId` and `SchemaVersion`. Beyond that there are two shapes:
+  - **Mutable documents** (aggregates, settings, `LedgerHead`): also `Version` (optimistic concurrency), `CreatedAt`, `UpdatedAt`, and a soft-delete flag where deletion is allowed at all.
+  - **Append-only documents** (journal entries, outbox messages, processed-event records): also `RecordedAt`. They are never updated, so they have no `Version` and no `UpdatedAt`. Delivery bookkeeping on an outbox message (attempts, dispatched time) is the only field group that changes after insert.
+- Storage format (fixed in phase 0; a later change needs an upcaster): element names in camelCase, `Guid` as standard UUID (binary subtype 4), `decimal` as `Decimal128`, enums as strings, business dates (`DateOnly`) as ISO strings, `Money` as `{ amount, currency }`, unknown elements rejected.
+- Collection names are prefixed by context. Per context, besides its own collections: `<ctx>_ledger_heads`, `<ctx>_outbox`, `<ctx>_processed_events` (for Budget: `budget_ledger_heads`, `budget_outbox`, `budget_processed_events`).
 - Free tier limits change. Verify before deployment. At the time of writing the Atlas free cluster had 512 MB storage and about 100 operations per second.
 
 ### 2.3 Consistency
@@ -39,6 +43,8 @@ Priority tags: **[P1]** build first, **[P2]** next, **[Later]** deferred but the
 - **Stored projections are deferred, not dropped.** They are added as an optimization when measurements show replay is too slow (many users, long history). They will then be a rebuildable cache, and a test will assert projection == replay. Code that reads state goes through one place per context (a state builder), so adding a cache later does not touch handlers.
 - **Write path**: load the owner's journal → build state → validate invariants → in **one MongoDB transaction**: insert journal entries, increase the owner's `LedgerHead.Version` (a single small document per owner and context, checked for the expected value), insert outbox events. A version conflict means another write happened in between: reload and retry.
 - **Events between contexts**: transactional outbox. Events are written in the same transaction as the data, dispatched in-process right after commit, and a timer function re-dispatches anything left undelivered. Handlers are idempotent (they record processed event IDs). No queue is needed while there is one Function App. A queue (Azure Storage Queue) is introduced only if apps are split or for long-running imports.
+- **The outbox sweep is the one exception to owner scoping.** The timer function must find undelivered messages of all owners, so its query for pending outbox messages is not filtered by `OwnerId`. Each message is then handled under that message's own `OwnerId`. No other query or write may skip the owner filter.
+- Stored events are identified by a stable event name declared on the event type, never by the CLR type name, because stored events outlive refactorings.
 - **Schema evolution**: `SchemaVersion` on every document; old versions are upgraded on read (upcasters). The journal lives forever, its format will change.
 
 ### 2.4 Local run (no Docker required)
@@ -75,8 +81,8 @@ Priority tags: **[P1]** build first, **[P2]** next, **[Later]** deferred but the
 
 ## 3. Shared kernel
 
-- `Money` = `decimal` amount + `Currency`. Arithmetic across different currencies is a compile-time or runtime error; conversion is always explicit.
-- Precision per currency: fiat 2 decimals, crypto quantities up to 18. Rounding: banker's rounding at the currency's precision; a split always sums exactly to the original (the remainder of rounding goes to the first line).
+- `Money` = `decimal` amount + `Currency`. Arithmetic across different currencies is a compile-time or runtime error (an exception: it is a programming error, not a business rule failure); conversion is always explicit.
+- Precision per currency: each `Currency` carries its own number of decimal places (0 to 18). Most fiat currencies have 2 (PLN, EUR and USD are registered first), some have 0 or 3; crypto quantities use up to 18. A `Money` value never has more decimals than its currency allows. Rounding: banker's rounding at the currency's precision; a split always sums exactly to the original (the remainder of rounding goes to the first line).
 - **Multi-currency [P1]**: every bucket has one currency, chosen per bucket (PLN, EUR, USD and so on). The owner has a `ReportingCurrency` setting for totals and reports; it is chosen on first run and can be switched at any time (PLN, EUR, USD), because totals are computed at read time. Crypto portfolios are always valued in USD; stablecoins such as USDT and USDC are assets priced against USD. A movement between different currencies records both amounts, the actual rate and the fee as entered by the user. Totals across currencies are computed at read time with rates from `IFxRateProvider` (first implementation: the Frankfurter API, free and without an API key, central-bank reference rates including PLN; daily rates, cached, stored historically) and always show the rate date. Converted totals are never stored as truth.
 - **Two dates on every entry**: `OccurredOn` (business date, chosen by the user) and `RecordedAt` (system time). Backdated entries are allowed; projections from that date are rebuilt.
 - Time zone and the "month" of a plan follow the owner's configured time zone.
@@ -242,7 +248,7 @@ Rule: a portfolio cannot withdraw more cash than it holds, and no holding quanti
 9. Allocation is deterministic and the split sums exactly to the payment.
 10. State is always derived from the journal. When stored projections are introduced, each must equal a full replay.
 11. `Money` of different currencies is never added without an explicit conversion.
-12. Every query and write is scoped by `OwnerId`.
+12. Every query and write is scoped by `OwnerId` (single exception: the outbox sweep, section 2.3).
 13. Handlers are idempotent for repeated commands and events (same `Id` → same outcome, no duplicates).
 
 Testing approach: domain unit tests first; property-based tests for invariants 1, 2, 9 and 10; scenario tests built from real-life cases; integration tests against a real local MongoDB. Acceptance: run the app in parallel with the existing spreadsheet for two to three months and compare.
@@ -253,7 +259,7 @@ Nothing in this document is cancelled by the phasing. Items marked `[P2]` or `[L
 
 | Phase | Content |
 |---|---|
-| **0 Foundation** | Solution skeleton, Shared kernel (`Money`, `Result`, IDs, clock), MongoDB adapter with transactions and outbox, local run script, CI, test projects. |
+| **0 Foundation** | Solution skeleton, Shared kernel (`Money`, `Result`, IDs, clock), MongoDB adapter with transactions and outbox, local run script, CI, test projects. Built as a walking skeleton: a health function, the `Result` to `ProblemDetails` mapper, mediator pipeline behaviours, the outbox sweep timer and a Web shell with theme and localization. Step-by-step plan: `docs/plans/stage-0-plan.md`. |
 | **1a First usable version** | Buckets, `Unallocated`, `OpeningBalance`, `Deposit`, `Spend`, `Transfer`, `Reversal`, multi-currency, balances, a simple overview and journal screen. Goal: start real use in parallel with the spreadsheet as early as possible. |
 | **1b Budget core** | Plans with carry-over, plan pause (shift/skip), limits, loans without interest, `Adjustment`, manual allocation, summaries. |
 | **2 Budget extensions** | Accounts and reconciliation, automatic and semi-automatic allocation, bulk pause, goals with dates, proportional loan repayment, period snapshots, stored projections if measurements require them, budget charts and the monthly report (section 13). |
@@ -301,6 +307,15 @@ Real estate; bank import; trading or withdrawals through APIs; family groups or 
 | Permissive licences only for dependencies | The project may become a commercial service or open source; no dependency may block either. |
 | Entra External ID by default, provider-neutral OIDC in code | One Azure account and a free tier; no provider SDK in the domain, so Auth0 or another provider is a configuration change. |
 | AI agents as a separate read-only `Insights` context | The journal stays protected from model errors; agents reuse the read contracts; nothing in Budget or Investments has to change when AI is added. |
+| Shared is split into `FinTrack.Shared.Kernel` and `FinTrack.Shared.Infrastructure` | Domain projects reference the kernel and must not reference MongoDB or the mediator library, so the adapter and pipeline code cannot live in the kernel. The name `Kernel` keeps the two projects apart. |
+| Context projects are created in their own phase | Phase 0 creates Shared, Budget, Api and Web only. Empty Investments and Integrations projects would be dead weight until phases 3 and 5. |
+| Two document shapes: mutable and append-only | `Version` and `UpdatedAt` have no meaning on a document that is never updated; append-only documents carry `RecordedAt` instead. |
+| Each `Currency` carries its own decimal places | "Fiat has 2 decimals" is false for some currencies (JPY has 0). |
+| The outbox sweep reads across owners | A timer has no owner; it must see every pending message. Each message is still handled under its own `OwnerId`. |
+| HTTP functions use the ASP.NET Core integration of the isolated worker | Standard request and response types and simple `ProblemDetails`. The Functions host still owns the process, so this is not a long-running ASP.NET host. |
+| CsCheck for property-based tests | Apache-2.0, written for C#, no F# runtime dependency. FsCheck was the alternative. |
+| Inter font is self-hosted under OFL-1.1 | The only accepted exception to the MIT/Apache/BSD rule, and for fonts only. OFL allows bundling and commercial use. Self-hosting keeps the app working offline. |
+| One branch and one pull request per plan step | `main` is protected and requires a green CI run, so every change is built and tested before it lands. |
 
 ## 11. Setup choices and open questions
 
@@ -311,7 +326,7 @@ Resolved:
 - Reporting currency: a user setting, switchable at any time. Crypto is valued in USD.
 - FX rates: Frankfurter API. Crypto prices: CoinGecko Demo plan. Stock and ETF prices: end-of-day, free source behind `IPriceProvider`, manual entry as fallback.
 - Cloud identity: Microsoft Entra External ID by default, provider-neutral OIDC in code.
-- Libraries: `Mediator` (Martin Othamar, MIT, source-generated) instead of MediatR; FluentResults; FluentValidation; MudBlazor; xUnit; Shouldly instead of FluentAssertions; one property-based testing library. Only permissive licences are allowed for dependencies (they are compatible with the project's AGPL-3.0).
+- Libraries: `Mediator` (Martin Othamar, MIT, source-generated) instead of MediatR; FluentResults; FluentValidation; MudBlazor; xUnit; Shouldly instead of FluentAssertions; CsCheck for property-based tests. Only permissive licences are allowed for dependencies (they are compatible with the project's AGPL-3.0). One exception, for fonts only: Inter under OFL-1.1.
 - UI rules: `docs/DESIGN.md`. UI language: English, strings in resource files.
 - Storage: MongoDB only.
 
