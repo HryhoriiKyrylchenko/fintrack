@@ -111,12 +111,13 @@ Every step is one branch `stage-0/NN-short-name` and one pull request into `main
 - **Depends on:** 1.
 - **Result:** Mediator.Abstractions and Mediator.SourceGenerator 3.0.2 confirmed MIT (licence file in the package). Deviation from the package table: `xunit.v3` 4.x runs only on Microsoft.Testing.Platform v2, which the .NET 10 SDK no longer runs through VSTest. `global.json` therefore selects `Microsoft.Testing.Platform` as the test runner, and `Microsoft.NET.Test.Sdk` and `xunit.runner.visualstudio` are not used. Verified with throwaway probe projects (deleted, not committed): tests run, and unused usings, block namespaces, nullable warnings and package versions outside `Directory.Packages.props` all fail the build. The empty solution still reports "Unable to find a project to restore!" until step 3 adds projects.
 
-### [ ] Step 3. Solution skeleton and architecture guard tests (M)
+### [x] Step 3. Solution skeleton and architecture guard tests (M)
 - **Goal:** all Stage 0 class libraries exist with the reference graph above, and tests fail if the graph is broken.
 - **What we do:** create `src/Shared/FinTrack.Shared.Kernel`, `src/Shared/FinTrack.Shared.Infrastructure`, the four `src/Budget/*` projects, `tests/FinTrack.Shared.Tests`, `tests/FinTrack.Budget.Domain.Tests`, `tests/FinTrack.Budget.Application.Tests`; add all to `FinTrack.sln` in solution folders. Each library gets an `AssemblyMarker`. Guard tests: `FinTrack.Shared.Tests/Architecture/ProjectReferenceRulesTests` parses every `.csproj` and checks project and package references against an allow-list (rules 3 and 4); the Budget test projects assert their assembly references no MongoDB, Functions or (for Domain) Mediator assemblies.
 - **Done when:** `dotnet build` and `dotnet test` pass; adding a forbidden reference locally makes a guard test fail (tried once, then reverted).
 - **Depends on:** 2.
 - **Notes:** `Api`, `Web` and the two integration test projects are created in the steps that give them content, so no project sits empty.
+- **Result:** six libraries and three test projects, 62 tests. The rules live in `tests/FinTrack.Shared.Tests/Architecture/ArchitectureRules.cs` (project references by role, package allow-list per role, packages forbidden everywhere: MediatR, FluentAssertions, Cosmos DB) and are tested as a table, including the not-yet-existing Api, Web and a second context. Compiled-assembly checks (`tests/Common/AssemblyGraph.cs`) cover the kernel, Budget Domain and Budget Application. Projects get packages only in the step that first uses them, so the kernel has no FluentResults reference yet. Verified: a forbidden project reference and a forbidden package used in code each fail the tests; both were reverted.
 
 ### [ ] Step 4. CI: build and test (R)
 - **Goal:** every push and pull request is built and tested.

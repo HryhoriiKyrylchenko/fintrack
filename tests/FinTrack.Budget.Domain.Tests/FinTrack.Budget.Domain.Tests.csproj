@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/Budget/FinTrack.Budget.Domain/FinTrack.Budget.Domain.csproj" />
+  </ItemGroup>
+</Project>
