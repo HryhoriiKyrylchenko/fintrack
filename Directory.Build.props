@@ -1,0 +1,29 @@
+<Project>
+  <!--
+    Build rules shared by every project in the repository.
+    Test projects add their own rules in tests/Directory.Build.props, which imports this file.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Warnings break the build; .editorconfig decides which rules are warnings. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!--
+      Needed so that IDE0005 (unused usings) runs in the build.
+      Missing XML comments (CS1591) are switched off in .editorconfig.
+    -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <Authors>Hryhorii Kyrylchenko</Authors>
+    <Copyright>Copyright (C) 2026 Hryhorii Kyrylchenko</Copyright>
+    <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>

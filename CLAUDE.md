@@ -119,7 +119,8 @@ Fill in exact scripts as they are created; keep this section current.
 
 ```
 dotnet build
-dotnet test
+dotnet test                     # Microsoft.Testing.Platform runner (set in global.json)
+dotnet test --project <path>    # one test project; MTP mode needs --project, not a bare path
 func start                      # from src/Api/FinTrack.Api
 dotnet run                      # from src/Web/FinTrack.Web
 ```

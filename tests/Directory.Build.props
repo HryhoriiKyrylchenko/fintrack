@@ -1,0 +1,33 @@
+<Project>
+  <!--
+    Rules for every test project. MSBuild stops at the nearest Directory.Build.props,
+    so the root file is imported explicitly first.
+  -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <!--
+      xUnit v3 test projects are executables running on Microsoft.Testing.Platform;
+      `dotnet test` uses it because global.json selects it as the test runner.
+    -->
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="CsCheck" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="Shouldly" />
+  </ItemGroup>
+
+  <!-- Helpers shared by several test projects (for example FakeClock), linked as source. -->
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Common/**/*.cs" Link="Common/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>
