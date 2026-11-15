@@ -72,7 +72,7 @@ Two things to confirm at kick-off, neither changes the plan:
 | MongoDB.Driver | 3.14.0 | Apache-2.0 | Shared.Infrastructure, Budget.Infrastructure |
 | Microsoft.Azure.Functions.Worker (+ Sdk, Http.AspNetCore, Timer) | 2.52.0 / 2.1.0 / 2.1.1 / 4.3.1 | MIT | Api |
 | MudBlazor | 9.13.0 | MIT | Web |
-| xunit.v3, xunit.runner.visualstudio, Microsoft.NET.Test.Sdk | 4.0.3 / 4.0.1 / 18.12.0 | Apache-2.0 / Apache-2.0 / MIT | tests |
+| xunit.v3 | 4.0.3 | Apache-2.0 | tests (on Microsoft.Testing.Platform; see step 2 note) |
 | Shouldly | 4.3.0 | BSD-3-Clause | tests |
 | CsCheck | 5.0.1 | Apache-2.0 | tests |
 
@@ -104,11 +104,12 @@ Every step is one branch `stage-0/NN-short-name` and one pull request into `main
 - **Depends on:** nothing.
 - **Commit:** `docs: record stage 0 decisions`.
 
-### [ ] Step 2. Build configuration (R)
+### [x] Step 2. Build configuration (R)
 - **Goal:** shared build rules exist before any project.
 - **What we do:** root `Directory.Build.props` (`net10.0`, `Nullable`, `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild`, `GenerateDocumentationFile`, `ImplicitUsings`), `Directory.Packages.props` (central versions from the table), `global.json`, `tests/Directory.Build.props` (test packages, linked `tests/Common/*.cs`).
 - **Done when:** `dotnet build FinTrack.sln` succeeds; licence of the Mediator package confirmed.
 - **Depends on:** 1.
+- **Result:** Mediator.Abstractions and Mediator.SourceGenerator 3.0.2 confirmed MIT (licence file in the package). Deviation from the package table: `xunit.v3` 4.x runs only on Microsoft.Testing.Platform v2, which the .NET 10 SDK no longer runs through VSTest. `global.json` therefore selects `Microsoft.Testing.Platform` as the test runner, and `Microsoft.NET.Test.Sdk` and `xunit.runner.visualstudio` are not used. Verified with throwaway probe projects (deleted, not committed): tests run, and unused usings, block namespaces, nullable warnings and package versions outside `Directory.Packages.props` all fail the build. The empty solution still reports "Unable to find a project to restore!" until step 3 adds projects.
 
 ### [ ] Step 3. Solution skeleton and architecture guard tests (M)
 - **Goal:** all Stage 0 class libraries exist with the reference graph above, and tests fail if the graph is broken.

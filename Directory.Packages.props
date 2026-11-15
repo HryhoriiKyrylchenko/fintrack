@@ -1,0 +1,49 @@
+<Project>
+  <!--
+    Central package management: projects reference packages without a version;
+    the version lives here only. Before adding or upgrading a package, check its
+    current licence: only MIT, Apache-2.0 or BSD are allowed (see CLAUDE.md).
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup Label="Shared kernel and application">
+    <!-- MIT -->
+    <PackageVersion Include="FluentResults" Version="4.0.0" />
+    <!-- MIT (licence file in the package, checked 15 Nov 2026) -->
+    <PackageVersion Include="Mediator.Abstractions" Version="3.0.2" />
+    <PackageVersion Include="Mediator.SourceGenerator" Version="3.0.2" />
+    <!-- Apache-2.0 -->
+    <PackageVersion Include="FluentValidation" Version="12.2.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Infrastructure">
+    <!-- Apache-2.0 -->
+    <PackageVersion Include="MongoDB.Driver" Version="3.14.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Azure Functions (all MIT)">
+    <PackageVersion Include="Microsoft.Azure.Functions.Worker" Version="2.52.0" />
+    <PackageVersion Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.1.0" />
+    <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="2.1.1" />
+    <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Timer" Version="4.3.1" />
+  </ItemGroup>
+
+  <ItemGroup Label="Web">
+    <!-- MIT -->
+    <PackageVersion Include="MudBlazor" Version="9.13.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Tests">
+    <!--
+      Apache-2.0. Runs on Microsoft.Testing.Platform (selected in global.json), so
+      Microsoft.NET.Test.Sdk and xunit.runner.visualstudio (VSTest) are not used.
+    -->
+    <PackageVersion Include="xunit.v3" Version="4.0.3" />
+    <!-- BSD-3-Clause -->
+    <PackageVersion Include="Shouldly" Version="4.3.0" />
+    <!-- Apache-2.0 -->
+    <PackageVersion Include="CsCheck" Version="5.0.1" />
+  </ItemGroup>
+</Project>
