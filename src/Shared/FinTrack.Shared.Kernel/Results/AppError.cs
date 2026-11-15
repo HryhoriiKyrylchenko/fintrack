@@ -66,9 +66,9 @@ public sealed partial class AppError : Error
         ArgumentNullException.ThrowIfNull(code);
         ArgumentNullException.ThrowIfNull(parameters);
 
-        if (!CodeFormat().IsMatch(code))
+        if (!StableName.IsValid(code))
         {
-            throw new ArgumentException($"Error code '{code}' must be lower-case segments separated by dots, for example 'bucket.insufficient_funds'.", nameof(code));
+            throw new ArgumentException($"Error code '{code}' must be lower-case segments separated by dots, for example '{StableName.Example}'.", nameof(code));
         }
 
         var byName = new Dictionary<string, object>(StringComparer.Ordinal);
@@ -93,9 +93,6 @@ public sealed partial class AppError : Error
 
         return new AppError(code, kind, byName.ToFrozenDictionary(StringComparer.Ordinal));
     }
-
-    [GeneratedRegex("^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+\\z")]
-    private static partial Regex CodeFormat();
 
     [GeneratedRegex("^[a-z][a-zA-Z0-9]*\\z")]
     private static partial Regex ParameterNameFormat();

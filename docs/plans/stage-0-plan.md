@@ -149,12 +149,18 @@ Every step is one branch `stage-0/NN-short-name` and one pull request into `main
 - **Depends on:** 6.
 - **Result:** `AppError` (private constructor; factories `Validation`, `NotFound`, `Conflict`, `BusinessRule` taking `(name, value)` parameters). `Message` is the code. Codes must be lower-case dot-separated segments (at least two); parameter names camelCase, unique; values only `string`, `bool`, `int`, `long`, `decimal`; violations throw (bugs). `ErrorCodes` holds the five shared codes. The three earlier failures now carry `AppError`: `id.invalid` (no parameters), `currency.unknown` (`currency` as sent), `money.too_many_decimals` (`currency`, `maxDecimalPlaces`; never the amount). `ErrorConventionTests` fails the build's tests when any file in `src` creates a plain FluentResults error or fails with a string. Test helper `tests/Common/ResultAssertions.ShouldFailWith(code, kind)`. 41 new tests; three deliberate mutations caught. Rule: log an error's code, never its parameters.
 
-### [ ] Step 8. Shared kernel: persistence and event abstractions (C)
+### [x] Step 8. Shared kernel: persistence and event abstractions (C)
 - **Goal:** contracts that Application code will use, with no MongoDB or Mediator types.
 - **What we do:** in `FinTrack.Shared.Kernel`: `IOwnerContext`; document interfaces for the two shapes (mutable, append-only); `IIntegrationEvent` (`EventId`, `OwnerId`, `OccurredAt`), `IIntegrationEventHandler<T>`, a stable event-name attribute (names never derive from CLR type names, because stored events outlive refactorings); the ledger write contract (`ILedgerWriter`: run a unit of work for one owner and context with an expected `LedgerHead.Version`, append outbox events, result is success or `concurrency.conflict`); marker `ILedgerCommand` for commands that need retry on conflict.
 - **Done when:** builds; guard tests still pass; contract documented with XML comments since it is the seam for the future projection cache and app split.
 - **Depends on:** 7.
 - **Risks:** the shape of `ILedgerWriter` fixes rule 7 for the whole project. Design it against the 1a write path (load journal → build state → validate → commit) before coding.
+- **Result:** design approved by the developer before coding, with four decisions (recorded in ARCHITECTURE 2.3 and the decision log, and in CLAUDE.md rule 7):
+  1. `ILedger` replaces the planned `ILedgerWriter`: `GetVersionAsync(ledger)` (read **before** the journal) and `CommitAsync(LedgerCommit)` → `Result<LedgerCommitted>` or `Conflict` `concurrency.conflict`.
+  2. Domain types are stored directly: they implement `IDocument` / `IAppendOnlyDocument` / `IMutableDocument`; MongoDB mapping lives in Infrastructure.
+  3. `LedgerCommit` carries `Appends`, `Saves` (mutable documents: version 0 inserts, otherwise replace if the stored version matches), `Events` and `HandledEvent`.
+  4. `HandledEvent` (`ProcessedEvent(handlerName, eventId)`) is written in the handler's commit; a repeated delivery returns `AlreadyHandled = true` and writes nothing.
+  Also: `IOwnerContext` is the only source of the owner (documents or events of another owner make the commit throw); `LedgerName` (2 to 20 lower-case letters or digits, also the collection prefix); `IIntegrationEvent`, `IIntegrationEventHandler<TEvent>`, `[EventName]` with `EventNameAttribute.Of(type)`; `ILedgerCommand` marker. Error codes, event names and handler names share one format (internal `StableName`). 34 new tests; three deliberate mutations of `LedgerCommit` caught (one first attempt did not compile and was redone).
 
 ### [ ] Step 9. Local environment (R)
 - **Goal:** the machine can run MongoDB with transactions, Azurite and the Functions host.
@@ -179,14 +185,14 @@ Every step is one branch `stage-0/NN-short-name` and one pull request into `main
 
 ### [ ] Step 12. Ledger transaction: `LedgerHead` and atomic commit (C)
 - **Goal:** rule 7 implemented once: journal entries + head version + outbox in one transaction.
-- **What we do (tests first):** `MongoLedgerWriter` implementing `ILedgerWriter`: session, driver transaction with its built-in retry of transient errors, conditional increment of the `LedgerHead` (`ownerId` unique; first write creates it; duplicate key or zero modified → conflict), caller's inserts through the same session, outbox inserts, commit. Tests use test-only collections.
-- **Done when:** integration tests prove: failure midway persists nothing; two concurrent writers with the same expected version produce exactly one success; version rises by one per commit; outbox documents exist only for committed work.
+- **What we do (tests first):** `MongoLedger` implementing `ILedger` (step 8): `GetVersionAsync`; `CommitAsync` with a session and driver transaction (built-in retry of transient errors): conditional increment of the `LedgerHead` (`ownerId` unique; first write creates it; duplicate key or zero modified → conflict), inserts of `Appends`, insert or version-checked replace of `Saves`, outbox inserts for `Events`, insert of the `HandledEvent` record (unique handler + event; a duplicate means already handled → `AlreadyHandled`, nothing written), commit; documents or events of another owner throw. Tests use test-only collections.
+- **Done when:** integration tests prove: failure midway persists nothing; two concurrent writers with the same expected version produce exactly one success; version rises by one per commit; outbox documents exist only for committed work; a stale saved document conflicts; a repeated handled event writes nothing.
 - **Depends on:** 11.
 - **Risks:** the most important step of Stage 0. Collections and indexes are created before use, not inside a transaction.
 
 ### [ ] Step 13. Outbox dispatch and idempotent handlers (C)
 - **Goal:** events reach handlers at least once, with effect exactly once.
-- **What we do (tests first):** `OutboxMessage` document (event ID, owner, event name, payload, attempts, dispatched time, last error code); event-name registry; `OutboxDispatcher` (in-process dispatch right after commit; `DispatchPendingAsync` for the sweep); processed-event store with a unique key (handler, event ID), recorded in the same transaction as the handler's own writes.
+- **What we do (tests first):** `OutboxMessage` document (event ID, owner, event name, payload, attempts, dispatched time, last error code); event-name registry; `OutboxDispatcher` (in-process dispatch right after commit; `DispatchPendingAsync` for the sweep; each message handled under its own owner through `IOwnerContext`). The processed-event record itself is written by `MongoLedger` (step 12) through `LedgerCommit.HandledEvent`; this step proves the end-to-end behaviour with test handlers.
 - **Done when:** integration tests prove: dispatch after commit; an undispatched message is delivered by the sweep; a duplicate delivery changes nothing; a failing handler leaves the message pending with attempts increased (invariant 13). Logs contain IDs and codes only.
 - **Depends on:** 12.
 
