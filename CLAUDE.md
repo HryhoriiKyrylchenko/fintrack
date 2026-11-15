@@ -22,7 +22,7 @@ FinTrack (internal working name) is a personal finance tracker: budget planning 
 - `Mediator` (the source-generated library by Martin Othamar, MIT) for commands and queries (CQRS). **Do not use MediatR**: its current versions are commercially licensed. FluentResults-based `Result` for outcomes, FluentValidation for input.
 - UI components: MudBlazor. Visual rules are in `docs/DESIGN.md`.
 - MongoDB with the official .NET driver. Local: single-node replica set. Cloud: MongoDB Atlas.
-- Tests: xUnit, Shouldly for assertions (**not FluentAssertions**: version 8 and later need a paid licence for commercial use), a property-based testing library (FsCheck or CsCheck), integration tests against a real local MongoDB.
+- Tests: xUnit, Shouldly for assertions (**not FluentAssertions**: version 8 and later need a paid licence for commercial use), CsCheck for property-based tests, integration tests against a real local MongoDB.
 - External data, always behind interfaces and cached, never called from Domain: Frankfurter API for fiat FX rates (`IFxRateProvider`), CoinGecko Demo API for crypto prices (`IPriceProvider`).
 - Currencies: each bucket has its own currency; the user's `ReportingCurrency` is a switchable setting; crypto is valued in USD.
 - Cloud target (later): Azure Functions Flex Consumption, Azure Static Web Apps, MongoDB Atlas, Microsoft Entra External ID for login (code stays provider-neutral: standard OIDC and JWT validation only). Do not use Cosmos DB.
@@ -31,25 +31,33 @@ FinTrack (internal working name) is a personal finance tracker: budget planning 
 
 ```
 src/
-  Shared/FinTrack.Shared                  Money, Currency, Result helpers, IDs, IClock, events, outbox
+  Shared/FinTrack.Shared.Kernel           Money, Currency, Result helpers, IDs, IClock, document, event and ledger abstractions
+  Shared/FinTrack.Shared.Infrastructure   MongoDB adapter, outbox dispatcher, mediator pipeline behaviours
   Budget/FinTrack.Budget.Domain
   Budget/FinTrack.Budget.Application
   Budget/FinTrack.Budget.Infrastructure
   Budget/FinTrack.Budget.Contracts
-  Investments/...                    same four projects
-  Integrations/...                   same four projects
+  Investments/...                         same four projects (created in phase 3)
+  Integrations/...                        same four projects (created in phase 5)
   Api/FinTrack.Api                        Azure Functions app; folders per context
   Web/FinTrack.Web                        Blazor WASM
 tests/
+  Common/                                 test helpers linked into test projects (not a project)
+  FinTrack.Shared.Tests                   kernel unit and property tests, architecture guard tests
+  FinTrack.Shared.Infrastructure.IntegrationTests   MongoDB adapter against a real MongoDB
   FinTrack.Budget.Domain.Tests
   FinTrack.Budget.Application.Tests
   FinTrack.Api.IntegrationTests
-docs/ARCHITECTURE.md                 specification (source of truth)
-docs/DESIGN.md                       UI rules, colours, typography
-infra/                               Bicep (cloud phase)
+scripts/                                  PowerShell 7 scripts (prerequisite check, local run)
+docs/ARCHITECTURE.md                      specification (source of truth)
+docs/DESIGN.md                            UI rules, colours, typography
+docs/plans/                               step-by-step plans per stage
+infra/                                    Bicep (cloud phase)
 ```
 
 `FinTrack` is an internal working name and namespace prefix, not a product name.
+
+`FinTrack.Shared.Kernel` has one package, FluentResults: no MongoDB, no mediator library. Anything that needs either goes to `FinTrack.Shared.Infrastructure`, which Domain and Application projects never reference. Do not create a project before the phase that needs it.
 
 ## Architecture rules (do not break)
 
@@ -61,7 +69,7 @@ infra/                               Bicep (cloud phase)
 6. **Journal is the source of truth; state is derived by replaying it** through one state builder per context. Do not add stored projections or caches yet: they are a planned optimization, added only when measurements require it.
 7. **One transaction per command**: journal entries + `LedgerHead.Version` increase (one document per owner and context, checked for the expected value) + outbox events. Version conflict → reload and retry.
 8. **Cross-context communication** goes through the transactional outbox with idempotent handlers. No queue until the app is split.
-9. **Every document has** `Id` (UUIDv7, client-generated), `OwnerId`, `SchemaVersion`, `Version`. **Every query and write is filtered by `OwnerId`.**
+9. **Every document has** `Id` (UUIDv7, client-generated), `OwnerId`, `SchemaVersion`. Mutable documents also have `Version`, `CreatedAt`, `UpdatedAt`; append-only documents (journal, outbox, processed events) have `RecordedAt` instead. **Every query and write is filtered by `OwnerId`.** The only exception is the outbox sweep timer, which reads pending messages of all owners and handles each under its own `OwnerId`.
 10. **Money**: always the `Money` type (`decimal` + currency). Never `double` or `float`. Never add different currencies without an explicit conversion.
 11. **Time**: use `IClock`. No `DateTime.Now` / `UtcNow` in Domain or Application. Entries carry `OccurredOn` and `RecordedAt`.
 12. **Business rule failures return `Result.Fail`**, not exceptions. Exceptions are for bugs and infrastructure faults.
@@ -95,13 +103,15 @@ Any new domain behaviour needs tests for the invariants it touches.
 - **Domain first, tests first.** Write the domain test, then the domain code, then the handler, then the function, then UI.
 - Follow the phases in `docs/ARCHITECTURE.md` section 8. Do not implement items tagged `[P2]`, `[Later]` or listed as out of scope unless asked. Do leave the extension points the spec describes.
 - Do not add libraries, projects or patterns beyond this file without asking.
-- **Licences**: the project is AGPL-3.0; dependencies must use permissive open-source licences (MIT, Apache-2.0, BSD). Before proposing any package, check its current licence and say what it is. Never add a package that needs a paid or copyleft licence for commercial use.
+- **Licences**: the project is AGPL-3.0; dependencies must use permissive open-source licences (MIT, Apache-2.0, BSD). Before proposing any package, check its current licence and say what it is. Never add a package that needs a paid or copyleft licence for commercial use. One accepted exception, for fonts only: Inter, self-hosted under OFL-1.1.
+- **Git workflow**: `main` is protected. Each plan step is one branch (`stage-0/NN-short-name`) and one pull request, merged by the developer only when CI is green. Never commit to `main` directly.
+- The step-by-step plan for the current stage is in `docs/plans/`. Tick a step when its pull request is merged.
 - UI work follows `docs/DESIGN.md`: use its theme tokens, never hard-coded colours in components.
 - **Deferred is not dropped.** Everything in the spec stays planned; simplifications in early phases are steps, so keep the extension points and do not design them away.
 - Prefer clarity over cleverness: this is financial code and must be easy to audit.
 - Before saying a task is done: build, run the tests, and state what was verified and what was not.
 
-**Current phase: 0 (Foundation).** First tasks: create the solution and projects, the Shared kernel (`Money`, `Currency`, IDs, `IClock`, `Result` helpers), the MongoDB adapter (transactions, optimistic concurrency, outbox), the local run script, CI build and test. Then Phase 1a, the first usable version: buckets, `Unallocated`, opening balances, deposit, spend, transfer, reversal, balances, a simple overview and journal screen. Phase 1b follows with plans, limits and loans.
+**Current phase: 0 (Foundation).** Plan: `docs/plans/stage-0-plan.md`. First tasks: create the solution and projects, the Shared kernel (`Money`, `Currency`, IDs, `IClock`, `Result` helpers), the MongoDB adapter (transactions, optimistic concurrency, outbox), the local run script, CI build and test. Then Phase 1a, the first usable version: buckets, `Unallocated`, opening balances, deposit, spend, transfer, reversal, balances, a simple overview and journal screen. Phase 1b follows with plans, limits and loans.
 
 ## Commands
 
@@ -122,7 +132,8 @@ Local prerequisites: .NET SDK, Azure Functions Core Tools, MongoDB Community run
 - Naming: commands are imperative (`AddDeposit`), queries start with `Get`, events are past tense (`DepositAdded`).
 - Function names match the use case; routes are REST-like and versioned (`/api/v1/...`).
 - Entry types, enum values and collection names follow the spec exactly.
-- Mongo collections are prefixed by context (`budget_journal`, `budget_buckets`, `inv_journal`).
+- Mongo collections are prefixed by context (`budget_journal`, `budget_buckets`, `inv_journal`). Each context also has `<ctx>_ledger_heads`, `<ctx>_outbox` and `<ctx>_processed_events`.
+- Stored events carry a stable event name declared on the type, never the CLR type name.
 - API errors: RFC 7807 `ProblemDetails` built from `Result`, with a stable error code (`bucket.insufficient_funds`) and parameters. The UI maps codes to text.
 - UI text: English only for now, but every user-facing string comes from resource files (`IStringLocalizer`); no hard-coded or concatenated strings. Format numbers, dates and money by the user's locale setting.
 - Logging: structured, through `ILogger`; never log amounts, balances, keys or personal data.
