@@ -2,4 +2,9 @@
   <ItemGroup>
     <PackageReference Include="FluentResults" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Lets the kernel tests define currencies of any precision (Currency.Define). -->
+    <InternalsVisibleTo Include="FinTrack.Shared.Tests" />
+  </ItemGroup>
 </Project>
