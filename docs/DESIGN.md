@@ -37,7 +37,8 @@ Define these in one `MudTheme` (`PaletteLight` and `PaletteDark`). Chosen becaus
 
 Rules:
 
-- Primary is the only brand colour. Do not introduce a secondary brand colour.
+- Primary is the only brand colour. Do not introduce a secondary brand colour. In MudBlazor's palette, `Secondary` and `Tertiary` are set to the text-secondary grey, so `Color.Secondary` means muted text, never a second accent.
+- The tokens live in one file, `src/Web/FinTrack.Web/Theme/FinTrackTheme.cs`; `wwwroot/css/app.css` uses only MudBlazor's CSS variables (`var(--mud-palette-...)`).
 - Check text contrast (WCAG AA, 4.5:1) when a token changes.
 - Semantic colours mean one thing each: success = gain or done, error = loss or failure, warning = needs attention, info = neutral notice.
 
