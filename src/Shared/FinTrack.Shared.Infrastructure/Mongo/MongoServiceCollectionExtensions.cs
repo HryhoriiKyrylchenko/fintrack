@@ -12,7 +12,8 @@ public static class MongoServiceCollectionExtensions
 
     /// <summary>
     /// Registers the storage format (<see cref="MongoSerialization.Register"/>), one
-    /// <see cref="IMongoClient"/> for the whole process and the application's <see cref="IMongoDatabase"/>.
+    /// <see cref="IMongoClient"/> for the whole process, the application's <see cref="IMongoDatabase"/>
+    /// and the <see cref="MongoIndexRunner"/>.
     /// </summary>
     /// <remarks>
     /// The client is a singleton because it owns the connection pool; creating one per request
@@ -42,6 +43,18 @@ public static class MongoServiceCollectionExtensions
             return provider.GetRequiredService<IMongoClient>().GetDatabase(options.DatabaseName);
         });
 
+        services.TryAddSingleton<MongoIndexRunner>();
+
+        return services;
+    }
+
+    /// <summary>Registers one context's index initializer for <see cref="MongoIndexRunner"/>.</summary>
+    public static IServiceCollection AddMongoIndexInitializer<TInitializer>(this IServiceCollection services)
+        where TInitializer : class, IMongoIndexInitializer
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IMongoIndexInitializer, TInitializer>());
         return services;
     }
 }
