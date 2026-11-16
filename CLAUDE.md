@@ -120,6 +120,7 @@ Fill in exact scripts as they are created; keep this section current.
 
 ```
 pwsh scripts/check-prereqs.ps1  # local prerequisites and MongoDB replica-set state (docs/LOCAL-SETUP.md)
+pwsh scripts/run-local.ps1      # Azurite + Api (func, :7071) + Web (:5180); creates local.settings.json if missing; Ctrl+C stops all
 dotnet build
 dotnet test                     # Microsoft.Testing.Platform runner (set in global.json)
 dotnet test --project <path>    # one test project; MTP mode needs --project, not a bare path
