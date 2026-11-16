@@ -29,6 +29,28 @@ h1:focus {
     outline: none;
 }
 
+/* Forms and settings stay readable on wide screens (DESIGN 8: one column). */
+.fintrack-narrow {
+    max-width: 640px;
+}
+
+/* DESIGN 8: the primary action at the bottom right, full width on mobile. */
+.fintrack-form-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+@media (max-width: 599.98px) {
+    .fintrack-form-actions .mud-button-root {
+        width: 100%;
+    }
+}
+
+/* DESIGN 5: figures in tabular digits. */
+.fintrack-figures {
+    font-variant-numeric: tabular-nums;
+}
+
 /* DESIGN 8: 12 px on cards (controls use the theme's 8 px). */
 .mud-card {
     border-radius: 12px;

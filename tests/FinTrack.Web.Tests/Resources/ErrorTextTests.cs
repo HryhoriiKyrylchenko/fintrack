@@ -26,6 +26,7 @@ public sealed class ErrorTextTests : IDisposable
         "server.error",
         "health.database_unavailable",
         "settings.not_found",
+        "validation.failed",
         "settings.time_zone_unknown",
         "settings.locale_unknown",
     ];

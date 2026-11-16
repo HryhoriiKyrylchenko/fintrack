@@ -1,0 +1,71 @@
+@page "/settings"
+@inject OwnerSettingsState Settings
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@L["Settings.PageTitle"]</PageTitle>
+
+<div class="fintrack-narrow">
+    <MudText Typo="Typo.h5" HtmlTag="h1" GutterBottom="true">@L["Settings.Title"]</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">@L["Settings.Description"]</MudText>
+
+    <MudCard Elevation="0" Outlined="true" Class="mb-6">
+        <MudCardContent>
+            <SettingsForm Model="model" SubmitLabel="@L["Settings.Save"]" Busy="busy" ErrorCode="@errorCode"
+                          Saved="saved" OnSubmit="SaveAsync" />
+        </MudCardContent>
+    </MudCard>
+
+    <MudCard Elevation="0" Outlined="true">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" HtmlTag="h2">@L["Settings.StatusTitle"]</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@L["Settings.StatusDescription"]</MudText>
+        </MudCardContent>
+        <MudCardActions>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="settings/status" StartIcon="@Icons.Material.Outlined.MonitorHeart">
+                @L["Settings.StatusOpen"]
+            </MudButton>
+        </MudCardActions>
+    </MudCard>
+</div>
+
+@code {
+    private OwnerSettingsDto saved = default!;
+    private SettingsFormModel model = default!;
+    private bool busy;
+    private string? errorCode;
+
+    // The layout shows this page only when the settings are saved.
+    protected override void OnInitialized()
+    {
+        saved = Settings.Settings!;
+        model = SettingsFormModel.FromSettings(saved);
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        errorCode = null;
+        var reload = model.ChangesLocale(saved);
+
+        var result = await Settings.SaveAsync(model.ToRequest(), CancellationToken.None);
+        if (!result.IsSuccess)
+        {
+            errorCode = result.ErrorCode;
+            busy = false;
+            return;
+        }
+
+        if (reload)
+        {
+            // A new locale is applied before the first render, so the app starts again with it.
+            Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+            return;
+        }
+
+        saved = Settings.Settings!;
+        busy = false;
+        Snackbar.Add(L["Settings.Saved"], Severity.Success);
+    }
+}

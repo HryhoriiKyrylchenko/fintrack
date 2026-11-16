@@ -2,6 +2,7 @@
 @implements IAsyncDisposable
 @inject IStringLocalizer<SharedResource> L
 @inject ThemePreference Preference
+@inject OwnerSettingsState Settings
 
 <MudThemeProvider @ref="themeProvider" Theme="FinTrackTheme.Theme" IsDarkMode="isDarkMode" />
 <MudPopoverProvider />
@@ -20,12 +21,30 @@
         </MudTooltip>
     </MudAppBar>
 
+    @if (Settings.Status != SettingsStatus.Saved)
+    {
+        @* First run or a failed start (plan 1a D7): no navigation, only this screen. *@
+        <MudMainContent>
+            <MudContainer MaxWidth="MaxWidth.Large" Class="py-6">
+                @if (Settings.Status == SettingsStatus.NotSaved)
+                {
+                    <FirstRun />
+                }
+                else
+                {
+                    <StartupError />
+                }
+            </MudContainer>
+        </MudMainContent>
+    }
+    else
+    {
     @* Desktop: a left drawer. On small screens the responsive drawer closes and the bottom navigation takes over. *@
     <MudDrawer @bind-Open="drawerOpen" Variant="DrawerVariant.Responsive" Breakpoint="Breakpoint.Md" ClipMode="DrawerClipMode.Always" Elevation="0">
         <MudNavMenu aria-label="@L["Nav.Label"]">
             @foreach (var item in NavigationItems.All)
             {
-                <MudNavLink Href="@item.Href" Match="NavLinkMatch.All" Icon="@item.Icon">@L[item.LabelKey]</MudNavLink>
+                <MudNavLink Href="@item.Href" Match="item.Match" Icon="@item.Icon">@L[item.LabelKey]</MudNavLink>
             }
         </MudNavMenu>
     </MudDrawer>
@@ -40,13 +59,14 @@
         <nav class="fintrack-bottom-nav" aria-label="@L["Nav.Label"]">
             @foreach (var item in NavigationItems.All)
             {
-                <NavLink href="@item.Href" Match="NavLinkMatch.All" class="fintrack-bottom-nav__item" ActiveClass="fintrack-bottom-nav__item--active">
+                <NavLink href="@item.Href" Match="item.Match" class="fintrack-bottom-nav__item" ActiveClass="fintrack-bottom-nav__item--active">
                     <MudIcon Icon="@item.Icon" />
                     <MudText Typo="Typo.caption" HtmlTag="span">@L[item.LabelKey]</MudText>
                 </NavLink>
             }
         </nav>
     </MudHidden>
+    }
 </MudLayout>
 
 @code {

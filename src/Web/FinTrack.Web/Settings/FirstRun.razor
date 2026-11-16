@@ -1,0 +1,43 @@
+@* First run (plan 1a D7): until the settings are saved, this is the only screen. Saving reloads the app, so the locale is applied before the first render. *@
+@inject OwnerSettingsState Settings
+@inject BrowserDefaults Browser
+@inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@L["FirstRun.PageTitle"]</PageTitle>
+
+<div class="fintrack-narrow">
+    <MudText Typo="Typo.h5" HtmlTag="h1" GutterBottom="true">@L["FirstRun.Title"]</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">@L["FirstRun.Description"]</MudText>
+
+    <MudCard Elevation="0" Outlined="true">
+        <MudCardContent>
+            <SettingsForm Model="model" SubmitLabel="@L["FirstRun.Save"]" Busy="busy" ErrorCode="@errorCode" OnSubmit="SaveAsync" />
+        </MudCardContent>
+    </MudCard>
+</div>
+
+@code {
+    private SettingsFormModel model = default!;
+    private bool busy;
+    private string? errorCode;
+
+    protected override void OnInitialized() =>
+        model = SettingsFormModel.ForFirstRun(Browser.TimeZone, Browser.Locale, SettingsChoices.TimeZones, SettingsChoices.LocaleNames);
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        errorCode = null;
+
+        var result = await Settings.SaveAsync(model.ToRequest(), CancellationToken.None);
+        if (result.IsSuccess)
+        {
+            Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+            return;
+        }
+
+        errorCode = result.ErrorCode;
+        busy = false;
+    }
+}

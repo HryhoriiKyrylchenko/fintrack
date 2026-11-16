@@ -128,6 +128,8 @@ dotnet test --project <path>    # one test project; MTP mode needs --project, no
                                 # integration tests need MongoDB: FINTRACK_TEST_MONGO, default mongodb://localhost:27017/?replicaSet=rs0
 dotnet run                      # from src/Api/FinTrack.Api: builds and starts the Functions host on :7071 (Core Tools' recommended way for .NET isolated); needs local.settings.json (copy local.settings.example.json) and Azurite
 dotnet run                      # from src/Web/FinTrack.Web; http://localhost:5180 (the Api allows this origin)
+node scripts/dev/screenshot.mjs --url <url> --out <png> [--width 360] [--theme dark] [--wait <text>] [--click "a >> b"]
+                                # headless Edge/Chrome screenshot for UI checks (options at the top of the script)
 ```
 
 Local prerequisites: .NET SDK, Azure Functions Core Tools, MongoDB Community 8.0 or later running as a single-node replica set, Node.js and Azurite. Setup: `docs/LOCAL-SETUP.md`. Docker is optional, never required (`docker-compose.yml`).
@@ -148,6 +150,6 @@ Local prerequisites: .NET SDK, Azure Functions Core Tools, MongoDB Community 8.0
 - API errors: RFC 7807 `ProblemDetails` built from `Result` by `ProblemDetailsMapper`, with a stable error code (`bucket.insufficient_funds`) and parameters. The UI maps codes to text.
 - New functions go into `src/Api/FinTrack.Api/<Context>/`; services are registered in `ApiComposition`, which the Api integration tests also use. A context registers itself with one call from its Infrastructure project (`AddBudget()`), which also registers its Application services (validators, state loader).
 - Read Budget state only through `BudgetStateLoader` (ledger version first, then the documents).
-- UI text: English only for now, but every user-facing string comes from resource files (`IStringLocalizer`); no hard-coded or concatenated strings. Format numbers, dates and money by the user's locale setting.
+- UI text: English only for now, but every user-facing string comes from resource files (`IStringLocalizer`); no hard-coded or concatenated strings. Format numbers, dates and money by the user's locale setting: it is the app's `CurrentCulture` (applied in `Program.cs` before the first render), so format with the current culture. Show instants in the owner's time zone (`OwnerDate.LocalTime`), and take "today" from `OwnerDate.Today`.
 - Logging: structured, through `ILogger`; never log amounts, balances, keys or personal data.
 - Small commits with conventional messages (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`).

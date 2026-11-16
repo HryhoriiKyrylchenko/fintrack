@@ -1,0 +1,100 @@
+@* The settings form (DESIGN 8: one column, label above, message under the field, action bottom right, full width on mobile). *@
+@inject IStringLocalizer<SharedResource> L
+
+<MudForm @ref="form" Spacing="4">
+    <MudSelect T="Currency" Label="@L["Settings.ReportingCurrency"]" HelperText="@L["Settings.ReportingCurrency.Help"]"
+               @bind-Value="Model.ReportingCurrency" ToStringFunc="CurrencyLabel" Variant="Variant.Outlined" Disabled="Busy">
+        @foreach (var currency in SettingsFormModel.ReportingCurrencies)
+        {
+            <MudSelectItem T="Currency" Value="currency">@CurrencyLabel(currency)</MudSelectItem>
+        }
+    </MudSelect>
+
+    <MudAutocomplete T="string" Label="@L["Settings.TimeZone"]" HelperText="@L["Settings.TimeZone.Help"]"
+                     @bind-Value="Model.TimeZone" SearchFunc="SearchTimeZones" MaxItems="null"
+                     Required="true" RequiredError="@L["Settings.TimeZone.Required"]"
+                     ResetValueOnEmptyText="true" Variant="Variant.Outlined" Disabled="Busy" />
+
+    <MudAutocomplete T="string" Label="@L["Settings.Locale"]" HelperText="@L["Settings.Locale.Help"]"
+                     @bind-Value="Model.Locale" SearchFunc="SearchLocales" ToStringFunc="LocaleLabel" MaxItems="null"
+                     Required="true" RequiredError="@L["Settings.Locale.Required"]"
+                     ResetValueOnEmptyText="true" Variant="Variant.Outlined" Disabled="Busy" />
+
+    @if (Model.Preview() is { } preview)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="fintrack-figures">
+            @L["Settings.Preview", preview.Number, preview.Date]
+        </MudText>
+    }
+
+    @if (ErrorCode is not null)
+    {
+        @* Errors stay visible until the next attempt (DESIGN 9). *@
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" role="alert">@SharedResource.ErrorText(L, ErrorCode)</MudAlert>
+    }
+
+    <div class="fintrack-form-actions">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" Disabled="@(Busy || !CanSubmit)" OnClick="SubmitAsync">
+            @SubmitLabel
+        </MudButton>
+    </div>
+</MudForm>
+
+@code {
+    private MudForm? form;
+
+    /// <summary>The values being edited.</summary>
+    [Parameter, EditorRequired]
+    public SettingsFormModel Model { get; set; } = default!;
+
+    /// <summary>The text of the submit button.</summary>
+    [Parameter, EditorRequired]
+    public string SubmitLabel { get; set; } = default!;
+
+    /// <summary>Whether a save is running; the form is then read-only.</summary>
+    [Parameter]
+    public bool Busy { get; set; }
+
+    /// <summary>
+    /// The stored settings, when there are any: submitting is then possible only after a change.
+    /// Decided here, because choosing a value re-renders this form, not the page around it.
+    /// </summary>
+    [Parameter]
+    public OwnerSettingsDto? Saved { get; set; }
+
+    /// <summary>The code of the last failure, shown as text.</summary>
+    [Parameter]
+    public string? ErrorCode { get; set; }
+
+    /// <summary>Called with the model when the form is valid and submitted.</summary>
+    [Parameter, EditorRequired]
+    public EventCallback OnSubmit { get; set; }
+
+    private bool CanSubmit => Model.CanSave(Saved);
+
+    private string CurrencyLabel(Currency? currency) =>
+        currency is null ? string.Empty : L["Currency." + currency.Code];
+
+    private string LocaleLabel(string? name) =>
+        SettingsChoices.FindLocale(name) is { } choice ? L["Settings.LocaleOption", choice.DisplayName, choice.Name] : name ?? string.Empty;
+
+    private static Task<IEnumerable<string>> SearchTimeZones(string text, CancellationToken cancellationToken) =>
+        Task.FromResult(SettingsChoices.FindTimeZones(text));
+
+    private static Task<IEnumerable<string>> SearchLocales(string text, CancellationToken cancellationToken) =>
+        Task.FromResult(SettingsChoices.FindLocales(text));
+
+    private async Task SubmitAsync()
+    {
+        if (form is null)
+        {
+            return;
+        }
+
+        await form.ValidateAsync();
+        if (form.IsValid && Model.IsComplete)
+        {
+            await OnSubmit.InvokeAsync();
+        }
+    }
+}
