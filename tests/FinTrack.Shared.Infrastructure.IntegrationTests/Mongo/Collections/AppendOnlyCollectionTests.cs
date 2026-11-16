@@ -12,7 +12,7 @@ namespace FinTrack.Shared.Infrastructure.IntegrationTests.Mongo.Collections;
 public sealed class AppendOnlyCollectionTests(MongoDatabaseFixture fixture)
 {
     private readonly FakeClock clock = new();
-    private readonly TestOwnerContext owner = new(Owners.A);
+    private readonly TestOwnerContext owner = new(TestOwners.A);
     private readonly string collectionName = $"it_{Guid.NewGuid():N}";
 
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -21,7 +21,7 @@ public sealed class AppendOnlyCollectionTests(MongoDatabaseFixture fixture)
     public async Task Insert_StoresTheDocumentAsItIs()
     {
         var collection = Collection();
-        var entry = TestEntry.New(Owners.A, clock.UtcNow);
+        var entry = TestEntry.New(TestOwners.A, clock.UtcNow);
 
         (await collection.InsertAsync(entry, cancellationToken: Cancellation)).IsSuccess.ShouldBeTrue();
 
@@ -32,7 +32,7 @@ public sealed class AppendOnlyCollectionTests(MongoDatabaseFixture fixture)
     public async Task Insert_OfAnotherOwnersDocument_Throws()
     {
         await Should.ThrowAsync<InvalidOperationException>(() =>
-            Collection().InsertAsync(TestEntry.New(Owners.B, clock.UtcNow), cancellationToken: Cancellation));
+            Collection().InsertAsync(TestEntry.New(TestOwners.B, clock.UtcNow), cancellationToken: Cancellation));
 
         (await Collection().FindAsync(_ => true, cancellationToken: Cancellation)).ShouldBeEmpty();
     }
@@ -41,7 +41,7 @@ public sealed class AppendOnlyCollectionTests(MongoDatabaseFixture fixture)
     public async Task Insert_OfAnExistingId_ConflictsAndKeepsTheFirst()
     {
         var collection = Collection();
-        var entry = TestEntry.New(Owners.A, clock.UtcNow, "first");
+        var entry = TestEntry.New(TestOwners.A, clock.UtcNow, "first");
         await collection.InsertAsync(entry, cancellationToken: Cancellation);
 
         var result = await collection.InsertAsync(entry with { Note = "second" }, cancellationToken: Cancellation);
@@ -54,14 +54,14 @@ public sealed class AppendOnlyCollectionTests(MongoDatabaseFixture fixture)
     public async Task Find_SeesOnlyTheCurrentOwnersDocuments_InTheRequestedOrder()
     {
         var collection = Collection();
-        var first = TestEntry.New(Owners.A, clock.UtcNow, "first");
+        var first = TestEntry.New(TestOwners.A, clock.UtcNow, "first");
         clock.Advance(TimeSpan.FromMilliseconds(1));
-        var second = TestEntry.New(Owners.A, clock.UtcNow, "second");
+        var second = TestEntry.New(TestOwners.A, clock.UtcNow, "second");
         await collection.InsertAsync(second, cancellationToken: Cancellation);
         await collection.InsertAsync(first, cancellationToken: Cancellation);
-        owner.OwnerId = Owners.B;
-        await collection.InsertAsync(TestEntry.New(Owners.B, clock.UtcNow, "of B"), cancellationToken: Cancellation);
-        owner.OwnerId = Owners.A;
+        owner.OwnerId = TestOwners.B;
+        await collection.InsertAsync(TestEntry.New(TestOwners.B, clock.UtcNow, "of B"), cancellationToken: Cancellation);
+        owner.OwnerId = TestOwners.A;
 
         var found = await collection.FindAsync(
             _ => true,

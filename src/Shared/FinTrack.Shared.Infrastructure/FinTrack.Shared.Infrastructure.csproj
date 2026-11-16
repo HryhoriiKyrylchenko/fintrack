@@ -5,7 +5,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />
     <PackageReference Include="MongoDB.Driver" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Lets the integration tests inspect stored outbox messages. -->
+    <InternalsVisibleTo Include="FinTrack.Shared.Infrastructure.IntegrationTests" />
   </ItemGroup>
 </Project>

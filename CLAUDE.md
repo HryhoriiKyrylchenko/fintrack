@@ -136,6 +136,7 @@ Local prerequisites: .NET SDK, Azure Functions Core Tools, MongoDB Community 8.0
 - Function names match the use case; routes are REST-like and versioned (`/api/v1/...`).
 - Entry types, enum values and collection names follow the spec exactly.
 - Store documents only through `AppendOnlyCollection<T>` (journal, outbox, processed events) or `MutableCollection<T>` (aggregates, settings) from `FinTrack.Shared.Infrastructure/Mongo`; never use a raw `IMongoCollection` in a context (the outbox sweep is the one exception). Each context creates its indexes in an `IMongoIndexInitializer` and maps its document types to collections with `AddLedgerDocuments`; commands write only through `ILedger`.
+- Integration event handlers are registered with `AddIntegrationEventHandler<TEvent, THandler>()` and must commit with `LedgerCommit.HandledEvent` set (stable handler name), so a repeated delivery writes nothing.
 - Mongo collections are prefixed by context (`budget_journal`, `budget_buckets`, `inv_journal`). Each context also has `<ctx>_ledger_heads`, `<ctx>_outbox` and `<ctx>_processed_events`.
 - Stored events carry a stable event name declared on the type, never the CLR type name.
 - API errors: RFC 7807 `ProblemDetails` built from `Result`, with a stable error code (`bucket.insufficient_funds`) and parameters. The UI maps codes to text.
