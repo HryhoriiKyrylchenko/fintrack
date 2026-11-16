@@ -5,7 +5,10 @@ using FinTrack.Shared.Kernel.Ledger;
 using FinTrack.Shared.Kernel.Persistence;
 using FinTrack.Shared.Kernel.Time;
 using FinTrack.Tests.Common;
+using FinTrack.Shared.Infrastructure.Outbox;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FinTrack.Shared.Infrastructure.IntegrationTests.Ledger;
 
@@ -72,7 +75,8 @@ public sealed class LedgerDocumentsTests
                 options.DatabaseName = "fintrack";
             })
             .AddSingleton<IClock>(new FakeClock())
-            .AddScoped<IOwnerContext>(_ => new TestOwnerContext(Owners.A))
+            .AddSingleton(typeof(ILogger<>), typeof(NullLogger<>))
+            .AddScoped<IOwnerContext>(_ => new TestOwnerContext(TestOwners.A))
             .AddMongoLedger()
             .AddLedgerDocuments(new LedgerDocuments(TestLedger).AppendOnly<TestJournalEntry>("testledger_journal"))
             .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
@@ -80,7 +84,7 @@ public sealed class LedgerDocumentsTests
         using var first = provider.CreateScope();
         using var second = provider.CreateScope();
 
-        first.ServiceProvider.GetRequiredService<ILedger>().ShouldBeOfType<MongoLedger>()
+        first.ServiceProvider.GetRequiredService<ILedger>().ShouldBeOfType<DispatchingLedger>()
             .ShouldNotBeSameAs(second.ServiceProvider.GetRequiredService<ILedger>());
         provider.GetServices<IMongoIndexInitializer>().ShouldContain(initializer => initializer is LedgerIndexInitializer);
         provider.GetRequiredService<LedgerCollections>().Contains(TestLedger).ShouldBeTrue();

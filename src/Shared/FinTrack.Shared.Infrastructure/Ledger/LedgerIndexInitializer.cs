@@ -5,9 +5,10 @@ using MongoDB.Driver;
 namespace FinTrack.Shared.Infrastructure.Ledger;
 
 /// <summary>
-/// Creates every ledger's collections and the indexes <see cref="MongoLedger"/> relies on, before
-/// any transaction uses them: a unique <c>ownerId</c> on the heads (one head per owner) and a unique
-/// (<c>ownerId</c>, <c>handlerName</c>, <c>eventId</c>) on processed events (each delivery handled once).
+/// Creates every ledger's collections and the indexes the ledger and the outbox rely on, before
+/// any transaction uses them: a unique <c>ownerId</c> on the heads (one head per owner), a unique
+/// (<c>ownerId</c>, <c>handlerName</c>, <c>eventId</c>) on processed events (each delivery handled once)
+/// and (<c>dispatchedAt</c>, <c>_id</c>) on the outbox (the sweep's query for pending messages).
 /// </summary>
 /// <remarks>Element names are the stored ones (camelCase, ARCHITECTURE 2.2); tests check them.</remarks>
 public sealed class LedgerIndexInitializer(LedgerCollections collections) : IMongoIndexInitializer
@@ -51,6 +52,12 @@ public sealed class LedgerIndexInitializer(LedgerCollections collections) : IMon
                 new BsonDocument { { "ownerId", 1 }, { "handlerName", 1 }, { "eventId", 1 } },
                 "ownerId_handlerName_eventId_unique",
                 cancellationToken).ConfigureAwait(false);
+
+            await database.GetCollection<BsonDocument>(LedgerCollections.OutboxCollection(ledger)).Indexes.CreateOneAsync(
+                new CreateIndexModel<BsonDocument>(
+                    new BsonDocument { { "dispatchedAt", 1 }, { "_id", 1 } },
+                    new CreateIndexOptions { Name = "pending" }),
+                cancellationToken: cancellationToken).ConfigureAwait(false);
         }
     }
 

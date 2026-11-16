@@ -23,6 +23,7 @@
     <PackageVersion Include="MongoDB.Driver" Version="3.14.0" />
     <!-- MIT (checked 16 Nov 2026) -->
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.15" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.15" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.15" />
   </ItemGroup>
 

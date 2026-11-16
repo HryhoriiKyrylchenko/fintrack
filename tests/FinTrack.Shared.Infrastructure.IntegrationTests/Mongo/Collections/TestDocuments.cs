@@ -47,7 +47,7 @@ internal sealed class TestOwnerContext(OwnerId owner) : IOwnerContext
     public OwnerId OwnerId { get; set; } = owner;
 }
 
-internal static class Owners
+internal static class TestOwners
 {
     public static readonly OwnerId A = OwnerId.From(Guid.Parse("aaaaaaaa-0000-4000-8000-000000000001"));
     public static readonly OwnerId B = OwnerId.From(Guid.Parse("bbbbbbbb-0000-4000-8000-000000000002"));
