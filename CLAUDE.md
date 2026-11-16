@@ -71,7 +71,7 @@ infra/                                    Bicep (cloud phase)
 8. **Cross-context communication** goes through the transactional outbox with idempotent handlers. No queue until the app is split.
 9. **Every document has** `Id` (UUIDv7, client-generated), `OwnerId`, `SchemaVersion`. Mutable documents also have `Version`, `CreatedAt`, `UpdatedAt`; append-only documents (journal, outbox, processed events) have `RecordedAt` instead. **Every query and write is filtered by `OwnerId`.** The only exception is the outbox sweep timer, which reads pending messages of all owners and handles each under its own `OwnerId`.
 10. **Money**: always the `Money` type (`decimal` + currency). Never `double` or `float`. Never add different currencies without an explicit conversion.
-11. **Time**: use `IClock`. No `DateTime.Now` / `UtcNow` in Domain or Application. Entries carry `OccurredOn` and `RecordedAt`.
+11. **Time**: use `IClock` (UTC, whole milliseconds, because instants are stored as BSON dates). No `DateTime.Now` / `UtcNow` in Domain or Application. Entries carry `OccurredOn` and `RecordedAt`.
 12. **Business rule failures return `Result.Fail`**, not exceptions. Exceptions are for bugs and infrastructure faults.
 13. **Imports and any automated source create drafts**; only a user confirmation writes to the journal.
 14. **The repository is public.** Never commit financial data, database dumps, secrets, API keys or connection strings. Use user secrets and environment variables. Keep `local.settings.json` out of git; maintain `local.settings.example.json`. Tests, fixtures, seed data, screenshots and docs use invented numbers only.
@@ -122,6 +122,7 @@ pwsh scripts/check-prereqs.ps1  # local prerequisites and MongoDB replica-set st
 dotnet build
 dotnet test                     # Microsoft.Testing.Platform runner (set in global.json)
 dotnet test --project <path>    # one test project; MTP mode needs --project, not a bare path
+                                # integration tests need MongoDB: FINTRACK_TEST_MONGO, default mongodb://localhost:27017/?replicaSet=rs0
 func start                      # from src/Api/FinTrack.Api
 dotnet run                      # from src/Web/FinTrack.Web
 ```

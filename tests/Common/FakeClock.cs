@@ -3,7 +3,8 @@ using FinTrack.Shared.Kernel.Time;
 namespace FinTrack.Tests.Common;
 
 /// <summary>
-/// A clock that tests control. Time moves only when a test moves it.
+/// A clock that tests control. Time moves only when a test moves it. Like every
+/// <see cref="IClock"/>, it is always UTC and whole milliseconds.
 /// </summary>
 internal sealed class FakeClock : IClock
 {
@@ -27,6 +28,7 @@ internal sealed class FakeClock : IClock
     public void Advance(TimeSpan by)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(by, TimeSpan.Zero);
+        EnsureWholeMilliseconds(by.Ticks, nameof(by));
         UtcNow += by;
     }
 
@@ -42,6 +44,16 @@ internal sealed class FakeClock : IClock
         if (value.Offset != TimeSpan.Zero)
         {
             throw new ArgumentException("The fake clock works in UTC only.", nameof(value));
+        }
+
+        EnsureWholeMilliseconds(value.Ticks, nameof(value));
+    }
+
+    private static void EnsureWholeMilliseconds(long ticks, string parameterName)
+    {
+        if (ticks % TimeSpan.TicksPerMillisecond != 0)
+        {
+            throw new ArgumentException("The fake clock works in whole milliseconds only.", parameterName);
         }
     }
 }
