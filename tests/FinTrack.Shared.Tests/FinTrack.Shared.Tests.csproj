@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../../src/Shared/FinTrack.Shared.Kernel/FinTrack.Shared.Kernel.csproj" />
+    <!-- The mediator pipeline behaviours are unit-tested here, without MongoDB. -->
+    <ProjectReference Include="../../src/Shared/FinTrack.Shared.Infrastructure/FinTrack.Shared.Infrastructure.csproj" />
   </ItemGroup>
 </Project>
