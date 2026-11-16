@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The Function App: one app with many small functions (ARCHITECTURE 2.1). Isolated worker model
+    with the ASP.NET Core integration for HTTP types; the Functions host still starts and stops the
+    process, so this is not a long-running ASP.NET host.
+  -->
+  <PropertyGroup>
+    <AzureFunctionsVersion>v4</AzureFunctionsVersion>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mediator.Abstractions" />
+    <PackageReference Include="Mediator.SourceGenerator">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Azure.Functions.Worker" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Timer" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Budget/FinTrack.Budget.Application/FinTrack.Budget.Application.csproj" />
+    <ProjectReference Include="../../Budget/FinTrack.Budget.Contracts/FinTrack.Budget.Contracts.csproj" />
+    <ProjectReference Include="../../Budget/FinTrack.Budget.Infrastructure/FinTrack.Budget.Infrastructure.csproj" />
+    <ProjectReference Include="../../Shared/FinTrack.Shared.Infrastructure/FinTrack.Shared.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="host.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Local only and never committed (.gitignore); local.settings.example.json is the template. -->
+    <None Update="local.settings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FinTrack.Api.IntegrationTests" />
+  </ItemGroup>
+</Project>

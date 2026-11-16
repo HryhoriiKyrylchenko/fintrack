@@ -70,7 +70,7 @@ Priority tags: **[P1]** build first, **[P2]** next, **[Later]** deferred but the
 
 ### 2.7 Engineering conventions
 
-- **API errors**: every failure is returned as RFC 7807 `ProblemDetails` built from the `Result`. Each business error has a **stable error code** (for example `bucket.insufficient_funds`) plus parameters. The back end never returns user-facing sentences as the contract; the UI turns codes into text.
+- **API errors**: every failure is returned as RFC 7807 `ProblemDetails` built from the `Result`. Each business error has a **stable error code** (for example `bucket.insufficient_funds`) plus parameters. The back end never returns user-facing sentences as the contract; the UI turns codes into text. Status by error kind: Validation 400, NotFound 404, Conflict 409, BusinessRule 422, Unavailable 503; an unexpected failure is 500 with code `server.error` and no details. Body: `type` (`urn:fintrack:error:<code>`), `title` (the code), `status`, `code` and `params` of the first error, and `errors` (every error as `{ code, params }`).
 - **Language**: the UI is English only for now. All user-facing strings live in resource files (`IStringLocalizer`) from the first screen, with no text concatenation and no hard-coded strings in components. Numbers, dates and currency formatting follow the user's locale setting. Translations are added later without touching code.
 - **Logging**: structured logging through `ILogger`. Never log amounts, balances, account identifiers, API keys or personal data; log IDs and error codes.
 - **CI**: build and all tests run on every push (GitHub Actions). A failing test blocks merging.
@@ -334,6 +334,8 @@ Real estate; bank import; trading or withdrawals through APIs; family groups or 
 | A failed delivery stays pending with `Attempts` and `LastErrorCode`; no retry limit yet | Handlers are idempotent, so retrying is safe; each failure is logged with its code. A dead-letter policy (a retry limit and a way to inspect stuck messages) is added when real handlers exist. |
 | Validation failures: one `validation.failed` error per field, with `field` and `rule` only | The UI can mark each field and pick a text by rule; the value that was sent is never echoed back, because it may be an amount and error parameters may be logged. |
 | A ledger command is retried at most 3 times in total on `concurrency.conflict`, without delay | Conflicts are rare for one user; three runs on fresh state are enough, and a bounded loop never hides a real problem. Other failures and exceptions are never retried. |
+| `ErrorKind.Unavailable` (HTTP 503) for an unreachable dependency | A database or rate service that does not answer is neither a bug nor a business rule; the client may retry later. The health check reports an unreachable MongoDB this way instead of failing with 500. |
+| Worker middleware: exceptions to `server.error`, the owner per HTTP request, indexes once per process | Cross-cutting work stays out of functions, which remain parse, send, map. Indexes are created before the first function that needs them; the health check is exempt so it can report a database that is down. |
 | One branch and one pull request per plan step | `main` is protected and requires a green CI run, so every change is built and tested before it lands. |
 
 ## 11. Setup choices and open questions

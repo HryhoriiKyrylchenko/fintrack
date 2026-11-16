@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/Api/FinTrack.Api/FinTrack.Api.csproj" />
+  </ItemGroup>
+</Project>

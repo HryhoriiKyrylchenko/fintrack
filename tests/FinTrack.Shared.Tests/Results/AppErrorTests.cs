@@ -10,6 +10,7 @@ public class AppErrorTests
     [InlineData(ErrorKind.NotFound)]
     [InlineData(ErrorKind.Conflict)]
     [InlineData(ErrorKind.BusinessRule)]
+    [InlineData(ErrorKind.Unavailable)]
     public void Factory_SetsKindAndCode(ErrorKind kind)
     {
         var error = kind switch
@@ -18,6 +19,7 @@ public class AppErrorTests
             ErrorKind.NotFound => AppError.NotFound("bucket.insufficient_funds"),
             ErrorKind.Conflict => AppError.Conflict("bucket.insufficient_funds"),
             ErrorKind.BusinessRule => AppError.BusinessRule("bucket.insufficient_funds"),
+            ErrorKind.Unavailable => AppError.Unavailable("bucket.insufficient_funds"),
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
 

@@ -123,7 +123,7 @@ dotnet build
 dotnet test                     # Microsoft.Testing.Platform runner (set in global.json)
 dotnet test --project <path>    # one test project; MTP mode needs --project, not a bare path
                                 # integration tests need MongoDB: FINTRACK_TEST_MONGO, default mongodb://localhost:27017/?replicaSet=rs0
-func start                      # from src/Api/FinTrack.Api
+func start                      # from src/Api/FinTrack.Api; needs local.settings.json (copy local.settings.example.json) and Azurite running
 dotnet run                      # from src/Web/FinTrack.Web
 ```
 
@@ -140,7 +140,8 @@ Local prerequisites: .NET SDK, Azure Functions Core Tools, MongoDB Community 8.0
 - Integration event handlers are registered with `AddIntegrationEventHandler<TEvent, THandler>()` and must commit with `LedgerCommit.HandledEvent` set (stable handler name), so a repeated delivery writes nothing.
 - Mongo collections are prefixed by context (`budget_journal`, `budget_buckets`, `inv_journal`). Each context also has `<ctx>_ledger_heads`, `<ctx>_outbox` and `<ctx>_processed_events`.
 - Stored events carry a stable event name declared on the type, never the CLR type name.
-- API errors: RFC 7807 `ProblemDetails` built from `Result`, with a stable error code (`bucket.insufficient_funds`) and parameters. The UI maps codes to text.
+- API errors: RFC 7807 `ProblemDetails` built from `Result` by `ProblemDetailsMapper`, with a stable error code (`bucket.insufficient_funds`) and parameters. The UI maps codes to text.
+- New functions go into `src/Api/FinTrack.Api/<Context>/`; services are registered in `ApiComposition`, which the Api integration tests also use.
 - UI text: English only for now, but every user-facing string comes from resource files (`IStringLocalizer`); no hard-coded or concatenated strings. Format numbers, dates and money by the user's locale setting.
 - Logging: structured, through `ILogger`; never log amounts, balances, keys or personal data.
 - Small commits with conventional messages (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`).
