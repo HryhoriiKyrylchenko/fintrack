@@ -1,10 +1,12 @@
-@page "/"
+@page "/settings/status"
 @implements IDisposable
 @inject ApiClient Api
+@inject OwnerSettingsState Settings
 @inject IStringLocalizer<SharedResource> L
 
 <PageTitle>@L["Status.PageTitle"]</PageTitle>
 
+<MudButton Variant="Variant.Text" Color="Color.Primary" Href="settings" StartIcon="@Icons.Material.Outlined.ArrowBack" Class="mb-2">@L["Status.Back"]</MudButton>
 <MudText Typo="Typo.h5" HtmlTag="h1" GutterBottom="true">@L["Status.Title"]</MudText>
 <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">@L["Status.Description"]</MudText>
 
@@ -26,7 +28,7 @@ else if (health is { } report)
                 <MudText Typo="Typo.h6" HtmlTag="p">@L["Status.Healthy"]</MudText>
             </MudStack>
             <MudText Typo="Typo.caption" Color="Color.Secondary" HtmlTag="p" Class="mt-2">
-                @L["Status.CheckedAt", report.CheckedAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)]
+                @L["Status.CheckedAt", OwnerDate.LocalTime(report.CheckedAt, Settings.Settings!.TimeZone).ToString("g", CultureInfo.CurrentCulture)]
             </MudText>
         </MudCardContent>
         <MudCardActions>

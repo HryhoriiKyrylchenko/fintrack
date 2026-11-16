@@ -1,0 +1,18 @@
+@* The settings could not be loaded, so the app cannot start (DESIGN 9: say why and what to do next). Retrying reloads the app. *@
+@inject OwnerSettingsState Settings
+@inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
+
+<PageTitle>@L["Startup.PageTitle"]</PageTitle>
+
+<div class="fintrack-narrow">
+    <MudText Typo="Typo.h5" HtmlTag="h1" GutterBottom="true">@L["Startup.Title"]</MudText>
+    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4" role="alert">
+        @SharedResource.ErrorText(L, Settings.ErrorCode ?? string.Empty)
+    </MudAlert>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" OnClick="Retry">@L["Startup.Retry"]</MudButton>
+</div>
+
+@code {
+    private void Retry() => Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+}

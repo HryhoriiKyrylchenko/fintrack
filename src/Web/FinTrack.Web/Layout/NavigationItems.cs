@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components.Routing;
 using MudBlazor;
 
 namespace FinTrack.Web.Layout;
@@ -12,7 +13,7 @@ public static class NavigationItems
     /// <summary>All items, in order.</summary>
     public static IReadOnlyList<NavigationItem> All { get; } =
     [
-        new(string.Empty, "Nav.Status", Icons.Material.Outlined.MonitorHeart),
+        new("settings", "Nav.Settings", Icons.Material.Outlined.Settings, NavLinkMatch.Prefix),
     ];
 }
 
@@ -20,4 +21,5 @@ public static class NavigationItems
 /// <param name="Href">The page address, relative to the base address (empty for the start page).</param>
 /// <param name="LabelKey">The resource key of the label.</param>
 /// <param name="Icon">The Material icon.</param>
-public sealed record NavigationItem(string Href, string LabelKey, string Icon);
+/// <param name="Match">Whether the item is active only on its own page or also on the pages under it (Settings and its status page).</param>
+public sealed record NavigationItem(string Href, string LabelKey, string Icon, NavLinkMatch Match);

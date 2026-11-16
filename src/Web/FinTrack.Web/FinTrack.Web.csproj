@@ -6,6 +6,14 @@
   <PropertyGroup>
     <!-- Fills the fingerprinted asset names into wwwroot/index.html (the .NET 10 default). -->
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+
+    <!--
+      All ICU culture data (icudt.dat, about 330 KB compressed) instead of the shard the browser's
+      language selects (144 to 249 KB). The owner's locale is a setting, not the browser's language:
+      with shards, pl-PL in an English browser has no culture data and would format as English
+      (measured in plan 1a step 4).
+    -->
+    <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,7 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The JSON contract (FinTrackJson) and kernel types. Budget.Contracts follows with the first screen that uses it. -->
+    <!-- The JSON contract (FinTrackJson), kernel types and Budget's read contracts (DTOs, request bodies). -->
+    <ProjectReference Include="../../Budget/FinTrack.Budget.Contracts/FinTrack.Budget.Contracts.csproj" />
     <ProjectReference Include="../../Shared/FinTrack.Shared.Kernel/FinTrack.Shared.Kernel.csproj" />
   </ItemGroup>
 </Project>

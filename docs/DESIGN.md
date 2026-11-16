@@ -65,6 +65,7 @@ Beyond eight series, group the rest as "Other". The system items `Unallocated` a
 - Gain and loss: explicit sign and an arrow icon plus colour (`+2.4% ▲` in success, `−1.1% ▼` in error). Use the real minus sign.
 - Amounts in tables are right-aligned; labels are left-aligned.
 - A converted total shows its reporting currency and the rate date in a caption or tooltip.
+- Numbers, dates and times are formatted by the owner's locale setting, and times are shown in the owner's time zone, both from Settings (not the browser's).
 - A stale or manually overridden price is marked with a warning icon and a tooltip.
 
 ## 7. Language
@@ -76,7 +77,8 @@ Beyond eight series, group the rest as "Other". The system items `Unallocated` a
 ## 8. Layout
 
 - Spacing on an 8 px grid (4 px for dense table cells).
-- Navigation: left drawer on desktop, bottom navigation on mobile. Top-level items: Overview, Buckets, Plans, Loans, Investments, Journal, Settings; an item appears once its page exists. Overview is the start page. The system status page (does the app reach its server and database) sits under Settings.
+- Navigation: left drawer on desktop, bottom navigation on mobile. Top-level items: Overview, Buckets, Plans, Loans, Investments, Journal, Settings; an item appears once its page exists. Overview is the start page; until it exists, the start page opens Settings. The system status page (does the app reach its server and database) sits under Settings (`/settings/status`), and Settings stays highlighted there.
+- First run: until the settings are saved, the app shows only the setup screen, without navigation; when the server cannot be reached at start, it shows why and a retry.
 - Overview shows: totals in the reporting currency, a card per bucket (available, progress to limit, due by plan, open loans), and the items that need attention.
 - Cards for summaries, tables for journals and lists. On mobile a wide table turns into a list of cards instead of scrolling sideways.
 - Corner radius 8 px on controls, 12 px on cards. Flat surfaces: elevation only for dialogs and menus.
