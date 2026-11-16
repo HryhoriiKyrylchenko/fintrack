@@ -1,0 +1,100 @@
+@inherits LayoutComponentBase
+@implements IAsyncDisposable
+@inject IStringLocalizer<SharedResource> L
+@inject ThemePreference Preference
+
+<MudThemeProvider @ref="themeProvider" Theme="FinTrackTheme.Theme" IsDarkMode="isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="0" Class="fintrack-appbar">
+        <MudText Typo="Typo.h6" HtmlTag="span">@L["App.Title"]</MudText>
+        <MudSpacer />
+        <MudTooltip Text="@ThemeSwitchLabel">
+            <MudIconButton Icon="@(isDarkMode ? Icons.Material.Outlined.LightMode : Icons.Material.Outlined.DarkMode)"
+                           Color="Color.Inherit"
+                           aria-label="@ThemeSwitchLabel"
+                           OnClick="ToggleThemeAsync" />
+        </MudTooltip>
+    </MudAppBar>
+
+    @* Desktop: a left drawer. On small screens the responsive drawer closes and the bottom navigation takes over. *@
+    <MudDrawer @bind-Open="drawerOpen" Variant="DrawerVariant.Responsive" Breakpoint="Breakpoint.Md" ClipMode="DrawerClipMode.Always" Elevation="0">
+        <MudNavMenu aria-label="@L["Nav.Label"]">
+            @foreach (var item in NavigationItems.All)
+            {
+                <MudNavLink Href="@item.Href" Match="NavLinkMatch.All" Icon="@item.Icon">@L[item.LabelKey]</MudNavLink>
+            }
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent Class="fintrack-main">
+        <MudContainer MaxWidth="MaxWidth.Large" Class="py-6">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+
+    <MudHidden Breakpoint="Breakpoint.MdAndUp">
+        <nav class="fintrack-bottom-nav" aria-label="@L["Nav.Label"]">
+            @foreach (var item in NavigationItems.All)
+            {
+                <NavLink href="@item.Href" Match="NavLinkMatch.All" class="fintrack-bottom-nav__item" ActiveClass="fintrack-bottom-nav__item--active">
+                    <MudIcon Icon="@item.Icon" />
+                    <MudText Typo="Typo.caption" HtmlTag="span">@L[item.LabelKey]</MudText>
+                </NavLink>
+            }
+        </nav>
+    </MudHidden>
+</MudLayout>
+
+@code {
+    private MudThemeProvider? themeProvider;
+    private bool isDarkMode;
+    private bool drawerOpen = true;
+    private bool followsSystem = true;
+
+    private string ThemeSwitchLabel => isDarkMode ? L["Theme.SwitchToLight"] : L["Theme.SwitchToDark"];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || themeProvider is null)
+        {
+            return;
+        }
+
+        // Default: the system setting (DESIGN 1.3); a stored choice wins.
+        var stored = await Preference.GetAsync();
+        followsSystem = stored is null;
+        isDarkMode = stored ?? await themeProvider.GetSystemDarkModeAsync();
+        await themeProvider.WatchSystemDarkModeAsync(OnSystemDarkModeChangedAsync);
+        StateHasChanged();
+    }
+
+    private Task OnSystemDarkModeChangedAsync(bool systemIsDark)
+    {
+        if (followsSystem)
+        {
+            isDarkMode = systemIsDark;
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task ToggleThemeAsync()
+    {
+        isDarkMode = !isDarkMode;
+        followsSystem = false;
+        await Preference.SetAsync(isDarkMode);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (themeProvider is not null)
+        {
+            await themeProvider.DisposeAsync();
+        }
+    }
+}

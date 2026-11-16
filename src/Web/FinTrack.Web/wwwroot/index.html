@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FinTrack</title>
+    <base href="/" />
+    <link rel="preload" id="webassembly" />
+    <link rel="preload" href="fonts/Inter-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="fonts/Inter-SemiBold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <script type="importmap"></script>
+</head>
+
+<body>
+    <!-- Shown until .NET has started; it has no text, because resource files are not loaded yet. -->
+    <div id="app">
+        <div class="fintrack-boot" role="progressbar" aria-busy="true"></div>
+    </div>
+
+    <!--
+        Blazor's last-resort error bar for unhandled exceptions. It is the one place with fixed English
+        text: it must work when .NET itself has failed, so it cannot use the resource files.
+    -->
+    <div id="blazor-error-ui">
+        An unexpected error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss" aria-label="Dismiss">×</span>
+    </div>
+
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
+</body>
+
+</html>

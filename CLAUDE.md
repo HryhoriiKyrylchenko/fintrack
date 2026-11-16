@@ -48,6 +48,7 @@ tests/
   FinTrack.Budget.Domain.Tests
   FinTrack.Budget.Application.Tests
   FinTrack.Api.IntegrationTests
+  FinTrack.Web.Tests                      plain unit tests of the Web app's non-UI code (Api client, error texts); no UI test library
 scripts/                                  PowerShell 7 scripts (prerequisite check, local run)
 docs/ARCHITECTURE.md                      specification (source of truth)
 docs/DESIGN.md                            UI rules, colours, typography
@@ -124,7 +125,7 @@ dotnet test                     # Microsoft.Testing.Platform runner (set in glob
 dotnet test --project <path>    # one test project; MTP mode needs --project, not a bare path
                                 # integration tests need MongoDB: FINTRACK_TEST_MONGO, default mongodb://localhost:27017/?replicaSet=rs0
 func start                      # from src/Api/FinTrack.Api; needs local.settings.json (copy local.settings.example.json) and Azurite running
-dotnet run                      # from src/Web/FinTrack.Web
+dotnet run                      # from src/Web/FinTrack.Web; http://localhost:5180 (the Api allows this origin)
 ```
 
 Local prerequisites: .NET SDK, Azure Functions Core Tools, MongoDB Community 8.0 or later running as a single-node replica set, Node.js and Azurite. Setup: `docs/LOCAL-SETUP.md`. Docker is optional, never required (`docker-compose.yml`).

@@ -84,7 +84,11 @@ Skip this when the check script already reports the replica set as `OK`.
 3. From `src/Api/FinTrack.Api`, run `func start`.
 4. Open `http://localhost:7071/api/v1/health`: `{"status":"healthy",...}`. With MongoDB stopped it answers 503 with `application/problem+json` and code `health.database_unavailable`.
 
-`scripts/run-local.ps1` will do all of this with one command (Stage 0, step 17).
+## Run the Web app
+
+With the Api running, from `src/Web/FinTrack.Web` run `dotnet run`, then open `http://localhost:5180`. The status page shows whether the Api and MongoDB answer. The Api address is in `wwwroot/appsettings.json`; the Api allows the origins `http://localhost:5180` and `https://localhost:7180` (CORS in `local.settings.json`).
+
+`scripts/run-local.ps1` will start Azurite, the Api and the Web app with one command (Stage 0, step 17).
 
 ## Docker instead (optional)
 

@@ -1,0 +1,109 @@
+/*
+ * Exceptions to "use MudBlazor components" (DESIGN 2): the self-hosted font, card radius, the
+ * mobile bottom navigation and the boot indicator. Colours come only from the theme's CSS
+ * variables; no colour values are written here.
+ */
+
+/* Inter, self-hosted under the SIL Open Font License 1.1 (fonts/OFL.txt). Weights 400 and 600 only. */
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("../fonts/Inter-Regular.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("../fonts/Inter-SemiBold.woff2") format("woff2");
+}
+
+/*
+ * After navigation Blazor focuses the page's h1 so screen readers announce the new page; that
+ * programmatic focus needs no visible ring (interactive elements keep theirs).
+ */
+h1:focus {
+    outline: none;
+}
+
+/* DESIGN 8: 12 px on cards (controls use the theme's 8 px). */
+.mud-card {
+    border-radius: 12px;
+}
+
+/* The flat app bar is separated from the page by a divider line, not a shadow. */
+.fintrack-appbar {
+    border-bottom: 1px solid var(--mud-palette-divider);
+}
+
+/* Room for the bottom navigation on small screens. */
+@media (max-width: 959.98px) {
+    .fintrack-main {
+        padding-bottom: 72px;
+    }
+}
+
+/* DESIGN 8: bottom navigation on mobile; touch targets of at least 44 px (DESIGN 10). */
+.fintrack-bottom-nav {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: var(--mud-zindex-appbar);
+    display: flex;
+    justify-content: space-around;
+    min-height: 56px;
+    background-color: var(--mud-palette-surface);
+    border-top: 1px solid var(--mud-palette-divider);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.fintrack-bottom-nav__item {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 56px;
+    min-width: 64px;
+    gap: 2px;
+    color: var(--mud-palette-text-secondary);
+    text-decoration: none;
+}
+
+.fintrack-bottom-nav__item--active {
+    color: var(--mud-palette-primary);
+}
+
+.fintrack-bottom-nav__item:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: -4px;
+}
+
+/* Before .NET starts: a thin bar that fills with the download progress, in the text colour. */
+.fintrack-boot {
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 3px;
+    width: var(--blazor-load-percentage, 0%);
+    background-color: currentColor;
+    opacity: 0.4;
+    transition: width 0.2s ease-out;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 2000;
+    padding: 12px 16px;
+    background-color: var(--mud-palette-surface);
+    color: var(--mud-palette-text-primary);
+    border-top: 1px solid var(--mud-palette-error);
+}
+
+#blazor-error-ui .dismiss {
+    float: right;
+    cursor: pointer;
+}

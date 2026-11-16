@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+  <!--
+    The front end: Blazor WebAssembly, hosted as static files (ARCHITECTURE 2.1). It talks to the
+    Api over HTTP only; UI rules are in docs/DESIGN.md.
+  -->
+  <PropertyGroup>
+    <!-- Fills the fingerprinted asset names into wwwroot/index.html (the .NET 10 default). -->
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Localization" />
+    <PackageReference Include="MudBlazor" />
+  </ItemGroup>
+</Project>

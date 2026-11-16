@@ -336,6 +336,8 @@ Real estate; bank import; trading or withdrawals through APIs; family groups or 
 | A ledger command is retried at most 3 times in total on `concurrency.conflict`, without delay | Conflicts are rare for one user; three runs on fresh state are enough, and a bounded loop never hides a real problem. Other failures and exceptions are never retried. |
 | `ErrorKind.Unavailable` (HTTP 503) for an unreachable dependency | A database or rate service that does not answer is neither a bug nor a business rule; the client may retry later. The health check reports an unreachable MongoDB this way instead of failing with 500. |
 | Worker middleware: exceptions to `server.error`, the owner per HTTP request, indexes once per process | Cross-cutting work stays out of functions, which remain parse, send, map. Indexes are created before the first function that needs them; the health check is exempt so it can report a database that is down. |
+| The light or dark choice is stored in the browser (`localStorage`) | It is a display preference of one device, not user data; without a stored choice the theme follows the system. A synced user setting can replace it when settings exist. |
+| The Web project references Contracts and the kernel only when it first uses them | Phase 0 has no shared DTOs yet; the health answer is a small client-side record. Unused references would only add download size to the WebAssembly app. |
 | One branch and one pull request per plan step | `main` is protected and requires a green CI run, so every change is built and tested before it lands. |
 
 ## 11. Setup choices and open questions
