@@ -21,6 +21,9 @@
   <ItemGroup Label="Infrastructure">
     <!-- Apache-2.0 -->
     <PackageVersion Include="MongoDB.Driver" Version="3.14.0" />
+    <!-- MIT (checked 16 Nov 2026) -->
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.15" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.15" />
   </ItemGroup>
 
   <ItemGroup Label="Azure Functions (all MIT)">
@@ -45,5 +48,7 @@
     <PackageVersion Include="Shouldly" Version="4.3.0" />
     <!-- Apache-2.0 -->
     <PackageVersion Include="CsCheck" Version="5.0.1" />
+    <!-- MIT; builds service providers in integration tests -->
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.15" />
   </ItemGroup>
 </Project>

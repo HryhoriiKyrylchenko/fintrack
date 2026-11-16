@@ -6,15 +6,21 @@ namespace FinTrack.Shared.Tests.Time;
 public class ClockTests
 {
     [Fact]
-    public void SystemClock_ReturnsCurrentUtcTime()
+    public void SystemClock_ReturnsCurrentUtcTimeInWholeMilliseconds()
     {
-        var before = DateTimeOffset.UtcNow;
+        var clock = new SystemClock();
 
-        var now = new SystemClock().UtcNow;
+        // Repeated, because a single reading can land on a whole millisecond by chance.
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            var before = DateTimeOffset.UtcNow;
+            var now = clock.UtcNow;
+            var after = DateTimeOffset.UtcNow;
 
-        var after = DateTimeOffset.UtcNow;
-        now.Offset.ShouldBe(TimeSpan.Zero);
-        now.ShouldBeInRange(before, after);
+            now.Offset.ShouldBe(TimeSpan.Zero);
+            (now.Ticks % TimeSpan.TicksPerMillisecond).ShouldBe(0);
+            now.ShouldBeInRange(before.AddTicks(-(before.Ticks % TimeSpan.TicksPerMillisecond)), after);
+        }
     }
 
     [Fact]
@@ -38,4 +44,16 @@ public class ClockTests
     [Fact]
     public void FakeClock_NonUtcStart_Throws() =>
         Should.Throw<ArgumentException>(() => new FakeClock(new DateTimeOffset(2026, 1, 15, 9, 30, 0, TimeSpan.FromHours(1))));
+
+    [Fact]
+    public void FakeClock_StartWithSubMillisecondTicks_Throws() =>
+        Should.Throw<ArgumentException>(() => new FakeClock(FakeClock.DefaultStart.AddTicks(1)));
+
+    [Fact]
+    public void FakeClock_AdvanceBySubMillisecond_Throws() =>
+        Should.Throw<ArgumentException>(() => new FakeClock().Advance(TimeSpan.FromTicks(TimeSpan.TicksPerMillisecond + 1)));
+
+    [Fact]
+    public void FakeClock_SetWithSubMillisecondTicks_Throws() =>
+        Should.Throw<ArgumentException>(() => new FakeClock().Set(FakeClock.DefaultStart.AddTicks(5)));
 }

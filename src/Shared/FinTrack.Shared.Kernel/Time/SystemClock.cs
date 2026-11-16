@@ -4,5 +4,12 @@ namespace FinTrack.Shared.Kernel.Time;
 public sealed class SystemClock : IClock
 {
     /// <inheritdoc />
-    public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+    public DateTimeOffset UtcNow
+    {
+        get
+        {
+            var now = DateTimeOffset.UtcNow;
+            return now.AddTicks(-(now.Ticks % TimeSpan.TicksPerMillisecond));
+        }
+    }
 }
