@@ -71,7 +71,13 @@ public class ArchitectureRulesTests
     [InlineData("Api", "MongoDB.Driver", false)]
     [InlineData("Web", "MudBlazor", true)]
     [InlineData("Web", "MongoDB.Driver", false)]
-    [InlineData("Contracts", "FluentResults", false)]
+    [InlineData("Contracts", "FluentResults", true)]
+    [InlineData("Contracts", "Mediator.Abstractions", true)]
+    [InlineData("Contracts", "Mediator.SourceGenerator", false)]
+    [InlineData("Contracts", "FluentValidation", false)]
+    [InlineData("Contracts", "MongoDB.Driver", false)]
+    [InlineData("Contracts", "Microsoft.Extensions.Logging.Abstractions", false)]
+    [InlineData("Contracts", "MediatR", false)]
     public void IsPackageAllowed_FollowsAllowList(string role, string package, bool expected) =>
         ArchitectureRules.IsPackageAllowed(Enum.Parse<ProjectRole>(role), package).ShouldBe(expected);
 

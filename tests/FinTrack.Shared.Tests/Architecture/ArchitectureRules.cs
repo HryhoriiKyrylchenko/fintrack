@@ -23,7 +23,8 @@ internal static class ArchitectureRules
         [ProjectRole.SharedKernel] = ["FluentResults"],
         [ProjectRole.SharedInfrastructure] = ["FluentResults", "FluentValidation", "Mediator.Abstractions", "MongoDB.Driver", "Microsoft.Extensions.*"],
         [ProjectRole.Domain] = ["FluentResults"],
-        [ProjectRole.Contracts] = [],
+        // Read queries are mediator messages returning Result<T> (ARCHITECTURE 2.6, plan 1a D9).
+        [ProjectRole.Contracts] = ["FluentResults", "Mediator.Abstractions"],
         [ProjectRole.Application] = ["FluentResults", "FluentValidation", "Mediator.Abstractions", "Microsoft.Extensions.Logging.Abstractions"],
         [ProjectRole.Infrastructure] = ["MongoDB.Driver", "Microsoft.Extensions.*"],
         [ProjectRole.Api] = ["FluentValidation", "Mediator.Abstractions", "Mediator.SourceGenerator", "Microsoft.Azure.Functions.Worker*", "Microsoft.Extensions.*"],
