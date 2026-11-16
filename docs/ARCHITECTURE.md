@@ -28,6 +28,7 @@ Priority tags: **[P1]** build first, **[P2]** next, **[Later]** deferred but the
 - One database engine everywhere: **MongoDB** with the official .NET driver. Local: MongoDB Community as a single-node replica set. Cloud: **MongoDB Atlas** (free cluster to start).
 - Why MongoDB and not Cosmos DB (final): the app must be able to live on a local machine forever. MongoDB is a real database that can be installed and self-hosted; Cosmos DB cannot. Locally Cosmos exists only as an emulator, which is a development tool (the current one is a Docker-only preview with a subset of features) and not a place to keep real financial data for years. MongoDB also gives the same engine and the same code locally and in the cloud, real multi-document transactions and no lock-in. Cosmos DB for MongoDB limits transactions to a single unsharded collection, which does not fit. If the app is deployed to Azure, the Atlas cluster can be created in an Azure region next to the functions.
 - Transactions require a replica set, so the local `mongod` runs with `--replSet` (one node is enough).
+- Supported server versions: **8.0 or later**. 8.0 matches the Atlas free cluster and is the version CI tests against; a local server may be newer. Setup: `docs/LOCAL-SETUP.md`.
 - Each context owns its collections. No cross-context queries or joins. Aggregates are stored as documents.
 - Every document carries `Id` (client-generated UUIDv7), `OwnerId` and `SchemaVersion`. Beyond that there are two shapes:
   - **Mutable documents** (aggregates, settings, `LedgerHead`): also `Version` (optimistic concurrency), `CreatedAt`, `UpdatedAt`, and a soft-delete flag where deletion is allowed at all.
@@ -322,6 +323,7 @@ Real estate; bank import; trading or withdrawals through APIs; family groups or 
 | A split truncates each part; banker's rounding only for single values | Rounding each part to nearest and giving the remainder to the first line can make the first part negative for a positive amount (0.05 split 0.0001 : 1 : 1 : 1 would give −0.01, 0.02, 0.02, 0.02). Truncation keeps every part on the same side of zero and the sum exact. |
 | The set of currencies is closed | Every currency is registered in code, so one code can never exist with two precisions. Tests define extra precisions through an internal factory. |
 | Inter font is self-hosted under OFL-1.1 | The only accepted exception to the MIT/Apache/BSD rule, and for fonts only. OFL allows bundling and commercial use. Self-hosting keeps the app working offline. |
+| MongoDB 8.0 is the minimum server version; CI tests 8.0, local servers may be newer | Atlas free clusters set the floor. A newer local server (9.0 on the first machine) cannot be downgraded easily once its data files are upgraded, and CI on the oldest version catches the use of newer features. |
 | One branch and one pull request per plan step | `main` is protected and requires a green CI run, so every change is built and tested before it lands. |
 
 ## 11. Setup choices and open questions
