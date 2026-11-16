@@ -1,0 +1,50 @@
+# Optional convenience: MongoDB (single-node replica set) and Azurite in containers.
+# Docker is never required; docs/LOCAL-SETUP.md describes the native setup.
+#
+# Use this INSTEAD of a locally installed MongoDB service, not next to it: both use port 27017.
+#
+#   docker compose up -d       start (the replica set initiates itself on first start)
+#   docker compose down        stop; data stays in the named volumes
+#   docker compose down -v     stop and DELETE all local data
+#
+# Ports are bound to 127.0.0.1 only, so nothing is reachable from the network.
+# Data lives in Docker volumes, outside the repository.
+
+name: fintrack
+
+services:
+  mongo:
+    # 8.0 is the oldest supported server version (docs/ARCHITECTURE.md 2.2), the same as CI.
+    image: mongo:8.0
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    # The member is registered as localhost:27017, which works both inside the container and from
+    # the host through the port mapping. The check initiates the set once, then only reports it.
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27017' }] }).ok }"
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.37.0
+    command: ["azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--location", "/data"]
+    ports:
+      - "127.0.0.1:10000:10000"
+      - "127.0.0.1:10001:10001"
+      - "127.0.0.1:10002:10002"
+    volumes:
+      - azurite-data:/data
+
+volumes:
+  mongo-data:
+  azurite-data:

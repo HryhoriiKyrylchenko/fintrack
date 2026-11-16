@@ -35,10 +35,10 @@ Prerequisites:
 
 - .NET 10 SDK
 - Azure Functions Core Tools
-- MongoDB Community, running as a single-node replica set
-- Azurite (Azure Storage emulator)
+- MongoDB Community 8.0 or later, running as a single-node replica set
+- Node.js and Azurite (Azure Storage emulator)
 
-Setup instructions will be added as the project takes shape.
+Setup instructions are in [docs/LOCAL-SETUP.md](docs/LOCAL-SETUP.md). Check a machine with `pwsh scripts/check-prereqs.ps1`. Docker is optional (`docker-compose.yml`).
 
 Keep your database and backups outside the repository folder.
 
