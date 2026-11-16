@@ -2,6 +2,7 @@ using System.Text;
 using FinTrack.Api.Http;
 using FinTrack.Api.IntegrationTests.Middleware;
 using FinTrack.Api.Middleware;
+using FinTrack.Budget.Contracts.V1.Settings;
 using FinTrack.Shared.Infrastructure.Health;
 using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Shared.Kernel.Results;
@@ -101,6 +102,14 @@ public sealed class JsonResponseTests : IDisposable
         var response = await ExecuteAsync(ProblemDetailsMapper.ToActionResult(Result.Ok(new HealthReport(GetHealthHandler.Healthy, Instant))));
 
         response.Body.ShouldBe("""{"status":"healthy","checkedAt":"2026-01-15T09:30:00.123Z"}""");
+    }
+
+    [Fact]
+    public async Task OwnerSettings_HaveTheV1Shape()
+    {
+        var response = await ExecuteAsync(ProblemDetailsMapper.ToActionResult(Result.Ok(new OwnerSettingsDto(Currency.Pln, "Europe/Warsaw", "pl-PL"))));
+
+        response.Body.ShouldBe("""{"reportingCurrency":"PLN","timeZone":"Europe/Warsaw","locale":"pl-PL"}""");
     }
 
     public void Dispose() => host.Dispose();

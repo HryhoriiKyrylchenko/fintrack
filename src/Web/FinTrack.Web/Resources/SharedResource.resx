@@ -79,4 +79,13 @@
   <data name="Error.health.database_unavailable" xml:space="preserve">
     <value>The server is running, but the database does not answer. Make sure MongoDB is running, then check again.</value>
   </data>
+  <data name="Error.settings.not_found" xml:space="preserve">
+    <value>Your settings have not been saved yet. Choose them to start.</value>
+  </data>
+  <data name="Error.settings.time_zone_unknown" xml:space="preserve">
+    <value>This time zone is not known. Choose one from the list.</value>
+  </data>
+  <data name="Error.settings.locale_unknown" xml:space="preserve">
+    <value>This language and region format is not known. Choose one from the list.</value>
+  </data>
 </root>
