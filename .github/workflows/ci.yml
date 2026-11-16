@@ -45,7 +45,7 @@ jobs:
           docker exec mongo mongosh --quiet --eval "rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27017' }] })"
           for attempt in $(seq 1 60); do
             if [ "$(docker exec mongo mongosh --quiet --eval 'db.hello().isWritablePrimary')" = "true" ]; then
-              docker exec mongo mongosh --quiet --eval "'MongoDB ' + db.version() + ' is primary of rs0'"
+              docker exec mongo mongosh --quiet --eval "print('MongoDB', db.version(), 'is primary of rs0')"
               exit 0
             fi
             sleep 1
