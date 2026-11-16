@@ -7,8 +7,9 @@
     1. Runs scripts/check-prereqs.ps1 and stops if anything required is missing.
     2. Creates src/Api/FinTrack.Api/local.settings.json from local.settings.example.json if it is missing.
     3. Starts Azurite (unless it already runs) with its data outside the repository.
-    4. Starts the Api with `func start` (http://localhost:7071) and the Web app with `dotnet run`
-       (http://localhost:5180), and waits until both answer.
+    4. Starts the Api and the Web app with `dotnet run` and waits until both answer: the Api at
+       http://localhost:7071 (the Functions SDK builds it and starts the Core Tools host, as Core
+       Tools recommends for .NET isolated apps), the Web app at http://localhost:5180.
     5. Runs until Ctrl+C, or until one of them stops; then it stops everything it started,
        including child processes.
 
@@ -110,10 +111,13 @@ if ($AzuriteLocation.StartsWith([System.IO.Path]::GetFullPath($repoRoot), [Strin
     exit 1
 }
 
-# Azurite runs on Node.js; if node was found only in its install folder, the started processes need it on PATH.
-$node = Find-Tool 'node'
-if ($node -and -not (Get-Command 'node' -CommandType Application -ErrorAction SilentlyContinue)) {
-    $env:PATH = (Split-Path -Parent $node) + [System.IO.Path]::PathSeparator + $env:PATH
+# Azurite runs on Node.js, and `dotnet run` of the Api starts `func`: when a tool was found only in
+# its install folder, the started processes need its folder on PATH.
+foreach ($tool in 'node', 'func') {
+    $path = Find-Tool $tool
+    if ($path -and -not (Get-Command $tool -CommandType Application -ErrorAction SilentlyContinue)) {
+        $env:PATH = (Split-Path -Parent $path) + [System.IO.Path]::PathSeparator + $env:PATH
+    }
 }
 
 $started = [System.Collections.Generic.List[object]]::new()
@@ -131,8 +135,9 @@ try {
         $started.Add([pscustomobject] @{ Name = 'Azurite'; Process = $azurite })
     }
 
-    Write-Step "Starting the Api (func start, port $ApiPort)"
-    $api = Start-Process (Find-Tool 'func') -ArgumentList @('start', '--port', "$ApiPort") -WorkingDirectory $apiDirectory -NoNewWindow -PassThru
+    # Core Tools' default port is 7071, which the Web app's appsettings.json expects.
+    Write-Step "Starting the Api (dotnet run, Functions host on port $ApiPort)"
+    $api = Start-Process (Find-Tool 'dotnet') -ArgumentList @('run') -WorkingDirectory $apiDirectory -NoNewWindow -PassThru
     $started.Add([pscustomobject] @{ Name = 'Api'; Process = $api })
 
     Write-Step "Starting the Web app (dotnet run, port $WebPort)"
