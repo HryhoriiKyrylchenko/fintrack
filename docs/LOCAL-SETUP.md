@@ -77,6 +77,15 @@ Skip this when the check script already reports the replica set as `OK`.
 - When a new major MongoDB version is installed, the installer creates a new folder; the data stays where `dbPath` points. Read MongoDB's upgrade notes first: a server cannot open data files written by a newer major version.
 - Backups (scheduled `mongodump` to a folder you choose) and app exports are planned (ARCHITECTURE 2.4). Keep them outside the repository as well.
 
+## Run the Api
+
+1. Copy `src/Api/FinTrack.Api/local.settings.example.json` to `local.settings.json` in the same folder (it is ignored by git). Keep the invented `FinTrack__LocalOwnerId` or choose any other GUID once; it is the owner of all local data, so do not change it later.
+2. Start Azurite (`azurite --silent --location <a folder outside the repository>`). The Functions host keeps timer state in it.
+3. From `src/Api/FinTrack.Api`, run `func start`.
+4. Open `http://localhost:7071/api/v1/health`: `{"status":"healthy",...}`. With MongoDB stopped it answers 503 with `application/problem+json` and code `health.database_unavailable`.
+
+`scripts/run-local.ps1` will do all of this with one command (Stage 0, step 17).
+
 ## Docker instead (optional)
 
 `docker-compose.yml` in the repository root starts MongoDB 8.0 as a single-node replica set (it initiates itself on first start) and Azurite, both bound to `127.0.0.1` with data in Docker volumes:

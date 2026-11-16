@@ -1,0 +1,14 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "Mongo__ConnectionString": "mongodb://localhost:27017/?replicaSet=rs0",
+    "Mongo__DatabaseName": "fintrack",
+    "FinTrack__LocalOwnerId": "11111111-2222-4333-8444-555555555555",
+    "OutboxSweepSchedule": "0 */5 * * * *"
+  },
+  "Host": {
+    "CORS": "http://localhost:5180,https://localhost:7180"
+  }
+}

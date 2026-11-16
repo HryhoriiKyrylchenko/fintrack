@@ -60,6 +60,10 @@ public sealed partial class AppError : Error
     public static AppError BusinessRule(string code, params (string Name, object Value)[] parameters) =>
         Create(code, ErrorKind.BusinessRule, parameters);
 
+    /// <summary>A dependency the operation needs cannot be reached right now; nothing was changed.</summary>
+    public static AppError Unavailable(string code, params (string Name, object Value)[] parameters) =>
+        Create(code, ErrorKind.Unavailable, parameters);
+
     // Invalid codes or parameters are programming errors, so they throw.
     private static AppError Create(string code, ErrorKind kind, (string Name, object Value)[] parameters)
     {
