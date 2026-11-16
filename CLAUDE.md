@@ -36,7 +36,7 @@ src/
   Budget/FinTrack.Budget.Domain
   Budget/FinTrack.Budget.Application
   Budget/FinTrack.Budget.Infrastructure
-  Budget/FinTrack.Budget.Contracts
+  Budget/FinTrack.Budget.Contracts        read queries as mediator messages, their DTOs (V1) and HTTP request bodies; packages: Mediator.Abstractions, FluentResults
   Investments/...                         same four projects (created in phase 3)
   Integrations/...                        same four projects (created in phase 5)
   Api/FinTrack.Api                        Azure Functions app; folders per context
@@ -47,6 +47,7 @@ tests/
   FinTrack.Shared.Infrastructure.IntegrationTests   MongoDB adapter against a real MongoDB
   FinTrack.Budget.Domain.Tests
   FinTrack.Budget.Application.Tests
+  FinTrack.Budget.Infrastructure.IntegrationTests   Budget storage format and handlers against a real MongoDB (created in phase 1a, step 3)
   FinTrack.Api.IntegrationTests
   FinTrack.Web.Tests                      plain unit tests of the Web app's non-UI code (Api client, error texts); no UI test library
 scripts/                                  PowerShell 7 scripts (prerequisite check, local run)
@@ -70,7 +71,7 @@ infra/                                    Bicep (cloud phase)
 6. **Journal is the source of truth; state is derived by replaying it** through one state builder per context. Do not add stored projections or caches yet: they are a planned optimization, added only when measurements require it.
 7. **One transaction per command**, through `ILedger` (kernel): journal entries + changed mutable documents of that context + `LedgerHead.Version` increase (one document per owner and context, checked for the expected value) + outbox events (+ the handled-event record for event handlers). Read the version **before** loading the journal. Version conflict → reload and retry, so a handler has no side effects before its commit.
 8. **Cross-context communication** goes through the transactional outbox with idempotent handlers. No queue until the app is split.
-9. **Every document has** `Id` (UUIDv7, client-generated), `OwnerId`, `SchemaVersion`. Mutable documents also have `Version`, `CreatedAt`, `UpdatedAt`; append-only documents (journal, outbox, processed events) have `RecordedAt` instead. **Every query and write is filtered by `OwnerId`.** The only exception is the outbox sweep timer, which reads pending messages of all owners and handles each under its own `OwnerId`.
+9. **Every document has** `Id` (UUIDv7; client-generated for what a user creates, server-generated for documents the system creates itself, such as a `LedgerHead` or `Unallocated`), `OwnerId`, `SchemaVersion`. Mutable documents also have `Version`, `CreatedAt`, `UpdatedAt`; append-only documents (journal, outbox, processed events) have `RecordedAt` instead. **Every query and write is filtered by `OwnerId`.** Two documented exceptions: the outbox sweep timer, which reads pending messages of all owners and handles each under its own `OwnerId`; and reference data shared by all owners (FX rates, later prices) in `ref_` collections, which has no `OwnerId` and never holds owner data.
 10. **Money**: always the `Money` type (`decimal` + currency). Never `double` or `float`. Never add different currencies without an explicit conversion.
 11. **Time**: use `IClock` (UTC, whole milliseconds, because instants are stored as BSON dates). No `DateTime.Now` / `UtcNow` in Domain or Application. Entries carry `OccurredOn` and `RecordedAt`.
 12. **Business rule failures return `Result.Fail`**, not exceptions. Exceptions are for bugs and infrastructure faults.
@@ -112,7 +113,7 @@ Any new domain behaviour needs tests for the invariants it touches.
 - Prefer clarity over cleverness: this is financial code and must be easy to audit.
 - Before saying a task is done: build, run the tests, and state what was verified and what was not.
 
-**Current phase: 1a (first usable version).** Stage 0 (Foundation) is complete; `docs/plans/stage-0-plan.md` records what exists and why, step by step. Phase 1a: buckets, `Unallocated`, opening balances, deposit, spend, transfer, reversal, multi-currency, balances, a simple overview and journal screen. Its step-by-step plan (`docs/plans/stage-1a-plan.md`) is written and approved before any 1a code. Phase 1b follows with plans, limits and loans.
+**Current phase: 1a (first usable version).** Stage 0 (Foundation) is complete; `docs/plans/stage-0-plan.md` records what exists and why, step by step. Phase 1a: buckets, `Unallocated`, opening balances, deposit, spend, transfer, reversal, multi-currency, balances, a simple overview and journal screen. Plan: `docs/plans/stage-1a-plan.md` (approved 16 Nov 2026; decisions D1 to D17, recorded in `docs/ARCHITECTURE.md`). Phase 1b follows with plans, limits and loans.
 
 ## Commands
 
@@ -137,11 +138,13 @@ Local prerequisites: .NET SDK, Azure Functions Core Tools, MongoDB Community 8.0
 - Naming: commands are imperative (`AddDeposit`), queries start with `Get`, events are past tense (`DepositAdded`).
 - Function names match the use case; routes are REST-like and versioned (`/api/v1/...`).
 - Entry types, enum values and collection names follow the spec exactly.
-- Store documents only through `AppendOnlyCollection<T>` (journal, outbox, processed events) or `MutableCollection<T>` (aggregates, settings) from `FinTrack.Shared.Infrastructure/Mongo`; never use a raw `IMongoCollection` in a context (the outbox sweep is the one exception). Each context creates its indexes in an `IMongoIndexInitializer` and maps its document types to collections with `AddLedgerDocuments`; commands write only through `ILedger`.
+- Store documents only through `AppendOnlyCollection<T>` (journal, outbox, processed events) or `MutableCollection<T>` (aggregates, settings), and reference data only through `ReferenceCollection<T>` (`ref_` collections, from phase 1a), all from `FinTrack.Shared.Infrastructure/Mongo`; never use a raw `IMongoCollection` in a context (the outbox sweep is the one exception). Each context creates its indexes in an `IMongoIndexInitializer` and maps its document types to collections with `AddLedgerDocuments`; commands write only through `ILedger`.
 - Input validation lives in a FluentValidation validator next to the command; the pipeline turns failures into `validation.failed` errors (`field`, `rule`), and ledger commands (`ILedgerCommand`) are retried on `concurrency.conflict`, so handlers contain neither.
 - Integration event handlers are registered with `AddIntegrationEventHandler<TEvent, THandler>()` and must commit with `LedgerCommit.HandledEvent` set (stable handler name), so a repeated delivery writes nothing.
-- Mongo collections are prefixed by context (`budget_journal`, `budget_buckets`, `inv_journal`). Each context also has `<ctx>_ledger_heads`, `<ctx>_outbox` and `<ctx>_processed_events`.
-- Stored events carry a stable event name declared on the type, never the CLR type name.
+- Mongo collections are prefixed by context (`budget_journal`, `budget_buckets`, `inv_journal`). Each context also has `<ctx>_ledger_heads`, `<ctx>_outbox` and `<ctx>_processed_events`. Reference data shared by all owners (FX rates, later prices) lives in `ref_` collections and is reached only through `ReferenceCollection<T>`.
+- Stored events carry a stable event name declared on the type, never the CLR type name. The same holds for subtypes stored in one collection (journal entry types): each has an explicit stable `type` name in the Infrastructure mapping, and a guard test requires one.
+- Commands carry the client-generated ID of what they create; a repeat with the same ID and the same content succeeds and writes nothing, a repeat with different content fails with `<object>.id_reused` (invariant 13).
+- JSON over HTTP: camelCase, enums as names, dates `yyyy-MM-dd`, instants ISO 8601 UTC, **amounts as strings** next to their currency code; one set of serializer options in the kernel serves the Api and the Web app.
 - API errors: RFC 7807 `ProblemDetails` built from `Result` by `ProblemDetailsMapper`, with a stable error code (`bucket.insufficient_funds`) and parameters. The UI maps codes to text.
 - New functions go into `src/Api/FinTrack.Api/<Context>/`; services are registered in `ApiComposition`, which the Api integration tests also use.
 - UI text: English only for now, but every user-facing string comes from resource files (`IStringLocalizer`); no hard-coded or concatenated strings. Format numbers, dates and money by the user's locale setting.

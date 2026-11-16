@@ -60,7 +60,7 @@ Beyond eight series, group the rest as "Other". The system items `Unallocated` a
 ## 6. Numbers and money
 
 - Always show the currency code or symbol next to an amount. Never show a bare number where currency could be unclear.
-- Fiat: 2 decimals. Crypto quantities: up to 8 significant decimals, trailing zeros trimmed. Percentages: 1 or 2 decimals.
+- Amounts use the precision of their currency (`Currency.DecimalPlaces`: PLN, EUR and USD have 2, some currencies 0 or 3); input with more decimals is rejected, never rounded. Crypto quantities: up to 8 significant decimals, trailing zeros trimmed. Percentages: 1 or 2 decimals.
 - Thousands separators follow the user's locale setting.
 - Gain and loss: explicit sign and an arrow icon plus colour (`+2.4% ▲` in success, `−1.1% ▼` in error). Use the real minus sign.
 - Amounts in tables are right-aligned; labels are left-aligned.
@@ -76,7 +76,7 @@ Beyond eight series, group the rest as "Other". The system items `Unallocated` a
 ## 8. Layout
 
 - Spacing on an 8 px grid (4 px for dense table cells).
-- Navigation: left drawer on desktop, bottom navigation on mobile. Top-level items: Overview, Buckets, Plans, Loans, Investments, Journal, Settings.
+- Navigation: left drawer on desktop, bottom navigation on mobile. Top-level items: Overview, Buckets, Plans, Loans, Investments, Journal, Settings; an item appears once its page exists. Overview is the start page. The system status page (does the app reach its server and database) sits under Settings.
 - Overview shows: totals in the reporting currency, a card per bucket (available, progress to limit, due by plan, open loans), and the items that need attention.
 - Cards for summaries, tables for journals and lists. On mobile a wide table turns into a list of cards instead of scrolling sideways.
 - Corner radius 8 px on controls, 12 px on cards. Flat surfaces: elevation only for dialogs and menus.
