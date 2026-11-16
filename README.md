@@ -38,7 +38,16 @@ Prerequisites:
 - MongoDB Community 8.0 or later, running as a single-node replica set
 - Node.js and Azurite (Azure Storage emulator)
 
-Setup instructions are in [docs/LOCAL-SETUP.md](docs/LOCAL-SETUP.md). Check a machine with `pwsh scripts/check-prereqs.ps1`. Docker is optional (`docker-compose.yml`).
+Setup instructions are in [docs/LOCAL-SETUP.md](docs/LOCAL-SETUP.md). Docker is optional (`docker-compose.yml`).
+
+Then, from the repository folder (PowerShell 7):
+
+```
+pwsh scripts/check-prereqs.ps1   # is this machine ready?
+pwsh scripts/run-local.ps1       # starts Azurite, the Api and the Web app; Ctrl+C stops all
+```
+
+Open http://localhost:5180. The status page shows whether the Api and the database answer.
 
 Keep your database and backups outside the repository folder.
 

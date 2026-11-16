@@ -77,6 +77,16 @@ Skip this when the check script already reports the replica set as `OK`.
 - When a new major MongoDB version is installed, the installer creates a new folder; the data stays where `dbPath` points. Read MongoDB's upgrade notes first: a server cannot open data files written by a newer major version.
 - Backups (scheduled `mongodump` to a folder you choose) and app exports are planned (ARCHITECTURE 2.4). Keep them outside the repository as well.
 
+## Run everything
+
+```
+pwsh scripts/run-local.ps1
+```
+
+It runs the prerequisite check, creates `src/Api/FinTrack.Api/local.settings.json` from the example if it is missing, starts Azurite (or uses one that already runs, for example Rider's), the Api and the Web app in this console, waits until both answer and prints the address (`http://localhost:5180`). Ctrl+C, or one of them stopping, stops everything it started. Azurite's data goes to `%LOCALAPPDATA%\FinTrack\azurite` (Linux and macOS: `~/.local/share/FinTrack/azurite`); `-AzuriteLocation` chooses another folder outside the repository. The script stops with a message when port 7071 or 5180 is already in use.
+
+The sections below do the same by hand.
+
 ## Run the Api
 
 1. Copy `src/Api/FinTrack.Api/local.settings.example.json` to `local.settings.json` in the same folder (it is ignored by git). Keep the invented `FinTrack__LocalOwnerId` or choose any other GUID once; it is the owner of all local data, so do not change it later.
@@ -88,7 +98,7 @@ Skip this when the check script already reports the replica set as `OK`.
 
 With the Api running, from `src/Web/FinTrack.Web` run `dotnet run`, then open `http://localhost:5180`. The status page shows whether the Api and MongoDB answer. The Api address is in `wwwroot/appsettings.json`; the Api allows the origins `http://localhost:5180` and `https://localhost:7180` (CORS in `local.settings.json`).
 
-`scripts/run-local.ps1` will start Azurite, the Api and the Web app with one command (Stage 0, step 17).
+In Rider, the Web run configuration needs a Chromium-based browser (Edge or Chrome) under "Browser / Live Edit": Rider debugs Blazor WebAssembly through the browser's DevTools and refuses the "default system browser".
 
 ## Docker instead (optional)
 
