@@ -14,4 +14,9 @@
     <PackageReference Include="Microsoft.Extensions.Localization" />
     <PackageReference Include="MudBlazor" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- The JSON contract (FinTrackJson) and kernel types. Budget.Contracts follows with the first screen that uses it. -->
+    <ProjectReference Include="../../Shared/FinTrack.Shared.Kernel/FinTrack.Shared.Kernel.csproj" />
+  </ItemGroup>
 </Project>

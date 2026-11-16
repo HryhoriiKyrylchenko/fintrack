@@ -1,4 +1,5 @@
 using FinTrack.Api.Http;
+using FinTrack.Shared.Kernel.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Middleware;
@@ -32,7 +33,7 @@ internal sealed partial class ExceptionMiddleware(ILogger<ExceptionMiddleware> l
 
             var problem = ProblemDetailsMapper.UnexpectedError();
             http.Response.StatusCode = StatusCodes.Status500InternalServerError;
-            await http.Response.WriteAsJsonAsync(problem, options: null, contentType: "application/problem+json", context.CancellationToken).ConfigureAwait(false);
+            await http.Response.WriteAsJsonAsync(problem, FinTrackJson.Options, contentType: "application/problem+json", context.CancellationToken).ConfigureAwait(false);
         }
     }
 

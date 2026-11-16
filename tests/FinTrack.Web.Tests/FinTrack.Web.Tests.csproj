@@ -7,12 +7,4 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>
-
-  <ItemGroup>
-    <!--
-      The shared helpers in tests/Common need the kernel, which the Web app does not reference
-      (it talks to the Api over HTTP only), so they are not linked here.
-    -->
-    <Compile Remove="../Common/**/*.cs" />
-  </ItemGroup>
 </Project>
