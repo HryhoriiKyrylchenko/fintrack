@@ -4,7 +4,7 @@
 
 FinTrack is at Phase 0. The repository holds only documents and config (`CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/DESIGN.md`, `.editorconfig`, `.gitignore`, `.gitattributes`, an empty `FinTrack.sln`). Stage 0 builds the foundation that Phase 1a (buckets, journal, balances) sits on, so that 1a can start directly with business slices.
 
-Status: approved 15 Nov 2026, implementation not started. Tick a step's `[ ]` when its pull request is merged.
+Status: approved 15 Nov 2026; complete 16 Nov 2026 (steps 1 to 18 merged, checklist below ticked with evidence). Tick a step's `[ ]` when its pull request is merged.
 
 ## Stage 0 scope
 
@@ -230,29 +230,30 @@ Every step is one branch `stage-0/NN-short-name` and one pull request into `main
 - **What we do:** `scripts/run-local.ps1`: run the prerequisite check, create `local.settings.json` from the example if missing, start Azurite with its data outside the repository, `func start`, `dotnet run` for Web, stop all on Ctrl+C. Update README "Running locally" and the `CLAUDE.md` Commands section.
 - **Done when:** on a clean clone, the script brings up Api and Web and the status page shows healthy.
 - **Depends on:** 16.
-- **Result:** `scripts/run-local.ps1` (PowerShell 7): prerequisite check (stops when it fails), `local.settings.json` from the example when missing, refuses to start when port 7071 or 5180 is in use, reuses a running Azurite or starts one with its data outside the repository (`%LOCALAPPDATA%\FinTrack\azurite`, `~/.local/share/FinTrack/azurite`, or `-AzuriteLocation`; a folder inside the repository is refused), puts Node.js on PATH for its children when it was found only in its install folder, starts `func start` and `dotnet run` in the same console, waits up to 5 minutes until both answer, prints the address, and on Ctrl+C or when one of them stops kills every process it started including child processes (exit code 1 when one stopped on its own). The tool lookup moved from `check-prereqs.ps1` into `scripts/FinTrack.Tools.psm1`, shared by both scripts; the check's output is unchanged. README "Running locally", LOCAL-SETUP ("Run everything", Rider's browser setting for Blazor) and the CLAUDE.md Commands section updated. Verified on a fresh `git clone` (in the scratchpad, with this step's scripts copied in): it created `local.settings.json`, built and started the Api and the Web app in about 40 seconds, the health endpoint and the Web app answered 200 and the status page (screenshot through headless Edge) showed "Everything is working."; a second run (about 27 seconds) kept the existing settings. Killing the Api made the script stop the Web app and exit with code 1, leaving no process and no port behind. A busy port 5180 and an Azurite folder inside the repository each stop the script with a message and exit code 1. Not verified: Ctrl+C itself (it cannot be sent from automation; the same clean-up runs in `finally`), and the branch that starts Azurite itself, because Rider's Azure Toolkit already ran an Azurite on port 10000 that was not stopped (the script reused it, which verified the reuse branch; the start command is the one used by hand in steps 15 and 16); Linux and macOS.
+- **Result:** `scripts/run-local.ps1` (PowerShell 7): prerequisite check (stops when it fails), `local.settings.json` from the example when missing, refuses to start when port 7071 or 5180 is in use, reuses a running Azurite or starts one with its data outside the repository (`%LOCALAPPDATA%\FinTrack\azurite`, `~/.local/share/FinTrack/azurite`, or `-AzuriteLocation`; a folder inside the repository is refused), puts Node.js on PATH for its children when it was found only in its install folder, starts `func start` and `dotnet run` in the same console, waits up to 5 minutes until both answer, prints the address, and on Ctrl+C or when one of them stops kills every process it started including child processes (exit code 1 when one stopped on its own). The tool lookup moved from `check-prereqs.ps1` into `scripts/FinTrack.Tools.psm1`, shared by both scripts; the check's output is unchanged. README "Running locally", LOCAL-SETUP ("Run everything", Rider's browser setting for Blazor) and the CLAUDE.md Commands section updated. Verified on a fresh `git clone` (in the scratchpad, with this step's scripts copied in): it created `local.settings.json`, built and started the Api and the Web app in about 40 seconds, the health endpoint and the Web app answered 200 and the status page (screenshot through headless Edge) showed "Everything is working."; a second run (about 27 seconds) kept the existing settings. Killing the Api made the script stop the Web app and exit with code 1, leaving no process and no port behind. A busy port 5180 and an Azurite folder inside the repository each stop the script with a message and exit code 1. Ctrl+C was confirmed by the developer on their machine ("Stopped." printed, the Api and the Web app gone). Not verified: the branch that starts Azurite itself, because Rider's Azure Toolkit already ran an Azurite on port 10000 that was not stopped (the script reused it, which verified the reuse branch; the start command is the one used by hand in steps 15 and 16); Linux and macOS.
 
-### [ ] Step 18. Stage 0 verification and docs sync (R)
+### [x] Step 18. Stage 0 verification and docs sync (R)
 - **Goal:** Stage 0 is closed and Phase 1a can start.
 - **What we do:** walk the checklist below; fix drift between code, `docs/ARCHITECTURE.md`, `CLAUDE.md`, README and `docs/LOCAL-SETUP.md`; tick the steps in `docs/plans/stage-0-plan.md`; set "Current phase" to 1a.
 - **Done when:** every checklist item is ticked with the evidence noted.
 - **Depends on:** all.
+- **Result:** checklist below, each item with its evidence. Two changes asked for by the developer: (1) the Api now runs with `dotnet run` instead of `func start` (Core Tools 4.16 warned that `func start` may not load extensions for .NET isolated apps); `run-local.ps1` starts it that way and puts `func`'s folder on PATH when needed; verified: host on port 7071, both functions loaded, no warning, health 200, the script ready in about 36 seconds and stopping everything when the Api is killed; ARCHITECTURE decision log, LOCAL-SETUP and CLAUDE.md updated. (2) IDE1006 "Missing prefix '_'" in Rider: the cause was our own `.editorconfig`, which required `_` for private fields while all code since step 2 uses camelCase without a prefix; the command-line build never reported it because naming rules run in the build only with an explicit `dotnet_diagnostic.IDE1006.severity`. The rule now matches the code (private fields camelCase, no prefix; static readonly fields PascalCase raised from suggestion to warning) and IDE1006 is enforced in the build; zero violations in the code; a probe field `_probe` and a static readonly `lowerStatic` each failed the build and were removed; CLAUDE.md states the convention. Docs synced: CLAUDE.md (current phase 1a, Commands, naming), README status, ARCHITECTURE phase 0 marked complete, LOCAL-SETUP (`dotnet run` for the Api), this plan.
 
 ## Stage 0 is complete when…
 
-- [ ] `dotnet build -c Release` passes with zero warnings on a clean clone.
-- [ ] `dotnet test` passes locally and in GitHub Actions, including integration tests against a real MongoDB replica set.
-- [ ] Guard tests enforce the reference rules (Domain free of MongoDB, Mediator, Functions; contexts isolated).
-- [ ] `Money` and `Currency` are covered by unit and property tests (exact split, banker's rounding, currency mismatch).
-- [ ] UUIDv7 IDs, `IClock` and `AppError` codes exist and are used by all Shared code.
-- [ ] Every step was merged through its own pull request, and `main` requires the CI check (verified with a failing test in step 4).
-- [ ] An integration test proves journal-style inserts, `LedgerHead.Version` and outbox messages commit or fail together, and concurrent writers conflict.
-- [ ] An integration test proves owner isolation and stale-version rejection.
-- [ ] Outbox events are dispatched after commit, re-delivered by the sweep, and handled idempotently.
-- [ ] `scripts/run-local.ps1` starts Api and Web; `/api/v1/health` answers; the Web status page shows it in light and dark themes.
-- [ ] Failures leave the Api as `ProblemDetails` with a stable code.
-- [ ] No secrets, connection strings or real financial data in the repository; `local.settings.example.json` exists, `local.settings.json` is ignored.
-- [ ] `docs/ARCHITECTURE.md`, `CLAUDE.md`, README and `docs/LOCAL-SETUP.md` describe what was built.
+- [x] `dotnet build -c Release` passes with zero warnings on a clean clone. *Step 18: fresh `git clone` plus this step's changes: prerequisite check green, Release build 0 warnings, 0 errors.*
+- [x] `dotnet test` passes locally and in GitHub Actions, including integration tests against a real MongoDB replica set. *424 tests on the clean clone; CI runs them against `mongo:8.0` as a replica set on every pull request since step 10 (last: PR #18, 424 of 424).*
+- [x] Guard tests enforce the reference rules (Domain free of MongoDB, Mediator, Functions; contexts isolated). *Step 3 (`ArchitectureRules`, assembly checks); they now also cover the real Api and Web projects.*
+- [x] `Money` and `Currency` are covered by unit and property tests (exact split, banker's rounding, currency mismatch). *Step 6: 71 tests, seven CsCheck properties.*
+- [x] UUIDv7 IDs, `IClock` and `AppError` codes exist and are used by all Shared code. *Step 18 grep of `src`: the system time is read only in `SystemClock`, no `Guid.NewGuid`, no `double`/`float`; `ErrorConventionTests` rejects plain errors.*
+- [x] Every step was merged through its own pull request, and `main` requires the CI check (verified with a failing test in step 4). *PRs #1 to #18 (one per step; #5 was the failing throwaway); the only direct commit on `main` is the initial setup before Stage 0; ruleset active: pull request, "Build and test", up to date, no force push, no deletion.*
+- [x] An integration test proves journal-style inserts, `LedgerHead.Version` and outbox messages commit or fail together, and concurrent writers conflict. *Step 12: `MongoLedgerTests`.*
+- [x] An integration test proves owner isolation and stale-version rejection. *Step 11: `MutableCollectionTests`, `AppendOnlyCollectionTests`.*
+- [x] Outbox events are dispatched after commit, re-delivered by the sweep, and handled idempotently. *Step 13: `OutboxDispatcherTests`.*
+- [x] `scripts/run-local.ps1` starts Api and Web; `/api/v1/health` answers; the Web status page shows it in light and dark themes. *Steps 16 to 18: screenshots at 360 px and 1280 px in both themes; run by the developer and in step 18 with `dotnet run` for the Api.*
+- [x] Failures leave the Api as `ProblemDetails` with a stable code. *Step 15: mapper tests, 503 `health.database_unavailable` from the real host; unexpected errors become 500 `server.error`.*
+- [x] No secrets, connection strings or real financial data in the repository; `local.settings.example.json` exists, `local.settings.json` is ignored. *Step 18 grep of all tracked files: only comments and a test that removes a password; the example has invented values and a password-free localhost connection string; `local.settings.json` is ignored and untracked.*
+- [x] `docs/ARCHITECTURE.md`, `CLAUDE.md`, README and `docs/LOCAL-SETUP.md` describe what was built. *Step 18 sync (see its Result).*
 
 ## Deliberately deferred
 
@@ -266,5 +267,5 @@ Every step is one branch `stage-0/NN-short-name` and one pull request into `main
 ## Verification of the whole stage
 
 1. Clean clone → `scripts/check-prereqs.ps1` → `dotnet build -c Release` → `dotnet test`.
-2. `scripts/run-local.ps1` → open the Web status page → healthy; stop MongoDB → the page shows the mapped error; start it again → healthy.
+2. `scripts/run-local.ps1` → open the Web status page → healthy; stop MongoDB → the page shows the mapped error; start it again → healthy. *The mapped error was shown with the Api pointed at a port where nothing listens (steps 15 and 16); stopping the real MongoDB service needs administrator rights and is left to the developer.*
 3. Push a branch → GitHub Actions green.

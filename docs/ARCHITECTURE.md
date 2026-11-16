@@ -261,7 +261,7 @@ Nothing in this document is cancelled by the phasing. Items marked `[P2]` or `[L
 
 | Phase | Content |
 |---|---|
-| **0 Foundation** | Solution skeleton, Shared kernel (`Money`, `Result`, IDs, clock), MongoDB adapter with transactions and outbox, local run script, CI, test projects. Built as a walking skeleton: a health function, the `Result` to `ProblemDetails` mapper, mediator pipeline behaviours, the outbox sweep timer and a Web shell with theme and localization. Step-by-step plan: `docs/plans/stage-0-plan.md`. |
+| **0 Foundation** | Solution skeleton, Shared kernel (`Money`, `Result`, IDs, clock), MongoDB adapter with transactions and outbox, local run script, CI, test projects. Built as a walking skeleton: a health function, the `Result` to `ProblemDetails` mapper, mediator pipeline behaviours, the outbox sweep timer and a Web shell with theme and localization. Step-by-step plan: `docs/plans/stage-0-plan.md`. **Complete (16 Nov 2026).** |
 | **1a First usable version** | Buckets, `Unallocated`, `OpeningBalance`, `Deposit`, `Spend`, `Transfer`, `Reversal`, multi-currency, balances, a simple overview and journal screen. Goal: start real use in parallel with the spreadsheet as early as possible. |
 | **1b Budget core** | Plans with carry-over, plan pause (shift/skip), limits, loans without interest, `Adjustment`, manual allocation, summaries. |
 | **2 Budget extensions** | Accounts and reconciliation, automatic and semi-automatic allocation, bulk pause, goals with dates, proportional loan repayment, period snapshots, stored projections if measurements require them, budget charts and the monthly report (section 13). |
@@ -338,6 +338,7 @@ Real estate; bank import; trading or withdrawals through APIs; family groups or 
 | Worker middleware: exceptions to `server.error`, the owner per HTTP request, indexes once per process | Cross-cutting work stays out of functions, which remain parse, send, map. Indexes are created before the first function that needs them; the health check is exempt so it can report a database that is down. |
 | The light or dark choice is stored in the browser (`localStorage`) | It is a display preference of one device, not user data; without a stored choice the theme follows the system. A synced user setting can replace it when settings exist. |
 | The Web project references Contracts and the kernel only when it first uses them | Phase 0 has no shared DTOs yet; the health answer is a small client-side record. Unused references would only add download size to the WebAssembly app. |
+| The Api runs locally with `dotnet run`, not `func start` | Azure Functions Core Tools 4.16 warns that `func start` against a .NET isolated project may not load function extensions correctly and recommends `dotnet run`, which builds the project and starts the same host from the right output folder. |
 | One branch and one pull request per plan step | `main` is protected and requires a green CI run, so every change is built and tested before it lands. |
 
 ## 11. Setup choices and open questions

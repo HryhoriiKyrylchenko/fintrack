@@ -27,7 +27,7 @@ Why each piece matters:
 
 - **Replica set.** MongoDB allows a transaction across several documents and collections only on a replica set, never on a standalone server. This differs from SQL Server, where every database has transactions. FinTrack writes journal entries, the ledger version and outbox events in one transaction (ARCHITECTURE 2.3), so a replica set is required. One member is enough: it has no copies and does no extra work, it just turns transactions on.
 - **Server version.** 8.0 is the oldest supported version: it matches the MongoDB Atlas free cluster, and CI tests against it. A newer local server (for example 9.0) is fine; CI on 8.0 catches the use of anything newer.
-- **Functions Core Tools.** In the cloud the Azure Functions host starts the app on demand. `func start` runs the same host on your machine, so the code path is identical.
+- **Functions Core Tools.** In the cloud the Azure Functions host starts the app on demand. Running the Api project (`dotnet run`) starts the same host on your machine through Core Tools, so the code path is identical.
 - **Azurite.** The Functions host keeps the state of timer triggers (for example the outbox sweep) in Azure Storage. Locally Azurite plays that role. No real Azure account is involved.
 
 ## Windows
@@ -91,7 +91,7 @@ The sections below do the same by hand.
 
 1. Copy `src/Api/FinTrack.Api/local.settings.example.json` to `local.settings.json` in the same folder (it is ignored by git). Keep the invented `FinTrack__LocalOwnerId` or choose any other GUID once; it is the owner of all local data, so do not change it later.
 2. Start Azurite (`azurite --silent --location <a folder outside the repository>`). The Functions host keeps timer state in it.
-3. From `src/Api/FinTrack.Api`, run `func start`.
+3. From `src/Api/FinTrack.Api`, run `dotnet run`. It builds the project and starts the Functions host through Core Tools on port 7071; Core Tools 4.16 recommends this over `func start` for .NET isolated apps.
 4. Open `http://localhost:7071/api/v1/health`: `{"status":"healthy",...}`. With MongoDB stopped it answers 503 with `application/problem+json` and code `health.database_unavailable`.
 
 ## Run the Web app

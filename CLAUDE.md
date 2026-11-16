@@ -17,7 +17,7 @@ FinTrack (internal working name) is a personal finance tracker: budget planning 
 ## Stack
 
 - .NET 10 (LTS), C#, nullable enabled, warnings as errors.
-- Code style: `.editorconfig` in the root is binding and enforced in the build. `Directory.Build.props` sets `EnforceCodeStyleInBuild` and `GenerateDocumentationFile` to `true` (the second is needed for the unused-usings rule; missing XML comments are switched off in `.editorconfig`). Line endings are LF (`.gitattributes`).
+- Code style: `.editorconfig` in the root is binding and enforced in the build. `Directory.Build.props` sets `EnforceCodeStyleInBuild` and `GenerateDocumentationFile` to `true` (the second is needed for the unused-usings rule; missing XML comments are switched off in `.editorconfig`). Line endings are LF (`.gitattributes`). Naming is enforced in the build too (IDE1006): private fields camelCase without a prefix (`clock`, not `_clock`), constants and `static readonly` fields PascalCase, interfaces `I…`, type parameters `T…`.
 - Back end: Azure Functions, isolated worker model. Front end: Blazor WebAssembly.
 - `Mediator` (the source-generated library by Martin Othamar, MIT) for commands and queries (CQRS). **Do not use MediatR**: its current versions are commercially licensed. FluentResults-based `Result` for outcomes, FluentValidation for input.
 - UI components: MudBlazor. Visual rules are in `docs/DESIGN.md`.
@@ -112,7 +112,7 @@ Any new domain behaviour needs tests for the invariants it touches.
 - Prefer clarity over cleverness: this is financial code and must be easy to audit.
 - Before saying a task is done: build, run the tests, and state what was verified and what was not.
 
-**Current phase: 0 (Foundation).** Plan: `docs/plans/stage-0-plan.md`. First tasks: create the solution and projects, the Shared kernel (`Money`, `Currency`, IDs, `IClock`, `Result` helpers), the MongoDB adapter (transactions, optimistic concurrency, outbox), the local run script, CI build and test. Then Phase 1a, the first usable version: buckets, `Unallocated`, opening balances, deposit, spend, transfer, reversal, balances, a simple overview and journal screen. Phase 1b follows with plans, limits and loans.
+**Current phase: 1a (first usable version).** Stage 0 (Foundation) is complete; `docs/plans/stage-0-plan.md` records what exists and why, step by step. Phase 1a: buckets, `Unallocated`, opening balances, deposit, spend, transfer, reversal, multi-currency, balances, a simple overview and journal screen. Its step-by-step plan (`docs/plans/stage-1a-plan.md`) is written and approved before any 1a code. Phase 1b follows with plans, limits and loans.
 
 ## Commands
 
@@ -125,7 +125,7 @@ dotnet build
 dotnet test                     # Microsoft.Testing.Platform runner (set in global.json)
 dotnet test --project <path>    # one test project; MTP mode needs --project, not a bare path
                                 # integration tests need MongoDB: FINTRACK_TEST_MONGO, default mongodb://localhost:27017/?replicaSet=rs0
-func start                      # from src/Api/FinTrack.Api; needs local.settings.json (copy local.settings.example.json) and Azurite running
+dotnet run                      # from src/Api/FinTrack.Api: builds and starts the Functions host on :7071 (Core Tools' recommended way for .NET isolated); needs local.settings.json (copy local.settings.example.json) and Azurite
 dotnet run                      # from src/Web/FinTrack.Web; http://localhost:5180 (the Api allows this origin)
 ```
 

@@ -4,7 +4,7 @@ A personal finance tracker for planning savings and tracking investments. Money 
 
 FinTrack runs entirely on your own machine. The cloud deployment is optional.
 
-> **Status:** early development (phase 0, foundation). Not usable yet.
+> **Status:** early development. The foundation is complete: the app runs locally and shows a status page. Budgeting features start with phase 1a; do not use it for real data yet.
 
 ## Principles
 
