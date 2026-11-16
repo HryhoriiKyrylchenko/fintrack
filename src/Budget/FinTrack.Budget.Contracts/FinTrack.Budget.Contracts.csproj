@@ -1,4 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Budget's public contract (ARCHITECTURE 2.6): read queries as mediator messages, their DTOs and
+    the HTTP request bodies, in versioned namespaces. Other contexts, the Web app and later agents
+    reference only this project.
+  -->
+  <ItemGroup>
+    <PackageReference Include="FluentResults" />
+    <PackageReference Include="Mediator.Abstractions" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="../../Shared/FinTrack.Shared.Kernel/FinTrack.Shared.Kernel.csproj" />
   </ItemGroup>

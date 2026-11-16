@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Budget's stored format and its handlers against a real MongoDB (plan 1a D14). -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Budget/FinTrack.Budget.Infrastructure/FinTrack.Budget.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+</Project>

@@ -25,6 +25,9 @@ public sealed class ErrorTextTests : IDisposable
         ApiClient.UnexpectedResponse,
         "server.error",
         "health.database_unavailable",
+        "settings.not_found",
+        "settings.time_zone_unknown",
+        "settings.locale_unknown",
     ];
 
     [Theory]
