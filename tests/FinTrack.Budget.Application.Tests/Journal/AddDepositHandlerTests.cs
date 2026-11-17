@@ -231,5 +231,5 @@ public class AddDepositHandlerTests
             .IsValid.ShouldBeTrue();
 
     private Task<FluentResults.Result> Add(AddDeposit command) =>
-        new AddDepositHandler(new BudgetStateLoader(ledger, store), ledger, new FakeOwnerContext(), clock).Handle(command, Cancellation).AsTask();
+        new AddDepositHandler(new BucketEntryWriter(new BudgetStateLoader(ledger, store), ledger, new FakeOwnerContext(), clock)).Handle(command, Cancellation).AsTask();
 }

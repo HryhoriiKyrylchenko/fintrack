@@ -10,10 +10,18 @@ namespace FinTrack.Budget.Domain.State;
 /// stored projection can later replace the replay without touching them. Pure: no clock, no I/O.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Balances follow 4.3: <c>NetContributed</c> = opening balance + deposits + transfers in − spends −
-/// transfers out (phase 1a step 6: deposits only); <c>OutstandingPrincipal</c> is 0 until loans exist
+/// transfers out (transfers arrive in step 8); <c>OutstandingPrincipal</c> is 0 until loans exist
 /// (phase 1b); <c>Available</c> = <c>NetContributed</c> − <c>OutstandingPrincipal</c>. Every amount stays in
 /// its bucket's currency; currencies are never added together (invariant 11).
+/// </para>
+/// <para>
+/// Invariant 1 holds at every point of the replay order (D2): each balance remembers the first date its
+/// <c>Available</c> went below zero, and <see cref="FirstOverdraft"/> reports the earliest such date of a
+/// savings bucket. A command checks it on the replay that includes its new entry; investment buckets may
+/// go below zero (4.9).
+/// </para>
 /// </remarks>
 public sealed class BudgetState
 {
@@ -23,6 +31,16 @@ public sealed class BudgetState
 
     /// <summary>One balance per bucket, in the order the buckets were given.</summary>
     public IReadOnlyList<BucketBalance> Balances => balances;
+
+    /// <summary>
+    /// The earliest point at which a savings bucket was below zero (the earliest date, then the first
+    /// bucket in order), or <c>null</c> when none ever was. A journal that respects invariant 1 has none.
+    /// </summary>
+    public Overdraft? FirstOverdraft => balances
+        .Where(balance => balance.Kind == BucketKind.Savings && balance.FirstNegativeOn is not null)
+        .OrderBy(balance => balance.FirstNegativeOn)
+        .Select(balance => new Overdraft(balance.BucketId, balance.FirstNegativeOn!.Value))
+        .FirstOrDefault();
 
     /// <summary>
     /// The state after every entry of <paramref name="journal"/>, applied in replay order (the order
@@ -42,10 +60,19 @@ public sealed class BudgetState
     /// <exception cref="InvalidOperationException">The entry refers to an unknown bucket, or its type is not known here (bugs).</exception>
     public BudgetState Apply(JournalEntry entry) => entry switch
     {
-        Deposit deposit => With(deposit.BucketId, balance => balance with
+        OpeningBalance opening => With(opening.BucketId, opening.OccurredOn, balance => balance with
+        {
+            NetContributed = balance.NetContributed + opening.Amount,
+            HasOpeningBalance = true,
+        }),
+        Deposit deposit => With(deposit.BucketId, deposit.OccurredOn, balance => balance with
         {
             NetContributed = balance.NetContributed + deposit.Amount,
             Deposited = balance.Deposited + deposit.Amount,
+        }),
+        Spend spend => With(spend.BucketId, spend.OccurredOn, balance => balance with
+        {
+            NetContributed = balance.NetContributed - spend.Amount,
         }),
         _ => throw new InvalidOperationException($"The state builder does not know the entry type {entry?.GetType().Name}."),
     };
@@ -56,7 +83,8 @@ public sealed class BudgetState
         balances.FirstOrDefault(balance => balance.BucketId == bucketId)
         ?? throw new InvalidOperationException($"Bucket {bucketId} is not part of this state.");
 
-    private BudgetState With(BucketId bucketId, Func<BucketBalance, BucketBalance> change)
+    // Applies a change to one bucket and records the first date its Available goes below zero.
+    private BudgetState With(BucketId bucketId, DateOnly occurredOn, Func<BucketBalance, BucketBalance> change)
     {
         var index = -1;
         for (var position = 0; position < balances.Count; position++)
@@ -74,17 +102,33 @@ public sealed class BudgetState
         }
 
         var changed = balances.ToArray();
-        changed[index] = change(changed[index]);
+        var balance = change(changed[index]);
+        if (balance.FirstNegativeOn is null && balance.Available.Amount < 0m)
+        {
+            balance = balance with { FirstNegativeOn = occurredOn };
+        }
+
+        changed[index] = balance;
         return new BudgetState(changed);
     }
 }
 
 /// <summary>One bucket's balances (ARCHITECTURE 4.3), all in the bucket's currency.</summary>
 /// <param name="BucketId">The bucket.</param>
+/// <param name="Kind">Savings or investment (only savings buckets must never go below zero).</param>
 /// <param name="NetContributed">Opening balance + deposits + transfers in − spends − transfers out.</param>
 /// <param name="OutstandingPrincipal">Borrowed − repaid principal; 0 until loans exist (phase 1b).</param>
 /// <param name="Deposited">The sum of deposits: the only income (invariant 5).</param>
-public sealed record BucketBalance(BucketId BucketId, Money NetContributed, Money OutstandingPrincipal, Money Deposited)
+/// <param name="HasOpeningBalance">Whether the bucket has an opening balance (D13: at most one).</param>
+/// <param name="FirstNegativeOn">The first date in replay order on which <see cref="Available"/> was below zero, or <c>null</c>.</param>
+public sealed record BucketBalance(
+    BucketId BucketId,
+    BucketKind Kind,
+    Money NetContributed,
+    Money OutstandingPrincipal,
+    Money Deposited,
+    bool HasOpeningBalance,
+    DateOnly? FirstNegativeOn)
 {
     /// <summary><c>NetContributed</c> − <c>OutstandingPrincipal</c>: what can be spent or moved.</summary>
     public Money Available => NetContributed - OutstandingPrincipal;
@@ -94,6 +138,11 @@ public sealed record BucketBalance(BucketId BucketId, Money NetContributed, Mone
     {
         ArgumentNullException.ThrowIfNull(bucket);
         var zero = Money.Zero(bucket.Currency);
-        return new BucketBalance(bucket.BucketId, zero, zero, zero);
+        return new BucketBalance(bucket.BucketId, bucket.Kind, zero, zero, zero, HasOpeningBalance: false, FirstNegativeOn: null);
     }
 }
+
+/// <summary>A savings bucket below zero at some point of the replay order (invariant 1 broken).</summary>
+/// <param name="BucketId">The bucket.</param>
+/// <param name="Date">The first date on which it was below zero.</param>
+public sealed record Overdraft(BucketId BucketId, DateOnly Date);

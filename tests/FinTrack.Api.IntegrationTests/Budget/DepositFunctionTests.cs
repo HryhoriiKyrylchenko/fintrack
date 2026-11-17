@@ -100,6 +100,41 @@ public sealed class DepositFunctionTests(ApiFixture fixture)
         state.State.BalanceOf(unallocated.BucketId).Available.ShouldBe(Money.From(6m, Currency.Eur));
     }
 
+    [Fact]
+    public async Task OpeningBalanceThenSpend_Are204_AndAnOverdraftIs422WithTheDay()
+    {
+        await SaveSettingsAsync();
+        var lastMonth = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var lastYear = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-365)).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+        (await OpeningBalanceAsync($$"""{"id":"{{Guid.CreateVersion7()}}","amount":{"amount":"100.00","currency":"PLN"},"occurredOn":"{{lastMonth}}","unallocated":"PLN"}"""))
+            .ShouldBeOfType<NoContentResult>();
+        (await SpendAsync($$"""{"id":"{{Guid.CreateVersion7()}}","amount":{"amount":"40.00","currency":"PLN"},"occurredOn":"{{Today}}","unallocated":"PLN"}"""))
+            .ShouldBeOfType<NoContentResult>();
+
+        var problem = Problem(await SpendAsync($$"""{"id":"{{Guid.CreateVersion7()}}","amount":{"amount":"1.00","currency":"PLN"},"occurredOn":"{{lastYear}}","unallocated":"PLN"}"""), 422);
+        problem.Extensions["code"].ShouldBe("bucket.insufficient_funds");
+        problem.Extensions["params"].ShouldBeAssignableTo<IReadOnlyDictionary<string, object>>()!["date"].ShouldBe(lastYear);
+
+        Code(await OpeningBalanceAsync($$"""{"id":"{{Guid.CreateVersion7()}}","amount":{"amount":"1.00","currency":"PLN"},"occurredOn":"{{Today}}","unallocated":"PLN"}"""), 422)
+            .ShouldBe("bucket.opening_balance_exists");
+
+        var state = await StateAsync();
+        state.State.BalanceOf(state.Buckets.ShouldHaveSingleItem().BucketId).Available.ShouldBe(Money.From(60m, Currency.Pln));
+    }
+
+    private async Task<IActionResult> OpeningBalanceAsync(string json)
+    {
+        await using var scope = await ScopeAsync();
+        return await ActivatorUtilities.CreateInstance<AddOpeningBalanceFunction>(scope.ServiceProvider).Run(JsonRequest(json), Cancellation);
+    }
+
+    private async Task<IActionResult> SpendAsync(string json)
+    {
+        await using var scope = await ScopeAsync();
+        return await ActivatorUtilities.CreateInstance<AddSpendFunction>(scope.ServiceProvider).Run(JsonRequest(json), Cancellation);
+    }
+
     private static string Body(Guid id, string amount, string currency) =>
         $$"""{"id":"{{id}}","amount":{"amount":"{{amount}}","currency":"{{currency}}"},"occurredOn":"{{Today}}","unallocated":"{{currency}}"}""";
 

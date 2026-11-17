@@ -37,6 +37,9 @@ public sealed class ErrorTextTests : IDisposable
         "money.amount_not_positive",
         "entry.id_reused",
         "entry.date_in_future",
+        "bucket.insufficient_funds",
+        "bucket.spend_not_allowed",
+        "bucket.opening_balance_exists",
         "settings.time_zone_unknown",
         "settings.locale_unknown",
     ];

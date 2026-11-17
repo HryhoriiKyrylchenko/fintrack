@@ -208,4 +208,13 @@
   <data name="Error.entry.date_in_future" xml:space="preserve">
     <value>The date cannot be later than today.</value>
   </data>
+  <data name="Error.bucket.insufficient_funds" xml:space="preserve">
+    <value>This would make the bucket's balance negative. Check the amount and the date, or add the money first.</value>
+  </data>
+  <data name="Error.bucket.spend_not_allowed" xml:space="preserve">
+    <value>Money cannot be spent from an investment bucket. Transfer it to a savings bucket first.</value>
+  </data>
+  <data name="Error.bucket.opening_balance_exists" xml:space="preserve">
+    <value>This bucket already has an opening balance.</value>
+  </data>
 </root>

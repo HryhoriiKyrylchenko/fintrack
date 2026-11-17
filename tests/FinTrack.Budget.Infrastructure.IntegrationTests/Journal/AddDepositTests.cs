@@ -112,11 +112,11 @@ public sealed class AddDepositTests(BudgetFixture fixture)
 
         // The second read its state before that commit (as a concurrent request would).
         var second = new AddDeposit(Guid.CreateVersion7(), Money.From(2m, Currency.Pln), Today, null, Currency.Pln, null, []);
-        var staleHandler = new AddDepositHandler(
+        var staleHandler = new AddDepositHandler(new BucketEntryWriter(
             new BudgetStateLoader(new FrozenVersionLedger(services.GetRequiredService<ILedger>(), stale.Version), new FrozenStore(stale)),
             services.GetRequiredService<ILedger>(),
             services.GetRequiredService<Shared.Kernel.Persistence.IOwnerContext>(),
-            services.GetRequiredService<Shared.Kernel.Time.IClock>());
+            services.GetRequiredService<Shared.Kernel.Time.IClock>()));
 
         (await staleHandler.Handle(second, Cancellation)).ShouldFailWith(Shared.Kernel.Results.ErrorCodes.ConcurrencyConflict, ErrorKind.Conflict);
 

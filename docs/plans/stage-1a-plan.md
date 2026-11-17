@@ -240,11 +240,20 @@ Rules for every step: branch from an up-to-date `main`; tests first; when the co
   - **Verified:** Debug and Release 0 warnings; 926 tests pass (804 before); `run-local.ps1` against a throwaway database (dropped; `fintrack` untouched): deposit before settings 404, deposit to `Unallocated` 204 (bucket created), repeat 204, other note 409, deposit to a bucket 204, other currency 422, future date 422; the stored entries printed with mongosh match the pinned shape; ledger version 4.
   - **Not verified:** CI (runs on the pull request).
 
-### [ ] Step 7. Slices: `OpeningBalance` and `Spend` (C)
+### [x] Step 7. Slices: `OpeningBalance` and `Spend` (C)
 - **Goal:** balances can start from real numbers and go down, never below zero.
 - **What we do (tests first):** both entry types; one opening balance per bucket (D13); spend rules (D11); the "never negative at any point" check (D2) with property tests for invariant 1 over random, also backdated, sequences.
 - **Done when:** a spend that would make any day negative is rejected with `bucket.insufficient_funds` and writes nothing.
 - **Depends on:** 6.
+- **Result:**
+  - **Domain:** `OpeningBalance` and `Spend`, with `Deposit`, derive from `SingleBucketEntry` (`BucketId`, `Amount`, the amount and date rules); the stored element order did not change (the pinned `Deposit` test passes unchanged). The state builder: an opening balance raises `NetContributed` and is not income; a spend lowers it; each `BucketBalance` now carries `Kind`, `HasOpeningBalance` and `FirstNegativeOn`, and `BudgetState.FirstOverdraft` is the earliest day a savings bucket was below zero (investment buckets exempt, 4.9). Codes `bucket.insufficient_funds` (parameter `date`, never an amount), `bucket.spend_not_allowed`, `bucket.opening_balance_exists` (all 422).
+  - **Application:** `IBucketEntryCommand`, `BucketEntryValidator<T>` and one write path, `BucketEntryWriter` (client ID, state with version first, settings, target with `Unallocated` on demand, repeat recognised first, archived, currency, the type's own rule, the entry's rules, invariant 1 by replaying with the new entry, one commit); `AddDeposit` moved onto it unchanged in behaviour; `AddOpeningBalance` (one per bucket) and `AddSpend` (not from an investment bucket).
+  - **Contracts and Api:** `AddOpeningBalanceRequest`, `AddSpendRequest`; `POST /v1/journal/opening-balances` and `/v1/journal/spends`.
+  - **Infrastructure:** the class map of `SingleBucketEntry` holds `bucketId` and `amount`; each concrete type maps its stable name (`OpeningBalance`, `Deposit`, `Spend`) and its constructor.
+  - **Tests:** state-builder cases (spending to exactly zero, a backdated spend before the money arrived, the same-day order by recorded time, the first day remembered after recovery, investment buckets exempt, the earliest day across buckets); a CsCheck property for invariant 1 over random backdated sequences of the three types (each accepted only through the domain's check, then verified by an independent running sum over the replay order) and invariants 2 and 10 on the accepted journals, also run for 10 s each; handler tests with fakes (including "a repeat is recognised before the balance check"); pinned shapes of `OpeningBalance` and `Spend`; end-to-end rules against MongoDB; the Api with the overdraft's `date`. Resource texts for the three codes.
+  - **Mutations,** each compiling and each caught: only the final balance checked, the alternative D2 rejected (Domain 3 including the property, Application 1, integration 1), investment buckets held to the savings rule (1), an opening balance counted as income (1), the type's own rule skipped (Application 2, integration 2), zero counted as below zero (1).
+  - **Verified:** Debug and Release 0 warnings; 961 tests pass (926 before); `run-local.ps1` against a throwaway database (dropped; `fintrack` untouched): opening balance 204, a second one 422, spend within the balance 204, beyond it 422, before the opening date 422, from an investment bucket 422; only the two accepted entries stored, with the pinned shape.
+  - **Not verified:** CI (runs on the pull request).
 
 ### [ ] Step 8. Slice: `Transfer` (C)
 - **Goal:** money moves between buckets, also across currencies.

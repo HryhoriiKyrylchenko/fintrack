@@ -122,7 +122,7 @@ Append-only. A mistake is fixed by a reversal entry plus a new entry; the UI may
 - Every amount in an entry is strictly positive (`money.amount_not_positive`); the type gives the direction. A bucket has at most one `OpeningBalance` that is not reversed (`bucket.opening_balance_exists`).
 - **Replay order**: (`OccurredOn`, `RecordedAt`, `Id`). Entries of one commit share `RecordedAt`, so `Id` breaks the tie: random within a millisecond, but fixed once stored, so every replay of the same journal gives the same order. The ID is compared by its standard (big-endian) bytes, which is how MongoDB sorts stored UUIDs, so memory and database agree (`ReplayOrder`). Index: `replay_order` `{ ownerId, occurredOn, recordedAt, _id }`.
 - **Common fields' rules**: `Note` optional, 1 to 500 characters, line breaks allowed, no other control characters, no surrounding white space; `Tags` at most 10, each 1 to 30 characters without surrounding white space or control characters, distinct without regard to case; `Source` stored as `Manual`, `Import:<name>` or `Agent:<name>` (name: lower-case letters, digits, `_`, `-`). Values are rejected, never corrected.
-- **Stored shape** (pinned by a raw-BSON test; a change needs an upcaster): `{ _id, type: "Deposit", ownerId, schemaVersion: 1, recordedAt, occurredOn: "2026-01-15", note?, tags: [...], groupId?, source: "Manual", externalId?, bucketId, amount: { amount: Decimal128, currency } }`. `tags` is always written (possibly empty); `note`, `groupId` and `externalId` only when set. The state builder (`BudgetState`, Domain) replays entries into balances per bucket; nothing is stored about balances.
+- **Stored shape** (pinned by a raw-BSON test; a change needs an upcaster); `OpeningBalance` and `Spend` have the same shape with their own `type`: `{ _id, type: "Deposit", ownerId, schemaVersion: 1, recordedAt, occurredOn: "2026-01-15", note?, tags: [...], groupId?, source: "Manual", externalId?, bucketId, amount: { amount: Decimal128, currency } }`. `tags` is always written (possibly empty); `note`, `groupId` and `externalId` only when set. The state builder (`BudgetState`, Domain) replays entries into balances per bucket; nothing is stored about balances.
 
 | Type | Meaning |
 |---|---|
@@ -141,7 +141,7 @@ Append-only. A mistake is fixed by a reversal entry plus a new entry; the UI may
 - `OutstandingPrincipal` = borrowed − repaid principal.
 - `Available` = `NetContributed` − `OutstandingPrincipal`.
 - Example: 1,000,000 contributed, 100,000 borrowed and not yet returned → 900,000 available.
-- `Available` is never negative **at any point of the replay order** (4.2), not only today: a new or backdated entry, or a reversal, is accepted only if no savings bucket goes below zero after any entry of the resulting journal (`bucket.insufficient_funds`). In phase 1a `OutstandingPrincipal` is 0; loans arrive in phase 1b.
+- `Available` is never negative **at any point of the replay order** (4.2), not only today: a new or backdated entry, or a reversal, is accepted only if no savings bucket goes below zero after any entry of the resulting journal (`bucket.insufficient_funds`, with the parameter `date`: the first day it would be below zero). Every command checks it by replaying the journal with its new entry; within one day the order is the recorded time, so a spend entered before that day's deposit is rejected. Reaching exactly zero is allowed. In phase 1a `OutstandingPrincipal` is 0; loans arrive in phase 1b.
 - Income reports count `Deposit` only.
 - Interest is **not** part of `OutstandingPrincipal` (see 4.4). This fixes an error in the earlier draft.
 
@@ -395,6 +395,8 @@ Real estate; bank import; trading or withdrawals through APIs; family groups or 
 | The replay order compares IDs by their big-endian bytes | That is MongoDB's order for stored UUIDs, so the order in memory and a sort or range read in the database are the same; written out instead of relying on `Guid.CompareTo`, which happens to agree. |
 | A repeated command is recognised before the rules are checked | It was valid when it was written; a later change (an archived bucket, the date moving past today's limit in another time zone) must not turn a harmless repeat into an error. |
 | The target of a deposit is a bucket ID or "Unallocated of a currency" | `Unallocated` has a server-generated ID the client may not know yet; naming it by currency lets the first deposit create it in the same commit (D5). |
+| Invariant 1 is checked by replaying the journal with the new entry | One rule for every entry type, also backdated ones and (step 9) reversals; the state builder records the first day each bucket went below zero, so the error can name it. Replaying the whole journal per command is fast for one owner; a stored projection can replace it later without touching the rule. |
+| Single-bucket entries share one write path | Opening balance, deposit and spend differ only in direction and one rule each (one opening balance; no spend from an investment bucket); one path keeps target resolution, repeats and the never-negative check identical for all three. |
 | No integration events in phase 1a | Nothing consumes them before the Investments context (phase 3); events without a consumer would be dead code. The outbox stays ready. |
 
 ## 11. Setup choices and open questions
