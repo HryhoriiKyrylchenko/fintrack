@@ -27,6 +27,12 @@ public sealed class ErrorTextTests : IDisposable
         "health.database_unavailable",
         "settings.not_found",
         "validation.failed",
+        "id.invalid",
+        "bucket.not_found",
+        "bucket.archived",
+        "bucket.name_taken",
+        "bucket.id_reused",
+        "bucket.system_bucket",
         "settings.time_zone_unknown",
         "settings.locale_unknown",
     ];

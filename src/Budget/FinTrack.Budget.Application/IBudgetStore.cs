@@ -1,3 +1,4 @@
+using FinTrack.Budget.Domain.Buckets;
 using FinTrack.Budget.Domain.Settings;
 
 namespace FinTrack.Budget.Application;
@@ -11,4 +12,7 @@ public interface IBudgetStore
 {
     /// <summary>The owner's settings, or <c>null</c> before they are saved for the first time.</summary>
     Task<OwnerSettings?> GetSettingsAsync(CancellationToken cancellationToken);
+
+    /// <summary>All of the owner's buckets, archived ones included, in no particular order.</summary>
+    Task<IReadOnlyList<Bucket>> GetBucketsAsync(CancellationToken cancellationToken);
 }

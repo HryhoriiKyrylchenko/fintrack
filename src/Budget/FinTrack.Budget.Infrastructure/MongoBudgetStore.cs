@@ -1,4 +1,5 @@
 using FinTrack.Budget.Application;
+using FinTrack.Budget.Domain.Buckets;
 using FinTrack.Budget.Domain.Settings;
 using FinTrack.Shared.Infrastructure.Mongo;
 using FinTrack.Shared.Kernel.Persistence;
@@ -17,5 +18,11 @@ internal sealed class MongoBudgetStore(IMongoDatabase database, IOwnerContext ow
 
         // The unique index allows at most one per owner.
         return found.SingleOrDefault();
+    }
+
+    public async Task<IReadOnlyList<Bucket>> GetBucketsAsync(CancellationToken cancellationToken)
+    {
+        var buckets = new MutableCollection<Bucket>(database, BudgetCollections.Buckets, owner, clock);
+        return await buckets.FindAsync(FilterDefinition<Bucket>.Empty, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 }

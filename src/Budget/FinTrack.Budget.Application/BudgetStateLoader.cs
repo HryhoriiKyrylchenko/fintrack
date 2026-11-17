@@ -1,3 +1,4 @@
+using FinTrack.Budget.Domain.Buckets;
 using FinTrack.Budget.Domain.Settings;
 using FinTrack.Shared.Kernel.Ledger;
 
@@ -8,7 +9,7 @@ namespace FinTrack.Budget.Application;
 /// version first, then the documents. A command commits against <see cref="BudgetSnapshot.Version"/>,
 /// so a write that lands in between makes the commit fail instead of passing on stale data.
 /// </summary>
-/// <remarks>Buckets (step 5) and the journal with the state builder (step 6) are added here.</remarks>
+/// <remarks>The journal and the state builder are added here in step 6.</remarks>
 public sealed class BudgetStateLoader(ILedger ledger, IBudgetStore store)
 {
     /// <summary>Reads the version, then the owner's documents.</summary>
@@ -16,11 +17,17 @@ public sealed class BudgetStateLoader(ILedger ledger, IBudgetStore store)
     {
         var version = await ledger.GetVersionAsync(BudgetLedger.Name, cancellationToken).ConfigureAwait(false);
         var settings = await store.GetSettingsAsync(cancellationToken).ConfigureAwait(false);
-        return new BudgetSnapshot(version, settings);
+        var buckets = await store.GetBucketsAsync(cancellationToken).ConfigureAwait(false);
+        return new BudgetSnapshot(version, settings, buckets);
     }
 }
 
 /// <summary>Budget's state for one owner, as read by <see cref="BudgetStateLoader"/>.</summary>
 /// <param name="Version">The ledger version, read before everything else; the expected version of a commit.</param>
 /// <param name="Settings">The owner's settings, or <c>null</c> before the first save.</param>
-public sealed record BudgetSnapshot(long Version, OwnerSettings? Settings);
+/// <param name="Buckets">All of the owner's buckets, archived ones included.</param>
+public sealed record BudgetSnapshot(long Version, OwnerSettings? Settings, IReadOnlyList<Bucket> Buckets)
+{
+    /// <summary>The owner's bucket with <paramref name="id"/>, or <c>null</c>.</summary>
+    public Bucket? FindBucket(Guid id) => Buckets.FirstOrDefault(bucket => bucket.Id == id);
+}
