@@ -1,7 +1,9 @@
 using FinTrack.Budget.Application;
 using FinTrack.Budget.Application.Buckets;
+using FinTrack.Budget.Application.Journal;
 using FinTrack.Budget.Application.Settings;
 using FinTrack.Budget.Domain.Buckets;
+using FinTrack.Budget.Domain.Journal;
 using FinTrack.Budget.Domain.Settings;
 using FinTrack.Shared.Infrastructure.Ledger;
 using FinTrack.Shared.Infrastructure.Mongo;
@@ -32,7 +34,8 @@ public static class BudgetServiceCollectionExtensions
 
         services.AddLedgerDocuments(new LedgerDocuments(BudgetLedger.Name)
             .Mutable<OwnerSettings>(BudgetCollections.Settings)
-            .Mutable<Bucket>(BudgetCollections.Buckets));
+            .Mutable<Bucket>(BudgetCollections.Buckets)
+            .AppendOnly<JournalEntry>(BudgetCollections.Journal));
         services.AddMongoIndexInitializer<BudgetIndexInitializer>();
 
         services.TryAddScoped<IBudgetStore, MongoBudgetStore>();
@@ -41,6 +44,7 @@ public static class BudgetServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<SaveOwnerSettings>, SaveOwnerSettingsValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<CreateBucket>, CreateBucketValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<RenameBucket>, RenameBucketValidator>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<AddDeposit>, AddDepositValidator>());
 
         return services;
     }

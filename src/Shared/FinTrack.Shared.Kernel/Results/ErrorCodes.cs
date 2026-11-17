@@ -26,4 +26,7 @@ public static class ErrorCodes
     /// Parameters <c>currency</c> and <c>maxDecimalPlaces</c>.
     /// </summary>
     public const string MoneyTooManyDecimals = "money.too_many_decimals";
+
+    /// <summary>An amount that must be above zero (an entry amount, plan 1a D13) is zero or negative. No parameters.</summary>
+    public const string MoneyAmountNotPositive = "money.amount_not_positive";
 }

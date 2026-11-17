@@ -8,4 +8,7 @@ public static class BudgetCollections
 
     /// <summary>The owner's buckets, archived ones included.</summary>
     public const string Buckets = "budget_buckets";
+
+    /// <summary>The owner's journal: every entry type, append-only.</summary>
+    public const string Journal = "budget_journal";
 }

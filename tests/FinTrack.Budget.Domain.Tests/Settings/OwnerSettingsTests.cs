@@ -118,6 +118,18 @@ public class OwnerSettingsTests
     public void HasValues_ComparesAllThree(string currency, string timeZone, string locale, bool expected) =>
         Stored().HasValues(Currency.FromCode(currency).Value, timeZone, locale).ShouldBe(expected);
 
+    [Theory]
+    [InlineData("2026-01-15T23:30:00Z", "Europe/Warsaw", "2026-01-16")]
+    [InlineData("2026-01-16T03:00:00Z", "America/New_York", "2026-01-15")]
+    [InlineData("2026-07-15T22:00:00Z", "Europe/Warsaw", "2026-07-16")]
+    public void Today_IsTheDateInTheOwnersTimeZone(string utcNow, string timeZone, string expected)
+    {
+        var settings = OwnerSettings.Create(Id, Owner, Currency.Pln, timeZone, "pl-PL").Value;
+
+        settings.Today(DateTimeOffset.Parse(utcNow, System.Globalization.CultureInfo.InvariantCulture))
+            .ShouldBe(DateOnly.Parse(expected, System.Globalization.CultureInfo.InvariantCulture));
+    }
+
     private static FluentResults.Result<OwnerSettings> Create(Currency currency, string timeZone, string locale) =>
         OwnerSettings.Create(Id, Owner, currency, timeZone, locale);
 

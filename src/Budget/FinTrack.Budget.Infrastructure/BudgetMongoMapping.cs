@@ -1,9 +1,11 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using FinTrack.Budget.Domain.Buckets;
+using FinTrack.Budget.Domain.Journal;
 using FinTrack.Budget.Domain.Settings;
 using FinTrack.Shared.Infrastructure.Mongo;
 using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Conventions;
 
 namespace FinTrack.Budget.Infrastructure;
 
@@ -17,7 +19,10 @@ namespace FinTrack.Budget.Infrastructure;
 /// <item><description>every stored property is mapped by hand with an explicit element name, so renaming a C# property never changes what is stored (no automatic mapping, no naming convention);</description></item>
 /// <item><description>every element is required, except a field that is optional by design (<see cref="MapOptional"/>): it is not written when empty and reads as empty when missing, so adding such a field later needs no upcaster (ARCHITECTURE 4.1);</description></item>
 /// <item><description>the type's private constructor restores a stored document; its parameters are matched to the mapped properties by name;</description></item>
-/// <item><description>unknown elements make reading fail, as for every stored type.</description></item>
+/// <item><description>unknown elements make reading fail, as for every stored type;</description></item>
+/// <item><description>journal entry types share <c>budget_journal</c>: the root <see cref="JournalEntry"/> maps the common
+/// fields, each type its own, and the element <c>type</c> holds the stable name from <see cref="JournalEntryTypes"/>,
+/// never the CLR name (plan 1a D1; a guard test requires a name for every entry type).</description></item>
 /// </list>
 /// <para>
 /// Value formats (IDs, currencies, instants) come from the shared format in
@@ -27,8 +32,20 @@ namespace FinTrack.Budget.Infrastructure;
 /// </remarks>
 public static class BudgetMongoMapping
 {
+    /// <summary>The element that holds an entry's type name.</summary>
+    public const string TypeElement = "type";
+
     private static readonly Lock Gate = new();
     private static bool registered;
+
+    /// <summary>
+    /// The stable stored name of each journal entry type (ARCHITECTURE 4.2). Written out by hand: a
+    /// stored name must never follow a renamed class. Every concrete entry type must be listed.
+    /// </summary>
+    public static IReadOnlyDictionary<Type, string> JournalEntryTypes { get; } = new Dictionary<Type, string>
+    {
+        [typeof(Deposit)] = "Deposit",
+    };
 
     /// <summary>Registers the class maps. Safe to call more than once and from several threads.</summary>
     public static void Register()
@@ -43,6 +60,11 @@ public static class BudgetMongoMapping
             MongoSerialization.Register();
             BsonClassMap.RegisterClassMap<OwnerSettings>(MapOwnerSettings);
             BsonClassMap.RegisterClassMap<Bucket>(MapBucket);
+
+            BsonSerializer.RegisterSerializer(new EntrySourceSerializer());
+            BsonSerializer.RegisterDiscriminatorConvention(typeof(JournalEntry), new ScalarDiscriminatorConvention(TypeElement));
+            BsonClassMap.RegisterClassMap<JournalEntry>(MapJournalEntry);
+            BsonClassMap.RegisterClassMap<Deposit>(MapDeposit);
 
             registered = true;
         }
@@ -81,6 +103,32 @@ public static class BudgetMongoMapping
         MapPrivateConstructor(map);
     }
 
+    private static void MapJournalEntry(BsonClassMap<JournalEntry> map)
+    {
+        // The root of the journal's types: the "type" element is always written, also for a single type.
+        map.SetIsRootClass(true);
+        map.MapIdMember(entry => entry.Id);
+        Map(map, entry => entry.OwnerId, "ownerId");
+        Map(map, entry => entry.SchemaVersion, "schemaVersion");
+        Map(map, entry => entry.RecordedAt, "recordedAt");
+        Map(map, entry => entry.OccurredOn, "occurredOn");
+        MapOptional(map, entry => entry.Note, "note");
+        Map(map, entry => entry.Tags, "tags");
+        MapOptional(map, entry => entry.GroupId, "groupId");
+        Map(map, entry => entry.Source, "source");
+        MapOptional(map, entry => entry.ExternalId, "externalId");
+        map.SetIgnoreExtraElements(false);
+    }
+
+    private static void MapDeposit(BsonClassMap<Deposit> map)
+    {
+        map.SetDiscriminator(JournalEntryTypes[typeof(Deposit)]);
+        Map(map, deposit => deposit.BucketId, "bucketId");
+        Map(map, deposit => deposit.Amount, "amount");
+        map.SetIgnoreExtraElements(false);
+        MapPrivateConstructor(map);
+    }
+
     private static void Map<TDocument, TMember>(BsonClassMap<TDocument> map, Expression<Func<TDocument, TMember>> member, string elementName) =>
         map.MapMember(member).SetElementName(elementName).SetIsRequired(true);
 
@@ -89,16 +137,17 @@ public static class BudgetMongoMapping
     private static void MapOptional<TDocument, TMember>(BsonClassMap<TDocument> map, Expression<Func<TDocument, TMember>> member, string elementName) =>
         map.MapMember(member).SetElementName(elementName).SetIsRequired(false).SetDefaultValue((object?)null).SetIgnoreIfNull(true);
 
-    // The single private constructor, with its parameters matched to the mapped properties by name
-    // (constructor "timeZone" is property "TimeZone"). A parameter without a mapped property is a bug.
+    // The single private constructor, with its parameters matched to the type's properties by name
+    // (constructor "timeZone" is property "TimeZone"; inherited properties count). A parameter without a
+    // property is a bug; a property that is not mapped fails when the map is frozen.
     private static void MapPrivateConstructor<TDocument>(BsonClassMap<TDocument> map)
     {
         var constructor = typeof(TDocument).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic).Single();
-        var members = map.DeclaredMemberMaps.Select(member => member.MemberName).ToList();
+        var properties = typeof(TDocument).GetProperties(BindingFlags.Instance | BindingFlags.Public).Select(property => property.Name).ToList();
 
         var arguments = constructor.GetParameters()
-            .Select(parameter => members.SingleOrDefault(member => string.Equals(member, parameter.Name, StringComparison.OrdinalIgnoreCase))
-                ?? throw new InvalidOperationException($"{typeof(TDocument).Name}: constructor parameter '{parameter.Name}' has no mapped property."))
+            .Select(parameter => properties.SingleOrDefault(property => string.Equals(property, parameter.Name, StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException($"{typeof(TDocument).Name}: constructor parameter '{parameter.Name}' has no property."))
             .ToArray();
 
         map.MapConstructor(constructor, arguments);

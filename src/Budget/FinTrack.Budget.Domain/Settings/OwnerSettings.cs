@@ -116,6 +116,13 @@ public sealed class OwnerSettings : IMutableDocument
             : Result.Ok(new OwnerSettings(Id, OwnerId, SchemaVersion, Version, CreatedAt, UpdatedAt, reportingCurrency, timeZone, locale));
     }
 
+    /// <summary>
+    /// Today in the owner's time zone at <paramref name="utcNow"/> (ARCHITECTURE 3): the latest date an
+    /// entry may have. Pure: the caller passes the time from <c>IClock</c>.
+    /// </summary>
+    public DateOnly Today(DateTimeOffset utcNow) =>
+        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(utcNow, TimeZoneInfo.FindSystemTimeZoneById(TimeZone)).DateTime);
+
     /// <summary>Whether these settings already hold exactly these values (so saving them would change nothing).</summary>
     public bool HasValues(Currency reportingCurrency, string timeZone, string locale) =>
         ReportingCurrency == reportingCurrency
