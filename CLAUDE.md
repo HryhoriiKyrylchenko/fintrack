@@ -97,7 +97,7 @@ The list in `docs/ARCHITECTURE.md` section 7 is binding. The most important:
 - Allocation splits sum exactly to the payment.
 - State always comes from the journal.
 
-Any new domain behaviour needs tests for the invariants it touches.
+Any new domain behaviour needs tests for the invariants it touches. A new Budget command also joins the model test (`tests/FinTrack.Budget.Application.Tests/Histories/BudgetModelTests.cs`), so it runs in random histories with every other command.
 
 ## How to work
 

@@ -273,7 +273,7 @@ Rule: a portfolio cannot withdraw more cash than it holds, and no holding quanti
 12. Every query and write is scoped by `OwnerId`. Two documented exceptions (section 2.3): the outbox sweep, and reference data without an owner (FX rates, later prices) in `ref_` collections, which never hold owner data.
 13. Handlers are idempotent for repeated commands and events (same `Id` → same outcome, no duplicates).
 
-Testing approach: domain unit tests first; property-based tests for invariants 1, 2, 9 and 10; scenario tests built from real-life cases; integration tests against a real local MongoDB. Acceptance: run the app in parallel with the existing spreadsheet for two to three months and compare.
+Testing approach: domain unit tests first; property-based tests for invariants 1, 2, 9 and 10, and a model test that runs random histories of every Budget command through the real handlers and checks invariants 1, 2, 10, 11 and 13 after each one (`BudgetModelTests`); scenario tests built from real-life cases; integration tests against a real local MongoDB. Acceptance: run the app in parallel with the existing spreadsheet for two to three months and compare.
 
 ## 8. Phases
 
@@ -402,6 +402,7 @@ Real estate; bank import; trading or withdrawals through APIs; family groups or 
 | One write path for every entry type (`JournalWriter`) | Transfers need two targets and two bucket checks; generalising the step-7 path keeps the order of checks (repeat first, then rules, then invariant 1 by replay) identical for every type, and lets both sides of a transfer share one `Unallocated` created on demand. |
 | A reversal of an entry that touches an archived bucket is rejected | An archived bucket accepts no change to its balance; reversing a spend would put money back into it. Not in D3 as written; added in step 9. |
 | Reversals are resolved before the replay | The state builder leaves out reversed entries and the reversals themselves, so the replay order is unchanged and a reversed entry counts as if it never happened at its original date; the step-by-step build runs over the same effective journal. |
+| The model test runs the real handlers against an in-memory ledger and store | Thousands of random histories per run need memory speed; the in-memory budget behaves like the MongoDB adapter where handlers can tell (expected version, unique IDs, version stamping, replay order), and MongoDB itself is covered by the integration tests. A coverage check requires every command to be both accepted and rejected somewhere, so the invariants are not checked against trivial histories. |
 | No integration events in phase 1a | Nothing consumes them before the Investments context (phase 3); events without a consumer would be dead code. The outbox stays ready. |
 
 ## 11. Setup choices and open questions
