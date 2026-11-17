@@ -105,7 +105,7 @@ public sealed class AddDepositTests(BudgetFixture fixture)
         var owner = await NewOwnerWithSettingsAsync();
         await using var scope = fixture.ScopeFor(owner);
         var services = scope.ServiceProvider;
-        var stale = await services.GetRequiredService<BudgetStateLoader>().LoadAsync(Cancellation);
+        var stale = (await services.GetRequiredService<BudgetStateLoader>().LoadAsync(Cancellation)).Value;
 
         // The first deposit creates Unallocated and moves the ledger on.
         (await DepositAsync(owner, new AddDeposit(Guid.CreateVersion7(), Money.From(1m, Currency.Pln), Today, null, Currency.Pln, null, []))).IsSuccess.ShouldBeTrue();
@@ -154,7 +154,7 @@ public sealed class AddDepositTests(BudgetFixture fixture)
     private async Task<BudgetSnapshot> StateAsync(OwnerId owner)
     {
         await using var scope = fixture.ScopeFor(owner);
-        return await scope.ServiceProvider.GetRequiredService<BudgetStateLoader>().LoadAsync(Cancellation);
+        return (await scope.ServiceProvider.GetRequiredService<BudgetStateLoader>().LoadAsync(Cancellation)).Value;
     }
 
     /// <summary>Reports a version read earlier; commits go to the real ledger.</summary>

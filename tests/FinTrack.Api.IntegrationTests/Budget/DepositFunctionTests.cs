@@ -161,7 +161,7 @@ public sealed class DepositFunctionTests(ApiFixture fixture)
     private async Task<BudgetSnapshot> StateAsync()
     {
         await using var scope = await ScopeAsync();
-        return await scope.ServiceProvider.GetRequiredService<BudgetStateLoader>().LoadAsync(Cancellation);
+        return (await scope.ServiceProvider.GetRequiredService<BudgetStateLoader>().LoadAsync(Cancellation)).Value;
     }
 
     private async Task<AsyncServiceScope> ScopeAsync()

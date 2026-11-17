@@ -117,6 +117,6 @@ public sealed class OpeningBalanceAndSpendTests(BudgetFixture fixture)
     private async Task<BudgetSnapshot> StateAsync(OwnerId owner)
     {
         await using var scope = fixture.ScopeFor(owner);
-        return await scope.ServiceProvider.GetRequiredService<BudgetStateLoader>().LoadAsync(Cancellation);
+        return (await scope.ServiceProvider.GetRequiredService<BudgetStateLoader>().LoadAsync(Cancellation)).Value;
     }
 }

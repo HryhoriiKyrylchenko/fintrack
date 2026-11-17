@@ -102,7 +102,13 @@ public sealed class BucketEntryWriter(BudgetStateLoader loader, ILedger ledger, 
             return id.ToResult();
         }
 
-        var state = await loader.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var loaded = await loader.LoadAsync(cancellationToken).ConfigureAwait(false);
+        if (loaded.IsFailed)
+        {
+            return loaded.ToResult();
+        }
+
+        var state = loaded.Value;
         if (state.Settings is not { } settings)
         {
             return Result.Fail(AppError.NotFound(BudgetErrorCodes.SettingsNotFound));

@@ -54,7 +54,7 @@ public class OwnerSettingsHandlerTests
 
         await Save(new SaveOwnerSettings(Currency.Pln, "Europe/Warsaw", "pl-PL"));
 
-        log.Calls.ShouldBe(["version", "settings", "buckets", "journal", "commit"]);
+        log.Calls.ShouldBe(["version", "settings", "buckets", "journal", "version", "commit"]);
         ledger.Commits.ShouldHaveSingleItem().ExpectedVersion.ShouldBe(7);
     }
 
@@ -155,7 +155,7 @@ public class OwnerSettingsHandlerTests
     {
         await Get();
 
-        log.Calls.ShouldBe(["version", "settings", "buckets", "journal"]);
+        log.Calls.ShouldBe(["version", "settings", "buckets", "journal", "version"]);
     }
 
     [Fact]

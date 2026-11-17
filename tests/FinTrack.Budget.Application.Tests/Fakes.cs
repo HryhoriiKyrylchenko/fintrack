@@ -69,10 +69,15 @@ internal sealed class FakeBudgetStore(CallLog log) : IBudgetStore
 
     public List<JournalEntry> Journal { get; } = [];
 
+    /// <summary>Runs after the journal is read: a test can make a commit "land" between the reads.</summary>
+    public Action? AfterJournalRead { get; set; }
+
     public Task<IReadOnlyList<JournalEntry>> GetJournalAsync(CancellationToken cancellationToken)
     {
         log.Calls.Add("journal");
-        return Task.FromResult<IReadOnlyList<JournalEntry>>([.. Journal]);
+        IReadOnlyList<JournalEntry> journal = [.. Journal];
+        AfterJournalRead?.Invoke();
+        return Task.FromResult(journal);
     }
 }
 

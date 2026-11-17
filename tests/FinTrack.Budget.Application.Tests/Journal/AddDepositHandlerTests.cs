@@ -42,7 +42,7 @@ public class AddDepositHandlerTests
         var result = await Add(new AddDeposit(id, Money.From(250.00m, Currency.Pln), Today, cushion.Id, null, "Salary", ["work"]));
 
         result.IsSuccess.ShouldBeTrue();
-        log.Calls.ShouldBe(["version", "settings", "buckets", "journal", "commit"]);
+        log.Calls.ShouldBe(["version", "settings", "buckets", "journal", "version", "commit"]);
         var commit = ledger.Commits.ShouldHaveSingleItem();
         commit.ExpectedVersion.ShouldBe(3);
         commit.Saves.ShouldBeEmpty();
