@@ -178,4 +178,22 @@
   <data name="Error.validation.failed" xml:space="preserve">
     <value>Some values are not valid. Check them and try again.</value>
   </data>
+  <data name="Error.bucket.not_found" xml:space="preserve">
+    <value>This bucket no longer exists. Reload the list and try again.</value>
+  </data>
+  <data name="Error.bucket.archived" xml:space="preserve">
+    <value>This bucket is archived and cannot be changed.</value>
+  </data>
+  <data name="Error.bucket.name_taken" xml:space="preserve">
+    <value>Another bucket already has this name. Choose a different name.</value>
+  </data>
+  <data name="Error.bucket.id_reused" xml:space="preserve">
+    <value>This bucket was already created with other values. Reload the list to see it.</value>
+  </data>
+  <data name="Error.bucket.system_bucket" xml:space="preserve">
+    <value>This bucket is managed by FinTrack and cannot be renamed or archived.</value>
+  </data>
+  <data name="Error.id.invalid" xml:space="preserve">
+    <value>The app sent an identifier the server does not accept. Reload the page and try again.</value>
+  </data>
 </root>

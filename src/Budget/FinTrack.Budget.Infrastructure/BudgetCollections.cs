@@ -5,4 +5,7 @@ public static class BudgetCollections
 {
     /// <summary>One <c>OwnerSettings</c> document per owner.</summary>
     public const string Settings = "budget_settings";
+
+    /// <summary>The owner's buckets, archived ones included.</summary>
+    public const string Buckets = "budget_buckets";
 }

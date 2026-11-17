@@ -2,6 +2,7 @@ using System.Text;
 using FinTrack.Api.Http;
 using FinTrack.Api.IntegrationTests.Middleware;
 using FinTrack.Api.Middleware;
+using FinTrack.Budget.Contracts.V1.Buckets;
 using FinTrack.Budget.Contracts.V1.Settings;
 using FinTrack.Shared.Infrastructure.Health;
 using FinTrack.Shared.Kernel.Monetary;
@@ -110,6 +111,23 @@ public sealed class JsonResponseTests : IDisposable
         var response = await ExecuteAsync(ProblemDetailsMapper.ToActionResult(Result.Ok(new OwnerSettingsDto(Currency.Pln, "Europe/Warsaw", "pl-PL"))));
 
         response.Body.ShouldBe("""{"reportingCurrency":"PLN","timeZone":"Europe/Warsaw","locale":"pl-PL"}""");
+    }
+
+    [Fact]
+    public async Task Buckets_HaveTheV1Shape_WithEmptyValuesAsNull()
+    {
+        var id = Guid.Parse("0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b");
+        IReadOnlyList<BucketDto> buckets =
+        [
+            new(id, "Crypto", Currency.Usd, BucketKind.Investment, InvestmentProfile.Crypto, BucketStatus.Active, BucketSystemRole.None),
+            new(id, null, Currency.Pln, BucketKind.Savings, null, BucketStatus.Active, BucketSystemRole.Unallocated),
+        ];
+
+        var response = await ExecuteAsync(ProblemDetailsMapper.ToActionResult(Result.Ok(buckets)));
+
+        response.Body.ShouldBe(
+            "[{\"id\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b\",\"name\":\"Crypto\",\"currency\":\"USD\",\"kind\":\"Investment\",\"profile\":\"Crypto\",\"status\":\"Active\",\"systemRole\":\"None\"},"
+            + "{\"id\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b\",\"name\":null,\"currency\":\"PLN\",\"kind\":\"Savings\",\"profile\":null,\"status\":\"Active\",\"systemRole\":\"Unallocated\"}]");
     }
 
     public void Dispose() => host.Dispose();

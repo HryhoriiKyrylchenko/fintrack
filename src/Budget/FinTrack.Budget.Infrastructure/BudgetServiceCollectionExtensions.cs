@@ -1,5 +1,7 @@
 using FinTrack.Budget.Application;
+using FinTrack.Budget.Application.Buckets;
 using FinTrack.Budget.Application.Settings;
+using FinTrack.Budget.Domain.Buckets;
 using FinTrack.Budget.Domain.Settings;
 using FinTrack.Shared.Infrastructure.Ledger;
 using FinTrack.Shared.Infrastructure.Mongo;
@@ -29,13 +31,16 @@ public static class BudgetServiceCollectionExtensions
         BudgetMongoMapping.Register();
 
         services.AddLedgerDocuments(new LedgerDocuments(BudgetLedger.Name)
-            .Mutable<OwnerSettings>(BudgetCollections.Settings));
+            .Mutable<OwnerSettings>(BudgetCollections.Settings)
+            .Mutable<Bucket>(BudgetCollections.Buckets));
         services.AddMongoIndexInitializer<BudgetIndexInitializer>();
 
         services.TryAddScoped<IBudgetStore, MongoBudgetStore>();
         services.TryAddScoped<BudgetStateLoader>();
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<SaveOwnerSettings>, SaveOwnerSettingsValidator>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<CreateBucket>, CreateBucketValidator>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<RenameBucket>, RenameBucketValidator>());
 
         return services;
     }

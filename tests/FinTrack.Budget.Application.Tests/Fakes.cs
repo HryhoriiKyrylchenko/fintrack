@@ -1,4 +1,5 @@
 using System.Reflection;
+using FinTrack.Budget.Domain.Buckets;
 using FinTrack.Budget.Domain.Settings;
 using FinTrack.Shared.Kernel.Ids;
 using FinTrack.Shared.Kernel.Ledger;
@@ -51,10 +52,18 @@ internal sealed class FakeBudgetStore(CallLog log) : IBudgetStore
 {
     public OwnerSettings? Settings { get; set; }
 
+    public List<Bucket> Buckets { get; } = [];
+
     public Task<OwnerSettings?> GetSettingsAsync(CancellationToken cancellationToken)
     {
         log.Calls.Add("settings");
         return Task.FromResult(Settings);
+    }
+
+    public Task<IReadOnlyList<Bucket>> GetBucketsAsync(CancellationToken cancellationToken)
+    {
+        log.Calls.Add("buckets");
+        return Task.FromResult<IReadOnlyList<Bucket>>([.. Buckets]);
     }
 }
 
@@ -63,6 +72,17 @@ internal sealed class FakeOwnerContext : IOwnerContext
     public static readonly OwnerId Owner = OwnerId.From(Guid.Parse("aaaaaaaa-0000-4000-8000-000000000001"));
 
     public OwnerId OwnerId => Owner;
+}
+
+/// <summary>Builds buckets as the database returns them (through the private constructor, as the mapping does).</summary>
+internal static class StoredBuckets
+{
+    public static Bucket Of(Guid id, string name, Currency currency, long version, DateTimeOffset createdAt, BucketStatus status)
+    {
+        var constructor = typeof(Bucket).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic).Single();
+        return (Bucket)constructor.Invoke(
+            [id, FakeOwnerContext.Owner, Bucket.CurrentSchemaVersion, version, createdAt, createdAt, name, currency, BucketKind.Savings, null, status, BucketSystemRole.None]);
+    }
 }
 
 /// <summary>Builds settings as the database returns them (through the private constructor, as the mapping does).</summary>
