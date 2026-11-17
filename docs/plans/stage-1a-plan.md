@@ -256,11 +256,20 @@ Rules for every step: branch from an up-to-date `main`; tests first; when the co
   - **Verified:** Debug and Release 0 warnings; 964 tests pass (926 before); `run-local.ps1` against a throwaway database (dropped; `fintrack` untouched): opening balance 204, a second one 422, spend within the balance 204, beyond it 422, before the opening date 422, from an investment bucket 422; only the two accepted entries stored, with the pinned shape.
   - **Not verified:** CI (runs on the pull request).
 
-### [ ] Step 8. Slice: `Transfer` (C)
+### [x] Step 8. Slice: `Transfer` (C)
 - **Goal:** money moves between buckets, also across currencies.
 - **What we do (tests first):** the entry and its rules (D6); derived rate; both sides in one entry; property tests: a same-currency transfer without fee leaves the owner's total unchanged, no currency is ever added to another (invariant 11).
 - **Done when:** same-currency and cross-currency transfers work end to end; inconsistent input is rejected with its code.
 - **Depends on:** 7.
+- **Result:**
+  - **Domain:** `Transfer` (D6): `FromBucketId`, `ToBucketId`, `FromAmount` (fee included), `ToAmount`, optional `Fee` (source currency), `Rate` = `ToAmount ÷ (FromAmount − Fee)`, banker's rounding to 12 places, stored for display. Rules reported together: amounts and fee above zero (`money.amount_not_positive`), a fee in the source currency (`bucket.currency_mismatch`), `transfer.same_bucket`, `transfer.fee_exceeds_amount`, `transfer.amounts_inconsistent` (all 400: visible in the request alone), date (422). The state builder takes `FromAmount` from the source and adds `ToAmount` to the destination; never income.
+  - **Application:** the step-7 path is generalised into `JournalWriter` with `JournalWriteContext` (target resolution with one `Unallocated` per currency created on demand, also when both sides name it; the bucket rules) and `JournalDraft`; `BucketEntryWriter` is a thin layer on it with the same constructor. `AddTransfer` resolves both sides and checks both buckets (active, currency of each amount); investment buckets may send and receive.
+  - **Contracts and Api:** `AddTransferRequest` (`fromBucketId` or `fromUnallocated`, `toBucketId` or `toUnallocated`, `fromAmount`, `toAmount`, optional `fee`); `POST /v1/journal/transfers`.
+  - **Infrastructure:** stable name `Transfer`; `fee` optional (absent when there is none), `rate` required. Pinned shape in ARCHITECTURE 4.2 and a raw-BSON test.
+  - **Tests:** domain rules and rate (fee excluded, 12 places); state builder (moved amounts, not income, an overdraft by a backdated transfer out, investment buckets may go below zero); CsCheck properties for invariant 11 (per-currency totals equal an independent sum over deposits and transfers of both kinds, with and without fees) and "a same-currency transfer without fee changes no total", and the invariant-1 property now with transfers, all also run for 10 s; handler tests with fakes (both sides, `Unallocated` on demand, the same `Unallocated` on both sides, insufficient funds, currencies, archived, repeats before the balance check); MongoDB end to end; the Api with the derived rate.
+  - **Mutations,** each compiling and each caught: the rate including the fee (Domain 2, integration 1), the destination receiving `FromAmount` (Domain 3, including both properties), same-currency amounts unchecked (Domain 3, Application 1), a transfer counted as income (Domain 1, integration 1), two `Unallocated` buckets of one currency in one transfer (Application 1). A first version of the third did not compile (comparing a value with itself is an error) and was replaced.
+  - **Verified:** Debug and Release 0 warnings; 1003 tests pass (964 before); `run-local.ps1` against a throwaway database (dropped; `fintrack` untouched): same-currency transfer with fee 204 (rate `1`), to EUR `Unallocated` 204 (bucket created, rate `0.232558139535`, no `fee` element), inconsistent amounts 400, more than the balance 422, same bucket 400.
+  - **Not verified:** CI (runs on the pull request).
 
 ### [ ] Step 9. Slices: `Reversal` and archiving a bucket (C)
 - **Goal:** mistakes are corrected without editing history; empty buckets can be put away.

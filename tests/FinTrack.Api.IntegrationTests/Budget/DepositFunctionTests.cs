@@ -123,6 +123,30 @@ public sealed class DepositFunctionTests(ApiFixture fixture)
         state.State.BalanceOf(state.Buckets.ShouldHaveSingleItem().BucketId).Available.ShouldBe(Money.From(60m, Currency.Pln));
     }
 
+    [Fact]
+    public async Task Transfer_Is204_WithTheDerivedRate_AndInvalidOnesAre400()
+    {
+        await SaveSettingsAsync();
+        await DepositAsync($$"""{"id":"{{Guid.CreateVersion7()}}","amount":{"amount":"500.00","currency":"PLN"},"occurredOn":"{{Today}}","unallocated":"PLN"}""");
+
+        (await TransferAsync($$"""{"id":"{{Guid.CreateVersion7()}}","fromAmount":{"amount":"430.00","currency":"PLN"},"toAmount":{"amount":"100.00","currency":"EUR"},"fee":{"amount":"5.00","currency":"PLN"},"occurredOn":"{{Today}}","fromUnallocated":"PLN","toUnallocated":"EUR"}"""))
+            .ShouldBeOfType<NoContentResult>();
+
+        var state = await StateAsync();
+        var transfer = state.Journal.OfType<FinTrack.Budget.Domain.Journal.Transfer>().ShouldHaveSingleItem();
+        transfer.Rate.ShouldBe(0.235294117647m);
+        state.State.BalanceOf(transfer.ToBucketId).Available.ShouldBe(Money.From(100m, Currency.Eur));
+
+        Code(await TransferAsync($$"""{"id":"{{Guid.CreateVersion7()}}","fromAmount":{"amount":"1.00","currency":"PLN"},"toAmount":{"amount":"0.99","currency":"PLN"},"occurredOn":"{{Today}}","fromUnallocated":"PLN","toUnallocated":"PLN"}"""), 400)
+            .ShouldBe("transfer.same_bucket");
+    }
+
+    private async Task<IActionResult> TransferAsync(string json)
+    {
+        await using var scope = await ScopeAsync();
+        return await ActivatorUtilities.CreateInstance<AddTransferFunction>(scope.ServiceProvider).Run(JsonRequest(json), Cancellation);
+    }
+
     private async Task<IActionResult> OpeningBalanceAsync(string json)
     {
         await using var scope = await ScopeAsync();

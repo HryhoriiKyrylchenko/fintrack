@@ -76,6 +76,51 @@ public sealed class JournalStorageTests(BudgetFixture fixture)
     }
 
     [Fact]
+    public async Task Transfer_HasThePinnedShape_WithFeeAndRate()
+    {
+        var owner = BudgetFixture.NewOwner();
+        var from = BucketId.From(Guid.CreateVersion7());
+        var to = BucketId.From(Guid.CreateVersion7());
+        var transfer = Transfer.Create(JournalEntryId.From(Guid.CreateVersion7()), owner, from, to, Money.From(1000.00m, Currency.Pln), Money.From(232.65m, Currency.Eur),
+            Money.From(10.00m, Currency.Pln), Day, Day, EntryInfo.None, FakeClock.DefaultStart).Value;
+        await AppendAsync(owner, transfer);
+
+        (await RawAsync(transfer.Id)).ShouldBe(new BsonDocument
+        {
+            { "_id", Uuid(transfer.Id) },
+            { "type", "Transfer" },
+            { "ownerId", Uuid(owner.Value) },
+            { "schemaVersion", 1 },
+            { "recordedAt", new BsonDateTime(FakeClock.DefaultStart.UtcDateTime) },
+            { "occurredOn", "2026-01-15" },
+            { "tags", new BsonArray() },
+            { "source", "Manual" },
+            { "fromBucketId", Uuid(from.Value) },
+            { "toBucketId", Uuid(to.Value) },
+            { "fromAmount", new BsonDocument { { "amount", new BsonDecimal128(1000.00m) }, { "currency", "PLN" } } },
+            { "toAmount", new BsonDocument { { "amount", new BsonDecimal128(232.65m) }, { "currency", "EUR" } } },
+            { "fee", new BsonDocument { { "amount", new BsonDecimal128(10.00m) }, { "currency", "PLN" } } },
+            { "rate", new BsonDecimal128(0.235m) },
+        });
+
+        var read = (await ReadAsync(owner)).ShouldHaveSingleItem().ShouldBeOfType<Transfer>();
+        read.HasSameContent(transfer).ShouldBeTrue();
+        read.Rate.ShouldBe(0.235m);
+    }
+
+    [Fact]
+    public async Task Transfer_WithoutFee_HasNoFeeElement()
+    {
+        var owner = BudgetFixture.NewOwner();
+        var transfer = Transfer.Create(JournalEntryId.From(Guid.CreateVersion7()), owner, BucketId.From(Guid.CreateVersion7()), BucketId.From(Guid.CreateVersion7()),
+            Money.From(5m, Currency.Pln), Money.From(5m, Currency.Pln), null, Day, Day, EntryInfo.None, FakeClock.DefaultStart).Value;
+        await AppendAsync(owner, transfer);
+
+        (await RawAsync(transfer.Id)).Contains("fee").ShouldBeFalse();
+        (await ReadAsync(owner)).ShouldHaveSingleItem().ShouldBeOfType<Transfer>().Fee.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Deposit_WithNoteAndTags_StoresThem_AndKeepsTheAmountsScale()
     {
         var owner = BudgetFixture.NewOwner();

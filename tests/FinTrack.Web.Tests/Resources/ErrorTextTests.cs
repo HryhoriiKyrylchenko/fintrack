@@ -40,6 +40,9 @@ public sealed class ErrorTextTests : IDisposable
         "bucket.insufficient_funds",
         "bucket.spend_not_allowed",
         "bucket.opening_balance_exists",
+        "transfer.same_bucket",
+        "transfer.fee_exceeds_amount",
+        "transfer.amounts_inconsistent",
         "settings.time_zone_unknown",
         "settings.locale_unknown",
     ];
