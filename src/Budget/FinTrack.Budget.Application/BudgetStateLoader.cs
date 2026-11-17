@@ -1,5 +1,7 @@
 using FinTrack.Budget.Domain.Buckets;
+using FinTrack.Budget.Domain.Journal;
 using FinTrack.Budget.Domain.Settings;
+using FinTrack.Budget.Domain.State;
 using FinTrack.Shared.Kernel.Ledger;
 
 namespace FinTrack.Budget.Application;
@@ -9,7 +11,6 @@ namespace FinTrack.Budget.Application;
 /// version first, then the documents. A command commits against <see cref="BudgetSnapshot.Version"/>,
 /// so a write that lands in between makes the commit fail instead of passing on stale data.
 /// </summary>
-/// <remarks>The journal and the state builder are added here in step 6.</remarks>
 public sealed class BudgetStateLoader(ILedger ledger, IBudgetStore store)
 {
     /// <summary>Reads the version, then the owner's documents.</summary>
@@ -18,7 +19,8 @@ public sealed class BudgetStateLoader(ILedger ledger, IBudgetStore store)
         var version = await ledger.GetVersionAsync(BudgetLedger.Name, cancellationToken).ConfigureAwait(false);
         var settings = await store.GetSettingsAsync(cancellationToken).ConfigureAwait(false);
         var buckets = await store.GetBucketsAsync(cancellationToken).ConfigureAwait(false);
-        return new BudgetSnapshot(version, settings, buckets);
+        var journal = await store.GetJournalAsync(cancellationToken).ConfigureAwait(false);
+        return new BudgetSnapshot(version, settings, buckets, journal);
     }
 }
 
@@ -26,8 +28,21 @@ public sealed class BudgetStateLoader(ILedger ledger, IBudgetStore store)
 /// <param name="Version">The ledger version, read before everything else; the expected version of a commit.</param>
 /// <param name="Settings">The owner's settings, or <c>null</c> before the first save.</param>
 /// <param name="Buckets">All of the owner's buckets, archived ones included.</param>
-public sealed record BudgetSnapshot(long Version, OwnerSettings? Settings, IReadOnlyList<Bucket> Buckets)
+/// <param name="Journal">The owner's journal, in replay order.</param>
+public sealed record BudgetSnapshot(long Version, OwnerSettings? Settings, IReadOnlyList<Bucket> Buckets, IReadOnlyList<JournalEntry> Journal)
 {
+    private BudgetState? state;
+
+    /// <summary>The balances, from replaying <see cref="Journal"/> (built on first use).</summary>
+    public BudgetState State => state ??= BudgetState.Replay(Buckets, Journal);
+
     /// <summary>The owner's bucket with <paramref name="id"/>, or <c>null</c>.</summary>
     public Bucket? FindBucket(Guid id) => Buckets.FirstOrDefault(bucket => bucket.Id == id);
+
+    /// <summary>The owner's <c>Unallocated</c> bucket of <paramref name="currency"/>, or <c>null</c> before its first use.</summary>
+    public Bucket? FindUnallocated(Shared.Kernel.Monetary.Currency currency) =>
+        Buckets.FirstOrDefault(bucket => bucket.SystemRole == BucketSystemRole.Unallocated && bucket.Currency == currency);
+
+    /// <summary>The owner's entry with <paramref name="id"/>, or <c>null</c>.</summary>
+    public JournalEntry? FindEntry(Guid id) => Journal.FirstOrDefault(entry => entry.Id == id);
 }

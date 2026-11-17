@@ -20,6 +20,7 @@ public class ErrorCodesTests
             "concurrency.conflict",
             "currency.unknown",
             "id.invalid",
+            "money.amount_not_positive",
             "money.too_many_decimals",
             "validation.failed",
         ]);

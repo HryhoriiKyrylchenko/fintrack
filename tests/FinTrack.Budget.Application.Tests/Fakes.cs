@@ -1,5 +1,6 @@
 using System.Reflection;
 using FinTrack.Budget.Domain.Buckets;
+using FinTrack.Budget.Domain.Journal;
 using FinTrack.Budget.Domain.Settings;
 using FinTrack.Shared.Kernel.Ids;
 using FinTrack.Shared.Kernel.Ledger;
@@ -64,6 +65,14 @@ internal sealed class FakeBudgetStore(CallLog log) : IBudgetStore
     {
         log.Calls.Add("buckets");
         return Task.FromResult<IReadOnlyList<Bucket>>([.. Buckets]);
+    }
+
+    public List<JournalEntry> Journal { get; } = [];
+
+    public Task<IReadOnlyList<JournalEntry>> GetJournalAsync(CancellationToken cancellationToken)
+    {
+        log.Calls.Add("journal");
+        return Task.FromResult<IReadOnlyList<JournalEntry>>([.. Journal]);
     }
 }
 

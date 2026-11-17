@@ -29,4 +29,13 @@ public static class BudgetErrorCodes
 
     /// <summary>The bucket is a system bucket (<c>Unallocated</c>) and cannot be renamed or archived. No parameters.</summary>
     public const string BucketSystemBucket = "bucket.system_bucket";
+
+    /// <summary>An amount is not in the bucket's currency. No parameters.</summary>
+    public const string BucketCurrencyMismatch = "bucket.currency_mismatch";
+
+    /// <summary>An entry with this ID exists with different content (repeated command, invariant 13). No parameters.</summary>
+    public const string EntryIdReused = "entry.id_reused";
+
+    /// <summary>An entry is dated after today in the owner's time zone (plan 1a D12). No parameters.</summary>
+    public const string EntryDateInFuture = "entry.date_in_future";
 }

@@ -1,4 +1,5 @@
 using FinTrack.Budget.Domain.Buckets;
+using FinTrack.Budget.Domain.Journal;
 using FinTrack.Budget.Domain.Settings;
 
 namespace FinTrack.Budget.Application;
@@ -15,4 +16,7 @@ public interface IBudgetStore
 
     /// <summary>All of the owner's buckets, archived ones included, in no particular order.</summary>
     Task<IReadOnlyList<Bucket>> GetBucketsAsync(CancellationToken cancellationToken);
+
+    /// <summary>The owner's whole journal, in replay order (<see cref="ReplayOrder"/>).</summary>
+    Task<IReadOnlyList<JournalEntry>> GetJournalAsync(CancellationToken cancellationToken);
 }

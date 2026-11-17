@@ -33,6 +33,10 @@ public sealed class ErrorTextTests : IDisposable
         "bucket.name_taken",
         "bucket.id_reused",
         "bucket.system_bucket",
+        "bucket.currency_mismatch",
+        "money.amount_not_positive",
+        "entry.id_reused",
+        "entry.date_in_future",
         "settings.time_zone_unknown",
         "settings.locale_unknown",
     ];
