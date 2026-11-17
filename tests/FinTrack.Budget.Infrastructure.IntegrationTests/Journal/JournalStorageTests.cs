@@ -121,6 +121,31 @@ public sealed class JournalStorageTests(BudgetFixture fixture)
     }
 
     [Fact]
+    public async Task Reversal_HasThePinnedShape()
+    {
+        var owner = BudgetFixture.NewOwner();
+        var target = JournalEntryId.From(Guid.CreateVersion7());
+        var reversal = Reversal.Create(JournalEntryId.From(Guid.CreateVersion7()), owner, target, Day, Day, new EntryInfo("Typo", [], EntrySource.Manual), FakeClock.DefaultStart).Value;
+        await AppendAsync(owner, reversal);
+
+        (await RawAsync(reversal.Id)).ShouldBe(new BsonDocument
+        {
+            { "_id", Uuid(reversal.Id) },
+            { "type", "Reversal" },
+            { "ownerId", Uuid(owner.Value) },
+            { "schemaVersion", 1 },
+            { "recordedAt", new BsonDateTime(FakeClock.DefaultStart.UtcDateTime) },
+            { "occurredOn", "2026-01-15" },
+            { "note", "Typo" },
+            { "tags", new BsonArray() },
+            { "source", "Manual" },
+            { "reversedEntryId", Uuid(target.Value) },
+        });
+
+        (await ReadAsync(owner)).ShouldHaveSingleItem().ShouldBeOfType<Reversal>().ReversedEntryId.ShouldBe(target);
+    }
+
+    [Fact]
     public async Task Deposit_WithNoteAndTags_StoresThem_AndKeepsTheAmountsScale()
     {
         var owner = BudgetFixture.NewOwner();

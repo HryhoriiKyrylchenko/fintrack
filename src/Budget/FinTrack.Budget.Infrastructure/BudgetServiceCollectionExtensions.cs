@@ -50,6 +50,7 @@ public static class BudgetServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<AddDeposit>, AddDepositValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<AddSpend>, AddSpendValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<AddTransfer>, AddTransferValidator>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<ReverseEntry>, ReverseEntryValidator>());
 
         return services;
     }

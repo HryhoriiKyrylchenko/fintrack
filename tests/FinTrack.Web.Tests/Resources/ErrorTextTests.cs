@@ -43,6 +43,10 @@ public sealed class ErrorTextTests : IDisposable
         "transfer.same_bucket",
         "transfer.fee_exceeds_amount",
         "transfer.amounts_inconsistent",
+        "bucket.not_empty",
+        "entry.not_found",
+        "entry.already_reversed",
+        "entry.not_reversible",
         "settings.time_zone_unknown",
         "settings.locale_unknown",
     ];

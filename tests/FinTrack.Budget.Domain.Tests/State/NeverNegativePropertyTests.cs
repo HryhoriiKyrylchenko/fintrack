@@ -10,7 +10,7 @@ namespace FinTrack.Budget.Domain.Tests.State;
 
 /// <summary>
 /// Invariant 1 (ARCHITECTURE 7) for arbitrary, backdated sequences of opening balances, deposits,
-/// spends and transfers (to the next bucket, sometimes with a fee) over savings and investment buckets: each entry is accepted only when the replay with it has
+/// spends, transfers (to the next bucket, sometimes with a fee) and reversals over savings and investment buckets: each entry is accepted only when the replay with it has
 /// no overdraft (the domain's check), and then an independent running sum confirms that no savings
 /// bucket is below zero after any entry of the replay order.
 /// </summary>
@@ -25,6 +25,7 @@ public class NeverNegativePropertyTests
         Deposit,
         Spend,
         Transfer,
+        Reversal,
     }
 
     // Two savings buckets and one investment bucket, all in PLN.
@@ -57,7 +58,10 @@ public class NeverNegativePropertyTests
         {
             var journal = Accept(history.Buckets, history.Attempts);
             var replayed = BudgetState.Replay(history.Buckets, journal);
-            var stepByStep = ReplayOrder.Sort(journal).Aggregate(BudgetState.Replay(history.Buckets, []), (state, entry) => state.Apply(entry));
+            // Step by step over the effective journal: what is left after reversals (D3).
+            var reversed = BudgetState.ReversedEntryIds(journal);
+            var effective = journal.Where(entry => entry is not Reversal && !reversed.Contains(entry.Id));
+            var stepByStep = ReplayOrder.Sort(effective).Aggregate(BudgetState.Replay(history.Buckets, []), (state, entry) => state.Apply(entry));
 
             return replayed.Balances.SequenceEqual(stepByStep.Balances)
                 && replayed.Balances.All(balance => balance.Available == balance.NetContributed - balance.OutstandingPrincipal)
@@ -73,6 +77,24 @@ public class NeverNegativePropertyTests
             var (kind, bucketIndex, units, daysBack, id) = attempts[index];
             var bucket = buckets[bucketIndex];
             var state = BudgetState.Replay(buckets, journal);
+
+            if (kind == Kind.Reversal)
+            {
+                // Reverse one of the accepted entries that is not a reversal and not reversed yet.
+                var reversed = BudgetState.ReversedEntryIds(journal);
+                var candidates = journal.Where(entry => entry is not Reversal && !reversed.Contains(entry.Id)).ToList();
+                if (candidates.Count > 0)
+                {
+                    var target = candidates[(int)(units % candidates.Count)];
+                    var reversal = Reversal.Create(JournalEntryId.From(id), Owner, target.EntryId, Today, Today, EntryInfo.None, FakeClock.DefaultStart.AddSeconds(index)).Value;
+                    if (BudgetState.Replay(buckets, [.. journal, reversal]).FirstOverdraft is null)
+                    {
+                        journal.Add(reversal);
+                    }
+                }
+
+                continue;
+            }
 
             if ((kind == Kind.Spend && bucket.Kind == BucketKind.Investment)
                 || (kind == Kind.Opening && state.BalanceOf(bucket.BucketId).HasOpeningBalance))
@@ -111,7 +133,11 @@ public class NeverNegativePropertyTests
         var sums = buckets.ToDictionary(bucket => bucket.BucketId, _ => 0m);
         var savings = buckets.Where(bucket => bucket.Kind == BucketKind.Savings).Select(bucket => bucket.BucketId).ToHashSet();
 
-        foreach (var entry in journal.OrderBy(entry => entry.OccurredOn).ThenBy(entry => entry.RecordedAt).ThenBy(entry => entry.Id.ToString("N"), StringComparer.Ordinal))
+        // Reversed entries count as if they never happened; reversals move no money.
+        var reversedIds = journal.OfType<Reversal>().Select(reversal => reversal.ReversedEntryId.Value).ToHashSet();
+        var effective = journal.Where(entry => entry is not Reversal && !reversedIds.Contains(entry.Id));
+
+        foreach (var entry in effective.OrderBy(entry => entry.OccurredOn).ThenBy(entry => entry.RecordedAt).ThenBy(entry => entry.Id.ToString("N"), StringComparer.Ordinal))
         {
             switch (entry)
             {

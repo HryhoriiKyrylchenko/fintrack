@@ -141,6 +141,44 @@ public sealed class DepositFunctionTests(ApiFixture fixture)
             .ShouldBe("transfer.same_bucket");
     }
 
+    [Fact]
+    public async Task Reversal_Is204_AndThenTheBucketCanBeArchived()
+    {
+        await SaveSettingsAsync();
+        var bucket = Guid.CreateVersion7();
+        await using (var scope = await ScopeAsync())
+        {
+            var create = new DefaultHttpContext().Request;
+            create.ContentType = "application/json";
+            create.Body = new MemoryStream(Encoding.UTF8.GetBytes($$"""{"id":"{{bucket}}","name":"Holiday","currency":"PLN","kind":"Savings"}"""));
+            (await ActivatorUtilities.CreateInstance<CreateBucketFunction>(scope.ServiceProvider).Run(create, Cancellation)).ShouldBeOfType<NoContentResult>();
+        }
+
+        var deposit = Guid.CreateVersion7();
+        await DepositAsync($$"""{"id":"{{deposit}}","amount":{"amount":"5.00","currency":"PLN"},"occurredOn":"{{Today}}","bucketId":"{{bucket}}"}""");
+        Code(await ArchiveAsync(bucket.ToString()), 422).ShouldBe("bucket.not_empty");
+
+        (await ReverseAsync($$"""{"id":"{{Guid.CreateVersion7()}}","reversedEntryId":"{{deposit}}","occurredOn":"{{Today}}","note":"Wrong bucket"}"""))
+            .ShouldBeOfType<NoContentResult>();
+        Code(await ReverseAsync($$"""{"id":"{{Guid.CreateVersion7()}}","reversedEntryId":"{{deposit}}","occurredOn":"{{Today}}"}"""), 422).ShouldBe("entry.already_reversed");
+        Code(await ReverseAsync($$"""{"id":"{{Guid.CreateVersion7()}}","reversedEntryId":"{{Guid.CreateVersion7()}}","occurredOn":"{{Today}}"}"""), 404).ShouldBe("entry.not_found");
+
+        (await ArchiveAsync(bucket.ToString())).ShouldBeOfType<NoContentResult>();
+        Problem(await ArchiveAsync("not-a-guid"), 400).Extensions["params"].ShouldBeAssignableTo<IReadOnlyDictionary<string, object>>()!["rule"].ShouldBe(RequestValues.RouteFormatRule);
+    }
+
+    private async Task<IActionResult> ReverseAsync(string json)
+    {
+        await using var scope = await ScopeAsync();
+        return await ActivatorUtilities.CreateInstance<ReverseEntryFunction>(scope.ServiceProvider).Run(JsonRequest(json), Cancellation);
+    }
+
+    private async Task<IActionResult> ArchiveAsync(string id)
+    {
+        await using var scope = await ScopeAsync();
+        return await ActivatorUtilities.CreateInstance<ArchiveBucketFunction>(scope.ServiceProvider).Run(new DefaultHttpContext().Request, id, Cancellation);
+    }
+
     private async Task<IActionResult> TransferAsync(string json)
     {
         await using var scope = await ScopeAsync();

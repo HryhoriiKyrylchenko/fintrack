@@ -48,6 +48,7 @@ public static class BudgetMongoMapping
         [typeof(Deposit)] = "Deposit",
         [typeof(Spend)] = "Spend",
         [typeof(Transfer)] = "Transfer",
+        [typeof(Reversal)] = "Reversal",
     };
 
     /// <summary>Registers the class maps. Safe to call more than once and from several threads.</summary>
@@ -72,6 +73,7 @@ public static class BudgetMongoMapping
             BsonClassMap.RegisterClassMap<Deposit>(MapEntryType);
             BsonClassMap.RegisterClassMap<Spend>(MapEntryType);
             BsonClassMap.RegisterClassMap<Transfer>(MapTransfer);
+            BsonClassMap.RegisterClassMap<Reversal>(MapReversal);
 
             registered = true;
         }
@@ -143,6 +145,12 @@ public static class BudgetMongoMapping
         Map(map, transfer => transfer.ToAmount, "toAmount");
         MapOptional(map, transfer => transfer.Fee, "fee");
         Map(map, transfer => transfer.Rate, "rate");
+        MapEntryType(map);
+    }
+
+    private static void MapReversal(BsonClassMap<Reversal> map)
+    {
+        Map(map, reversal => reversal.ReversedEntryId, "reversedEntryId");
         MapEntryType(map);
     }
 

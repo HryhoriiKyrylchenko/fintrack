@@ -1,4 +1,5 @@
 using System.Text;
+using FinTrack.Budget.Domain.State;
 using FinTrack.Shared.Kernel.Ids;
 using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Shared.Kernel.Persistence;
@@ -172,6 +173,32 @@ public sealed class Bucket : IMutableDocument
         return NameTaken(name, ownersBuckets, except: Id)
             ? Result.Fail<Bucket>(AppError.BusinessRule(BudgetErrorCodes.BucketNameTaken))
             : Result.Ok(new Bucket(Id, OwnerId, SchemaVersion, Version, CreatedAt, UpdatedAt, name, Currency, Kind, Profile, Status, SystemRole));
+    }
+
+    /// <summary>
+    /// The same bucket, archived (ARCHITECTURE 4.1): it frees its name and accepts no new entries.
+    /// Fails with <see cref="BudgetErrorCodes.BucketSystemBucket"/> for a system bucket and with
+    /// <see cref="BudgetErrorCodes.BucketNotEmpty"/> while its <c>Available</c> is not zero (phase 1a has no
+    /// loans or plans, the other things that keep a bucket open). Identity and version are kept.
+    /// </summary>
+    /// <param name="balance">This bucket's balance, from the state builder.</param>
+    /// <exception cref="ArgumentException">The balance is another bucket's (a bug).</exception>
+    public Result<Bucket> Archive(BucketBalance balance)
+    {
+        ArgumentNullException.ThrowIfNull(balance);
+        if (balance.BucketId != BucketId)
+        {
+            throw new ArgumentException("The balance belongs to another bucket.", nameof(balance));
+        }
+
+        if (SystemRole != BucketSystemRole.None)
+        {
+            return Result.Fail<Bucket>(AppError.BusinessRule(BudgetErrorCodes.BucketSystemBucket));
+        }
+
+        return balance.Available.Amount != 0m
+            ? Result.Fail<Bucket>(AppError.BusinessRule(BudgetErrorCodes.BucketNotEmpty))
+            : Result.Ok(new Bucket(Id, OwnerId, SchemaVersion, Version, CreatedAt, UpdatedAt, Name, Currency, Kind, Profile, BucketStatus.Archived, SystemRole));
     }
 
     /// <summary>
