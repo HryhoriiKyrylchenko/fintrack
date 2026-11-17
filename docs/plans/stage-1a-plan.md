@@ -287,11 +287,19 @@ Rules for every step: branch from an up-to-date `main`; tests first; when the co
   - **Verified:** Debug and Release 0 warnings; 1037 tests pass (1003 before); properties also run for 10 s; `run-local.ps1` against a throwaway database (dropped; `fintrack` untouched): archive with money 422, reversing a deposit already moved on 422, reversing the transfer 204, again 422, reversing the reversal 422, archive the emptied bucket 204, deposit into it 422, the archived bucket listed only with `includeArchived=true`; three journal entries stored.
   - **Not verified:** CI (runs on the pull request).
 
-### [ ] Step 10. Model-wide property tests and isolation (M)
+### [x] Step 10. Model-wide property tests and isolation (M)
 - **Goal:** the invariants hold for arbitrary histories, not only for the examples.
 - **What we do:** a CsCheck model of random command sequences over several buckets and currencies (all five entry types, reversals, backdating, repeats of the same command): invariants 1, 2, 10, 11, 13; integration tests that two owners never see or affect each other through any handler (invariant 12). Run the properties for 10 seconds each (`CsCheck_Time=10`).
 - **Done when:** all pass; three deliberate rule mutations are caught.
 - **Depends on:** 9.
+- **Result:**
+  - **Model test** (`BudgetModelTests`): CsCheck generates up to 50 operations, interpreted against the current state and run through the real handlers: buckets in three currencies (savings and investment, colliding names), opening balances, deposits, spends, transfers (with and without fee, same and cross currency, `Unallocated` on either side), reversals (of any entry, reversals included), archiving, renaming, dates up to 60 days back and one day ahead, and repeats of earlier successful commands. After each command: a rejected one wrote nothing; a repeat wrote nothing and succeeded, except a bucket's creation repeated after a rename, which is `bucket.id_reused` by step 5's rule. At the end: invariant 1 by an independent running sum over the effective journal, 2, 10 (step-by-step and reversed storage order), 11 (each balance equals the independent sum, in the bucket's currency), and archived buckets are empty. A second test requires that every command is both accepted and rejected somewhere in 300 histories.
+  - **`InMemoryBudget`**, the ledger and store of the model: expected version, unique IDs (also on insert of a bucket), the next version stamped on save and checked on replace, the journal in replay order.
+  - **Found while building the model** (all in the test, none in the product): a "repeat" with nothing to repeat is a new command; repeats must be recognised by reference, because an equal new command (the same rename after another one) is not a repeat; the in-memory store first kept version 0, so every archive and real rename conflicted, which the coverage test exposed (no archive ever succeeded).
+  - **Isolation (invariant 12):** owner A uses every command; owner B reads nothing of A's through any query or the loader, gets `not_found` for every command naming A's buckets or entries, gets `concurrency.conflict` when reusing A's IDs (never an overwrite or a leak), and has its own `Unallocated`; A's settings, buckets, journal and ledger head are byte for byte unchanged.
+  - **Mutations,** each compiling and caught by the model alone: invariant 1 not checked before the commit (the independent sum found a savings bucket below zero), a repeated entry not recognised (the repeat failed), a bucket with money archivable (an archived bucket held money).
+  - **Verified:** Debug and Release 0 warnings; 1040 tests pass (1037 before); every property (Domain, Application model, kernel) also run for 10 s each; the model also with 3000 histories.
+  - **Not verified:** CI (runs on the pull request).
 
 ### [ ] Step 11. FX rates: `IFxRateProvider`, Frankfurter, stored history (C)
 - **Goal:** totals in the reporting currency, also offline.
