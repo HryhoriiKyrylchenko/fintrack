@@ -45,6 +45,15 @@ public static class BudgetErrorCodes
     /// <summary>An amount is not in the bucket's currency. No parameters.</summary>
     public const string BucketCurrencyMismatch = "bucket.currency_mismatch";
 
+    /// <summary>A transfer's source and destination are the same bucket (D6). No parameters.</summary>
+    public const string TransferSameBucket = "transfer.same_bucket";
+
+    /// <summary>A transfer's fee is not below the amount that leaves the source (D6). No parameters.</summary>
+    public const string TransferFeeExceedsAmount = "transfer.fee_exceeds_amount";
+
+    /// <summary>In one currency, what arrives is not exactly what leaves minus the fee (D6). No parameters.</summary>
+    public const string TransferAmountsInconsistent = "transfer.amounts_inconsistent";
+
     /// <summary>An entry with this ID exists with different content (repeated command, invariant 13). No parameters.</summary>
     public const string EntryIdReused = "entry.id_reused";
 

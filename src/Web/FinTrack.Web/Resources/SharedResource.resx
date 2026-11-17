@@ -217,4 +217,13 @@
   <data name="Error.bucket.opening_balance_exists" xml:space="preserve">
     <value>This bucket already has an opening balance.</value>
   </data>
+  <data name="Error.transfer.same_bucket" xml:space="preserve">
+    <value>Choose two different buckets.</value>
+  </data>
+  <data name="Error.transfer.fee_exceeds_amount" xml:space="preserve">
+    <value>The fee must be smaller than the amount sent.</value>
+  </data>
+  <data name="Error.transfer.amounts_inconsistent" xml:space="preserve">
+    <value>In one currency, the amount received must equal the amount sent minus the fee.</value>
+  </data>
 </root>

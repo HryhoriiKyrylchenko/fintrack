@@ -9,8 +9,8 @@ using FinTrack.Tests.Common;
 namespace FinTrack.Budget.Domain.Tests.State;
 
 /// <summary>
-/// Invariant 1 (ARCHITECTURE 7) for arbitrary, backdated sequences of opening balances, deposits and
-/// spends over savings and investment buckets: each entry is accepted only when the replay with it has
+/// Invariant 1 (ARCHITECTURE 7) for arbitrary, backdated sequences of opening balances, deposits,
+/// spends and transfers (to the next bucket, sometimes with a fee) over savings and investment buckets: each entry is accepted only when the replay with it has
 /// no overdraft (the domain's check), and then an independent running sum confirms that no savings
 /// bucket is below zero after any entry of the replay order.
 /// </summary>
@@ -24,6 +24,7 @@ public class NeverNegativePropertyTests
         Opening,
         Deposit,
         Spend,
+        Transfer,
     }
 
     // Two savings buckets and one investment bucket, all in PLN.
@@ -83,11 +84,15 @@ public class NeverNegativePropertyTests
             var occurredOn = Today.AddDays(-daysBack);
             var recordedAt = FakeClock.DefaultStart.AddSeconds(index);
             var entryId = JournalEntryId.From(id);
+            // A transfer goes to the next bucket; every third one carries a fee of 1 złoty.
+            var next = buckets[(bucketIndex + 1) % buckets.Length];
+            var fee = units > 1 && index % 3 == 0 ? Money.From(1m, bucket.Currency) : null;
             JournalEntry entry = kind switch
             {
                 Kind.Opening => OpeningBalance.Create(entryId, Owner, bucket.BucketId, amount, occurredOn, Today, EntryInfo.None, recordedAt).Value,
                 Kind.Deposit => Deposit.Create(entryId, Owner, bucket.BucketId, amount, occurredOn, Today, EntryInfo.None, recordedAt).Value,
-                _ => Spend.Create(entryId, Owner, bucket.BucketId, amount, occurredOn, Today, EntryInfo.None, recordedAt).Value,
+                Kind.Spend => Spend.Create(entryId, Owner, bucket.BucketId, amount, occurredOn, Today, EntryInfo.None, recordedAt).Value,
+                _ => Transfer.Create(entryId, Owner, bucket.BucketId, next.BucketId, amount, fee is null ? amount : amount - fee, fee, occurredOn, Today, EntryInfo.None, recordedAt).Value,
             };
 
             if (BudgetState.Replay(buckets, [.. journal, entry]).FirstOverdraft is null)
@@ -110,6 +115,10 @@ public class NeverNegativePropertyTests
         {
             switch (entry)
             {
+                case Transfer transfer:
+                    sums[transfer.FromBucketId] -= transfer.FromAmount.Amount;
+                    sums[transfer.ToBucketId] += transfer.ToAmount.Amount;
+                    break;
                 case Spend spend:
                     sums[spend.BucketId] -= spend.Amount.Amount;
                     break;

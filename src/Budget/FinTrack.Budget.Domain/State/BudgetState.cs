@@ -12,7 +12,7 @@ namespace FinTrack.Budget.Domain.State;
 /// <remarks>
 /// <para>
 /// Balances follow 4.3: <c>NetContributed</c> = opening balance + deposits + transfers in − spends −
-/// transfers out (transfers arrive in step 8); <c>OutstandingPrincipal</c> is 0 until loans exist
+/// transfers out; <c>OutstandingPrincipal</c> is 0 until loans exist
 /// (phase 1b); <c>Available</c> = <c>NetContributed</c> − <c>OutstandingPrincipal</c>. Every amount stays in
 /// its bucket's currency; currencies are never added together (invariant 11).
 /// </para>
@@ -74,6 +74,14 @@ public sealed class BudgetState
         {
             NetContributed = balance.NetContributed - spend.Amount,
         }),
+        Transfer transfer => With(transfer.FromBucketId, transfer.OccurredOn, balance => balance with
+            {
+                NetContributed = balance.NetContributed - transfer.FromAmount,
+            })
+            .With(transfer.ToBucketId, transfer.OccurredOn, balance => balance with
+            {
+                NetContributed = balance.NetContributed + transfer.ToAmount,
+            }),
         _ => throw new InvalidOperationException($"The state builder does not know the entry type {entry?.GetType().Name}."),
     };
 

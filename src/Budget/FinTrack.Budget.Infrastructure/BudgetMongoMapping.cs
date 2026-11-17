@@ -47,6 +47,7 @@ public static class BudgetMongoMapping
         [typeof(OpeningBalance)] = "OpeningBalance",
         [typeof(Deposit)] = "Deposit",
         [typeof(Spend)] = "Spend",
+        [typeof(Transfer)] = "Transfer",
     };
 
     /// <summary>Registers the class maps. Safe to call more than once and from several threads.</summary>
@@ -70,6 +71,7 @@ public static class BudgetMongoMapping
             BsonClassMap.RegisterClassMap<OpeningBalance>(MapEntryType);
             BsonClassMap.RegisterClassMap<Deposit>(MapEntryType);
             BsonClassMap.RegisterClassMap<Spend>(MapEntryType);
+            BsonClassMap.RegisterClassMap<Transfer>(MapTransfer);
 
             registered = true;
         }
@@ -131,6 +133,17 @@ public static class BudgetMongoMapping
         Map(map, entry => entry.BucketId, "bucketId");
         Map(map, entry => entry.Amount, "amount");
         map.SetIgnoreExtraElements(false);
+    }
+
+    private static void MapTransfer(BsonClassMap<Transfer> map)
+    {
+        Map(map, transfer => transfer.FromBucketId, "fromBucketId");
+        Map(map, transfer => transfer.ToBucketId, "toBucketId");
+        Map(map, transfer => transfer.FromAmount, "fromAmount");
+        Map(map, transfer => transfer.ToAmount, "toAmount");
+        MapOptional(map, transfer => transfer.Fee, "fee");
+        Map(map, transfer => transfer.Rate, "rate");
+        MapEntryType(map);
     }
 
     // A concrete entry type: its stable name and its private constructor.
