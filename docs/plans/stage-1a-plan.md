@@ -271,11 +271,21 @@ Rules for every step: branch from an up-to-date `main`; tests first; when the co
   - **Verified:** Debug and Release 0 warnings; 1003 tests pass (964 before); `run-local.ps1` against a throwaway database (dropped; `fintrack` untouched): same-currency transfer with fee 204 (rate `1`), to EUR `Unallocated` 204 (bucket created, rate `0.232558139535`, no `fee` element), inconsistent amounts 400, more than the balance 422, same bucket 400.
   - **Not verified:** CI (runs on the pull request).
 
-### [ ] Step 9. Slices: `Reversal` and archiving a bucket (C)
+### [x] Step 9. Slices: `Reversal` and archiving a bucket (C)
 - **Goal:** mistakes are corrected without editing history; empty buckets can be put away.
 - **What we do (tests first):** `Reversal` (D3) for every entry type; `ArchiveBucket` (only with zero balance, never a system bucket; archived buckets reject new entries with `bucket.archived`).
 - **Done when:** reversing restores the earlier balances exactly; a reversal that would break D2 is rejected; invariant 3 holds (nothing in the journal collection is ever updated or deleted: the collection type has no such method, and a test compares stored entries before and after).
 - **Depends on:** 8.
+- **Result:**
+  - **Domain:** `Reversal` (D3): `ReversedEntryId`; moves no money; its date is the day of the correction (not after today). `BudgetState.Replay` leaves out every reversed entry and every reversal, so a reversed entry counts as if it never happened at its original date (a reversed transfer voids both sides; a reversed opening balance no longer counts, so a new one is allowed); `BudgetState.ReversedEntryIds`; `Apply(Reversal)` changes nothing (the step-by-step build runs over the effective journal). `Bucket.Archive(balance)`: `bucket.system_bucket`, `bucket.not_empty` (`Available` not zero). Codes `entry.not_found` (404), `entry.already_reversed`, `entry.not_reversible`, `bucket.not_empty` (422).
+  - **Application:** `ReverseEntry` through `JournalWriter`: not found, not reversible, already reversed, and **an entry touching an archived bucket is rejected (`bucket.archived`)**, a rule D3 does not state (decision log); a repeat is recognised before these rules; the journal without the entry must keep invariant 1. `ArchiveBucket` by the replayed balance; archiving an archived bucket writes nothing.
+  - **Contracts and Api:** `ReverseEntryRequest`; `POST /v1/journal/reversals`, `POST /v1/buckets/{id}/archive` (no body; `RouteFormat` for a malformed ID).
+  - **Infrastructure:** stable name `Reversal`, element `reversedEntryId`; pinned shape.
+  - **Invariant 3:** the type guard from Stage 0 (`AppendOnlyCollection` has no update, replace or delete) plus a MongoDB test that runs opening balance, deposit, spend, transfer, reversal, a rejected spend, a rename and an archive, then finds every earlier stored entry unchanged byte for byte and exactly two new ones.
+  - **Tests:** domain cases and a CsCheck property "reversing any entry equals the journal without it"; the invariant-1 property now also attempts reversals (its independent running sum leaves reversed entries out) and the step-by-step property runs over the effective journal; archive rules; handler tests with fakes (including "a repeated reversal is not already reversed" and "a bucket emptied by a reversal can be archived"); MongoDB end to end; the Api.
+  - **Mutations,** each compiling and each caught: reversed entries still counted (Domain 7 including both properties, integration 2), an entry reversed twice (1), a reversal reversible (1), a bucket with money archivable (Domain 2, Application 1, integration 1), reversals touching archived buckets (1).
+  - **Verified:** Debug and Release 0 warnings; 1037 tests pass (1003 before); properties also run for 10 s; `run-local.ps1` against a throwaway database (dropped; `fintrack` untouched): archive with money 422, reversing a deposit already moved on 422, reversing the transfer 204, again 422, reversing the reversal 422, archive the emptied bucket 204, deposit into it 422, the archived bucket listed only with `includeArchived=true`; three journal entries stored.
+  - **Not verified:** CI (runs on the pull request).
 
 ### [ ] Step 10. Model-wide property tests and isolation (M)
 - **Goal:** the invariants hold for arbitrary histories, not only for the examples.

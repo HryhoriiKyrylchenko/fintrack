@@ -226,4 +226,16 @@
   <data name="Error.transfer.amounts_inconsistent" xml:space="preserve">
     <value>In one currency, the amount received must equal the amount sent minus the fee.</value>
   </data>
+  <data name="Error.bucket.not_empty" xml:space="preserve">
+    <value>Only an empty bucket can be archived. Move or spend its money first.</value>
+  </data>
+  <data name="Error.entry.not_found" xml:space="preserve">
+    <value>This entry no longer exists. Reload the journal and try again.</value>
+  </data>
+  <data name="Error.entry.already_reversed" xml:space="preserve">
+    <value>This entry has already been reversed.</value>
+  </data>
+  <data name="Error.entry.not_reversible" xml:space="preserve">
+    <value>A reversal cannot be reversed. Enter a new entry instead.</value>
+  </data>
 </root>

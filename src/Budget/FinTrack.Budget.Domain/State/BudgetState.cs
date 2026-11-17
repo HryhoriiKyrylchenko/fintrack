@@ -22,6 +22,12 @@ namespace FinTrack.Budget.Domain.State;
 /// savings bucket. A command checks it on the replay that includes its new entry; investment buckets may
 /// go below zero (4.9).
 /// </para>
+/// <para>
+/// Reversals (D3) are resolved before the replay: every reversed entry and every reversal are left out,
+/// so a reversed entry counts as if it never happened at its original date (a reversed transfer voids
+/// both sides). <see cref="Apply"/> is for the remaining, effective entries; a reversal applied there
+/// changes nothing.
+/// </para>
 /// </remarks>
 public sealed class BudgetState
 {
@@ -52,8 +58,19 @@ public sealed class BudgetState
         ArgumentNullException.ThrowIfNull(buckets);
         ArgumentNullException.ThrowIfNull(journal);
 
+        var entries = journal.ToList();
+        var reversed = ReversedEntryIds(entries);
+        var effective = entries.Where(entry => entry is not Reversal && !reversed.Contains(entry.Id));
+
         var state = new BudgetState([.. buckets.Select(BucketBalance.Empty)]);
-        return ReplayOrder.Sort(journal).Aggregate(state, (current, entry) => current.Apply(entry));
+        return ReplayOrder.Sort(effective).Aggregate(state, (current, entry) => current.Apply(entry));
+    }
+
+    /// <summary>The IDs of the entries that a reversal in <paramref name="journal"/> cancels.</summary>
+    public static IReadOnlySet<Guid> ReversedEntryIds(IEnumerable<JournalEntry> journal)
+    {
+        ArgumentNullException.ThrowIfNull(journal);
+        return journal.OfType<Reversal>().Select(reversal => reversal.ReversedEntryId.Value).ToHashSet();
     }
 
     /// <summary>The state after one more entry. Apply entries in replay order; <see cref="Replay"/> does that.</summary>
@@ -82,6 +99,7 @@ public sealed class BudgetState
             {
                 NetContributed = balance.NetContributed + transfer.ToAmount,
             }),
+        Reversal => this,
         _ => throw new InvalidOperationException($"The state builder does not know the entry type {entry?.GetType().Name}."),
     };
 

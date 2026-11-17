@@ -42,6 +42,18 @@ public static class BudgetErrorCodes
     /// <summary>The bucket already has an opening balance that is not reversed (D13). No parameters.</summary>
     public const string BucketOpeningBalanceExists = "bucket.opening_balance_exists";
 
+    /// <summary>The bucket still holds money (phase 1a: <c>Available</c> is not zero) and cannot be archived. No parameters.</summary>
+    public const string BucketNotEmpty = "bucket.not_empty";
+
+    /// <summary>No entry with this ID exists for the owner. No parameters.</summary>
+    public const string EntryNotFound = "entry.not_found";
+
+    /// <summary>The entry has been reversed already; an entry is reversed at most once (D3). No parameters.</summary>
+    public const string EntryAlreadyReversed = "entry.already_reversed";
+
+    /// <summary>The entry is a reversal, which cannot be reversed (D3): enter a new entry instead. No parameters.</summary>
+    public const string EntryNotReversible = "entry.not_reversible";
+
     /// <summary>An amount is not in the bucket's currency. No parameters.</summary>
     public const string BucketCurrencyMismatch = "bucket.currency_mismatch";
 
