@@ -29,4 +29,11 @@ public static class ErrorCodes
 
     /// <summary>An amount that must be above zero (an entry amount, plan 1a D13) is zero or negative. No parameters.</summary>
     public const string MoneyAmountNotPositive = "money.amount_not_positive";
+
+    /// <summary>
+    /// No exchange rate is known for a pair of currencies: the rate source cannot be reached and none
+    /// is stored (plan 1a D8). Kind <c>Unavailable</c>. A total that needs it is left out with this
+    /// code as the reason; no parameters.
+    /// </summary>
+    public const string FxRateUnavailable = "fx.rate_unavailable";
 }

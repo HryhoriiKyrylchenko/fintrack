@@ -35,7 +35,7 @@ public sealed class ApiFixture : IAsyncDisposable
     public ServiceProvider Services { get; }
 
     /// <summary>Builds the Api's container with the given settings, as <c>Program.cs</c> does.</summary>
-    public static ServiceProvider BuildServices(string connectionString, string databaseName, string localOwnerId = LocalOwnerId)
+    public static ServiceProvider BuildServices(string connectionString, string databaseName, string localOwnerId = LocalOwnerId, IReadOnlyDictionary<string, string?>? more = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -44,6 +44,7 @@ public sealed class ApiFixture : IAsyncDisposable
                 ["Mongo:DatabaseName"] = databaseName,
                 ["FinTrack:LocalOwnerId"] = localOwnerId,
             })
+            .AddInMemoryCollection(more ?? new Dictionary<string, string?>())
             .Build();
 
         return new ServiceCollection()

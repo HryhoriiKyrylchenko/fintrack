@@ -7,13 +7,14 @@
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="Mediator.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />
     <PackageReference Include="MongoDB.Driver" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Lets the integration tests inspect stored outbox messages. -->
+    <!-- Lets the integration tests inspect stored outbox messages and create indexes on their own collections. -->
     <InternalsVisibleTo Include="FinTrack.Shared.Infrastructure.IntegrationTests" />
   </ItemGroup>
 </Project>

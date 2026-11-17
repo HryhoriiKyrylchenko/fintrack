@@ -19,6 +19,7 @@ public class ErrorCodesTests
         [
             "concurrency.conflict",
             "currency.unknown",
+            "fx.rate_unavailable",
             "id.invalid",
             "money.amount_not_positive",
             "money.too_many_decimals",

@@ -36,6 +36,12 @@ public abstract class OwnerScopedCollection<TDocument>
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
         ArgumentNullException.ThrowIfNull(ownerContext);
 
+        // Reference data has no owner; owner data never goes into its collections (plan 1a D8).
+        if (collectionName.StartsWith(ReferenceCollection.NamePrefix, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("Owner data is never stored in a reference-data collection.", nameof(collectionName));
+        }
+
         // The format must be known before the first serializer of TDocument is looked up.
         MongoSerialization.Register();
 
