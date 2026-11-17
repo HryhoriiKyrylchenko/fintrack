@@ -45,6 +45,36 @@ public sealed class JournalStorageTests(BudgetFixture fixture)
         });
     }
 
+    [Theory]
+    [InlineData("OpeningBalance")]
+    [InlineData("Spend")]
+    public async Task OtherSingleBucketEntries_HaveTheDepositsShape_WithTheirOwnType(string type)
+    {
+        var owner = BudgetFixture.NewOwner();
+        var bucket = BucketId.From(Guid.CreateVersion7());
+        var id = JournalEntryId.From(Guid.CreateVersion7());
+        JournalEntry entry = type == "Spend"
+            ? Spend.Create(id, owner, bucket, Money.From(12.30m, Currency.Pln), Day, Day, EntryInfo.None, FakeClock.DefaultStart).Value
+            : OpeningBalance.Create(id, owner, bucket, Money.From(12.30m, Currency.Pln), Day, Day, EntryInfo.None, FakeClock.DefaultStart).Value;
+        await AppendAsync(owner, entry);
+
+        (await RawAsync(entry.Id)).ShouldBe(new BsonDocument
+        {
+            { "_id", Uuid(entry.Id) },
+            { "type", type },
+            { "ownerId", Uuid(owner.Value) },
+            { "schemaVersion", 1 },
+            { "recordedAt", new BsonDateTime(FakeClock.DefaultStart.UtcDateTime) },
+            { "occurredOn", "2026-01-15" },
+            { "tags", new BsonArray() },
+            { "source", "Manual" },
+            { "bucketId", Uuid(bucket.Value) },
+            { "amount", new BsonDocument { { "amount", new BsonDecimal128(12.30m) }, { "currency", "PLN" } } },
+        });
+
+        (await ReadAsync(owner)).ShouldHaveSingleItem().GetType().Name.ShouldBe(type);
+    }
+
     [Fact]
     public async Task Deposit_WithNoteAndTags_StoresThem_AndKeepsTheAmountsScale()
     {

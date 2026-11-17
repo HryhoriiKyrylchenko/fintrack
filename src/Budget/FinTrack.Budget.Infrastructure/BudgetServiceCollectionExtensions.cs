@@ -40,11 +40,14 @@ public static class BudgetServiceCollectionExtensions
 
         services.TryAddScoped<IBudgetStore, MongoBudgetStore>();
         services.TryAddScoped<BudgetStateLoader>();
+        services.TryAddScoped<BucketEntryWriter>();
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<SaveOwnerSettings>, SaveOwnerSettingsValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<CreateBucket>, CreateBucketValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<RenameBucket>, RenameBucketValidator>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<AddOpeningBalance>, AddOpeningBalanceValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<AddDeposit>, AddDepositValidator>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<AddSpend>, AddSpendValidator>());
 
         return services;
     }

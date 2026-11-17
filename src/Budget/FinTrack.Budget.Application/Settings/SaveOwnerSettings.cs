@@ -50,7 +50,13 @@ public sealed class SaveOwnerSettingsHandler(BudgetStateLoader loader, ILedger l
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        var state = await loader.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var loaded = await loader.LoadAsync(cancellationToken).ConfigureAwait(false);
+        if (loaded.IsFailed)
+        {
+            return loaded.ToResult();
+        }
+
+        var state = loaded.Value;
 
         if (state.Settings is { } stored && stored.HasValues(command.ReportingCurrency, command.TimeZone, command.Locale))
         {

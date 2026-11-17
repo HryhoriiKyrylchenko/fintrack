@@ -11,7 +11,7 @@ namespace FinTrack.Budget.Domain.Journal;
 /// <c>NetContributed</c>; the only entry that counts as income (invariant 5).
 /// </summary>
 /// <remarks>The link to a contribution plan (<c>PlanId</c>) is added in phase 1b as an optional field.</remarks>
-public sealed class Deposit : JournalEntry
+public sealed class Deposit : SingleBucketEntry
 {
     /// <summary>The stored shape's version.</summary>
     public const int CurrentSchemaVersion = 1;
@@ -30,17 +30,9 @@ public sealed class Deposit : JournalEntry
         string? externalId,
         BucketId bucketId,
         Money amount)
-        : base(id, ownerId, schemaVersion, recordedAt, occurredOn, note, tags, groupId, source, externalId)
+        : base(id, ownerId, schemaVersion, recordedAt, occurredOn, note, tags, groupId, source, externalId, bucketId, amount)
     {
-        BucketId = bucketId;
-        Amount = amount;
     }
-
-    /// <summary>The bucket that receives the money.</summary>
-    public BucketId BucketId { get; }
-
-    /// <summary>The amount, strictly positive, in the bucket's currency.</summary>
-    public Money Amount { get; }
 
     /// <summary>
     /// A new deposit. Fails with <see cref="ErrorCodes.MoneyAmountNotPositive"/> and/or
@@ -66,29 +58,9 @@ public sealed class Deposit : JournalEntry
         EntryInfo info,
         DateTimeOffset recordedAt)
     {
-        ArgumentNullException.ThrowIfNull(amount);
-        ArgumentNullException.ThrowIfNull(info);
-
-        var errors = new List<IError>();
-        if (amount.Amount <= 0m)
-        {
-            errors.Add(AppError.Validation(ErrorCodes.MoneyAmountNotPositive));
-        }
-
-        if (occurredOn > today)
-        {
-            errors.Add(AppError.BusinessRule(BudgetErrorCodes.EntryDateInFuture));
-        }
-
-        return errors.Count > 0
-            ? Result.Fail<Deposit>(errors)
+        var check = Check(amount, occurredOn, today, info);
+        return check.IsFailed
+            ? check.ToResult<Deposit>()
             : Result.Ok(new Deposit(id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, groupId: null, info.Source, externalId: null, bucketId, amount));
     }
-
-    /// <inheritdoc />
-    public override bool HasSameContent(JournalEntry other) =>
-        HasSameCommonContent(other)
-        && other is Deposit deposit
-        && BucketId == deposit.BucketId
-        && Amount == deposit.Amount;
 }

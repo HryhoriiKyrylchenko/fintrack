@@ -33,7 +33,13 @@ public sealed class RenameBucketHandler(BudgetStateLoader loader, ILedger ledger
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        var state = await loader.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var loaded = await loader.LoadAsync(cancellationToken).ConfigureAwait(false);
+        if (loaded.IsFailed)
+        {
+            return loaded.ToResult();
+        }
+
+        var state = loaded.Value;
 
         if (state.FindBucket(command.Id) is not { } bucket)
         {

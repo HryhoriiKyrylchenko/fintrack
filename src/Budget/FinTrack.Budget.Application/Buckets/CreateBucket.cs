@@ -57,7 +57,13 @@ public sealed class CreateBucketHandler(BudgetStateLoader loader, ILedger ledger
 
         var kind = BucketContractMapping.ToDomain(command.Kind);
         var profile = BucketContractMapping.ToDomain(command.Profile);
-        var state = await loader.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var loaded = await loader.LoadAsync(cancellationToken).ConfigureAwait(false);
+        if (loaded.IsFailed)
+        {
+            return loaded.ToResult();
+        }
+
+        var state = loaded.Value;
 
         if (state.FindBucket(command.Id) is { } existing)
         {

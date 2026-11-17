@@ -44,7 +44,9 @@ public static class BudgetMongoMapping
     /// </summary>
     public static IReadOnlyDictionary<Type, string> JournalEntryTypes { get; } = new Dictionary<Type, string>
     {
+        [typeof(OpeningBalance)] = "OpeningBalance",
         [typeof(Deposit)] = "Deposit",
+        [typeof(Spend)] = "Spend",
     };
 
     /// <summary>Registers the class maps. Safe to call more than once and from several threads.</summary>
@@ -64,7 +66,10 @@ public static class BudgetMongoMapping
             BsonSerializer.RegisterSerializer(new EntrySourceSerializer());
             BsonSerializer.RegisterDiscriminatorConvention(typeof(JournalEntry), new ScalarDiscriminatorConvention(TypeElement));
             BsonClassMap.RegisterClassMap<JournalEntry>(MapJournalEntry);
-            BsonClassMap.RegisterClassMap<Deposit>(MapDeposit);
+            BsonClassMap.RegisterClassMap<SingleBucketEntry>(MapSingleBucketEntry);
+            BsonClassMap.RegisterClassMap<OpeningBalance>(MapEntryType);
+            BsonClassMap.RegisterClassMap<Deposit>(MapEntryType);
+            BsonClassMap.RegisterClassMap<Spend>(MapEntryType);
 
             registered = true;
         }
@@ -120,11 +125,19 @@ public static class BudgetMongoMapping
         map.SetIgnoreExtraElements(false);
     }
 
-    private static void MapDeposit(BsonClassMap<Deposit> map)
+    // The fields of every single-bucket entry, stored after the common ones (the Deposit shape of step 6).
+    private static void MapSingleBucketEntry(BsonClassMap<SingleBucketEntry> map)
     {
-        map.SetDiscriminator(JournalEntryTypes[typeof(Deposit)]);
-        Map(map, deposit => deposit.BucketId, "bucketId");
-        Map(map, deposit => deposit.Amount, "amount");
+        Map(map, entry => entry.BucketId, "bucketId");
+        Map(map, entry => entry.Amount, "amount");
+        map.SetIgnoreExtraElements(false);
+    }
+
+    // A concrete entry type: its stable name and its private constructor.
+    private static void MapEntryType<TEntry>(BsonClassMap<TEntry> map)
+        where TEntry : JournalEntry
+    {
+        map.SetDiscriminator(JournalEntryTypes[typeof(TEntry)]);
         map.SetIgnoreExtraElements(false);
         MapPrivateConstructor(map);
     }

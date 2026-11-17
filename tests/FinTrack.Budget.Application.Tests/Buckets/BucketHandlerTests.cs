@@ -38,7 +38,7 @@ public class BucketHandlerTests
         var result = await Create(new CreateBucket(id, "Cushion", Currency.Pln, BucketKind.Savings, null));
 
         result.IsSuccess.ShouldBeTrue();
-        log.Calls.ShouldBe(["version", "settings", "buckets", "journal", "commit"]);
+        log.Calls.ShouldBe(["version", "settings", "buckets", "journal", "version", "commit"]);
         var commit = ledger.Commits.ShouldHaveSingleItem();
         commit.ExpectedVersion.ShouldBe(5);
         var bucket = commit.Saves.ShouldHaveSingleItem().ShouldBeOfType<DomainBucket>();
@@ -115,7 +115,7 @@ public class BucketHandlerTests
         var result = await Rename(new RenameBucket(id, "Safety net"));
 
         result.IsSuccess.ShouldBeTrue();
-        log.Calls.ShouldBe(["version", "settings", "buckets", "journal", "commit"]);
+        log.Calls.ShouldBe(["version", "settings", "buckets", "journal", "version", "commit"]);
         var renamed = ledger.Commits.ShouldHaveSingleItem().Saves.ShouldHaveSingleItem().ShouldBeOfType<DomainBucket>();
         renamed.Id.ShouldBe(id);
         renamed.Version.ShouldBe(4);

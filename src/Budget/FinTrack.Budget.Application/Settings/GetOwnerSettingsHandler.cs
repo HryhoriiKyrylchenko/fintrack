@@ -12,7 +12,13 @@ public sealed class GetOwnerSettingsHandler(BudgetStateLoader loader) : IQueryHa
     /// <inheritdoc />
     public async ValueTask<Result<OwnerSettingsDto>> Handle(GetOwnerSettings query, CancellationToken cancellationToken)
     {
-        var state = await loader.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var loaded = await loader.LoadAsync(cancellationToken).ConfigureAwait(false);
+        if (loaded.IsFailed)
+        {
+            return loaded.ToResult<OwnerSettingsDto>();
+        }
+
+        var state = loaded.Value;
 
         return state.Settings is { } settings
             ? Result.Ok(new OwnerSettingsDto(settings.ReportingCurrency, settings.TimeZone, settings.Locale))

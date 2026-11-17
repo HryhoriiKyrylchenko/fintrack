@@ -16,7 +16,13 @@ public sealed class GetBucketsHandler(BudgetStateLoader loader) : IQueryHandler<
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var state = await loader.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var loaded = await loader.LoadAsync(cancellationToken).ConfigureAwait(false);
+        if (loaded.IsFailed)
+        {
+            return loaded.ToResult<IReadOnlyList<BucketDto>>();
+        }
+
+        var state = loaded.Value;
 
         IReadOnlyList<BucketDto> buckets =
         [

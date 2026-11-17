@@ -105,18 +105,18 @@ public sealed class AddDepositTests(BudgetFixture fixture)
         var owner = await NewOwnerWithSettingsAsync();
         await using var scope = fixture.ScopeFor(owner);
         var services = scope.ServiceProvider;
-        var stale = await services.GetRequiredService<BudgetStateLoader>().LoadAsync(Cancellation);
+        var stale = (await services.GetRequiredService<BudgetStateLoader>().LoadAsync(Cancellation)).Value;
 
         // The first deposit creates Unallocated and moves the ledger on.
         (await DepositAsync(owner, new AddDeposit(Guid.CreateVersion7(), Money.From(1m, Currency.Pln), Today, null, Currency.Pln, null, []))).IsSuccess.ShouldBeTrue();
 
         // The second read its state before that commit (as a concurrent request would).
         var second = new AddDeposit(Guid.CreateVersion7(), Money.From(2m, Currency.Pln), Today, null, Currency.Pln, null, []);
-        var staleHandler = new AddDepositHandler(
+        var staleHandler = new AddDepositHandler(new BucketEntryWriter(
             new BudgetStateLoader(new FrozenVersionLedger(services.GetRequiredService<ILedger>(), stale.Version), new FrozenStore(stale)),
             services.GetRequiredService<ILedger>(),
             services.GetRequiredService<Shared.Kernel.Persistence.IOwnerContext>(),
-            services.GetRequiredService<Shared.Kernel.Time.IClock>());
+            services.GetRequiredService<Shared.Kernel.Time.IClock>()));
 
         (await staleHandler.Handle(second, Cancellation)).ShouldFailWith(Shared.Kernel.Results.ErrorCodes.ConcurrencyConflict, ErrorKind.Conflict);
 
@@ -154,7 +154,7 @@ public sealed class AddDepositTests(BudgetFixture fixture)
     private async Task<BudgetSnapshot> StateAsync(OwnerId owner)
     {
         await using var scope = fixture.ScopeFor(owner);
-        return await scope.ServiceProvider.GetRequiredService<BudgetStateLoader>().LoadAsync(Cancellation);
+        return (await scope.ServiceProvider.GetRequiredService<BudgetStateLoader>().LoadAsync(Cancellation)).Value;
     }
 
     /// <summary>Reports a version read earlier; commits go to the real ledger.</summary>

@@ -30,6 +30,18 @@ public static class BudgetErrorCodes
     /// <summary>The bucket is a system bucket (<c>Unallocated</c>) and cannot be renamed or archived. No parameters.</summary>
     public const string BucketSystemBucket = "bucket.system_bucket";
 
+    /// <summary>
+    /// The entry would take a savings bucket below zero at some point of the replay order (invariant 1,
+    /// D2). Parameter <c>date</c>: the first such day (<c>yyyy-MM-dd</c>); never an amount.
+    /// </summary>
+    public const string BucketInsufficientFunds = "bucket.insufficient_funds";
+
+    /// <summary>Money cannot be spent from an investment bucket (D11, ARCHITECTURE 4.9). No parameters.</summary>
+    public const string BucketSpendNotAllowed = "bucket.spend_not_allowed";
+
+    /// <summary>The bucket already has an opening balance that is not reversed (D13). No parameters.</summary>
+    public const string BucketOpeningBalanceExists = "bucket.opening_balance_exists";
+
     /// <summary>An amount is not in the bucket's currency. No parameters.</summary>
     public const string BucketCurrencyMismatch = "bucket.currency_mismatch";
 
