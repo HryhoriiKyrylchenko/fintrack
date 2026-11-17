@@ -31,6 +31,9 @@ public sealed record Currency
     private static readonly FrozenDictionary<string, Currency> Registered =
         new[] { Pln, Eur, Usd }.ToFrozenDictionary(currency => currency.Code, StringComparer.Ordinal);
 
+    /// <summary>Every registered currency, for example to ask a rate source for all of them.</summary>
+    public static IReadOnlyCollection<Currency> All => Registered.Values;
+
     private Currency(string code, int decimalPlaces)
     {
         if (!IsValidCode(code))

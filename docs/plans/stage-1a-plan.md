@@ -301,12 +301,24 @@ Rules for every step: branch from an up-to-date `main`; tests first; when the co
   - **Verified:** Debug and Release 0 warnings; 1040 tests pass (1037 before); every property (Domain, Application model, kernel) also run for 10 s each; the model also with 3000 histories.
   - **Not verified:** CI (runs on the pull request).
 
-### [ ] Step 11. FX rates: `IFxRateProvider`, Frankfurter, stored history (C)
+### [x] Step 11. FX rates: `IFxRateProvider`, Frankfurter, stored history (C)
 - **Goal:** totals in the reporting currency, also offline.
 - **What we do (tests first):** verify the Frankfurter endpoints and licence of `Microsoft.Extensions.Http` first; kernel interface and `FxRate`; `ReferenceCollection<T>` and `ref_fx_rates` (D8) with its index; provider with a fake HTTP handler in tests (fresh, stale, offline with and without stored rates, weekend dates, cross rate through EUR, malformed answer); logs carry no amounts.
 - **Done when:** tests pass without network; one manual run against the real service is recorded in the Result note.
 - **Depends on:** 3 (independent of 5 to 10).
 - **Risks:** an external service; timeouts and failures must never fail a page.
+- **Result:**
+  - **Checked first (17 Nov 2026):** `https://api.frankfurter.dev/v1/latest?base=EUR&symbols=PLN,USD` answers `{"amount":1.0,"base":"EUR","date":"2026-11-17","rates":{"PLN":…,"USD":…}}`; a dated request for Saturday 14 Nov answered with Friday 13 Nov; an unknown symbol is HTTP 404 `{"message":"not found"}`; the old `api.frankfurter.app` host only redirects (301), so it is not used. `Microsoft.Extensions.Http` 10.0.15: licence expression MIT in its nuspec, the newest 10.x release.
+  - **Kernel:** `FxRate(From, To, Rate, Date)` with `Convert` (rounds once, banker's rounding; another currency is a bug), `IFxRateProvider.GetRateAsync`, `Currency.All`, error code `fx.rate_unavailable` (kind `Unavailable`; its Web text comes with step 12, where it first reaches the Web).
+  - **`ReferenceCollection<T>`** for `IReferenceDocument` types: only `ref_` names, never an owner document (both checked when it is created), the type's explicit mapping registered before the collection is opened (a static interface member), `FindFirstAsync` and `UpsertAsync` (by a unique key, keeping the stored `_id`, a racing insert retried as an update). The owner-scoped collections now refuse `ref_` names.
+  - **`ref_fx_rates`:** `FxRateSet` `{ _id, schemaVersion, base, date, rates: { code: Decimal128 }, fetchedAt }`, mapped by hand, rates read strictly; unique index `base_date_unique`.
+  - **`FrankfurterFxRateProvider`** through `IHttpClientFactory` (`AddFxRates()`, options `FxRates:BaseAddress` and `FxRates:Timeout`, validated at start: absolute address ending with `/`, time-out above zero and at most 5 s), registered in `ApiComposition`. Behaviour as in ARCHITECTURE 3; "fetched today" is the UTC day of the most recent fetch (decision-log row).
+  - **Tests (no network):** same currency without a call; first fetch stored with the request for every registered currency; cross rates through EUR and a conversion; fetched today reused; yesterday's stale and refetched; a weekend answer reused all day; the same rate date fetched again kept as one set with its `_id`; 16 kinds of failure (status 500 and 404, no connection, time-out, not JSON, empty, an array, another base, no base, no date, a malformed date, no rates, a missing currency, a zero, negative or text rate) each falling back to the newest rate date, and each giving `fx.rate_unavailable` with nothing stored; the caller's cancellation passed on, not logged as a failure; logs without any rate; stored shape, strict reading and the unique index; the guards in both directions; the Api composition and invalid options.
+  - **Mutations,** each compiling and caught: stored rates fresh on any day, the cross rate inverted, no fallback, the caller's cancellation treated as a time-out, a zero rate accepted, the fallback by the oldest rate date, any collection name accepted for reference data.
+  - **Manual run against the real service** (the explicit test `AgainstTheRealService`, 17 Nov 2026): passed; PLN to USD with a positive rate dated within the last week.
+  - **End to end** against `fintrack_e2e_step11`: the Api started, `/api/v1/health` healthy, settings `404 settings.not_found`, `ref_fx_rates` created with `base_date_unique`; the database dropped afterwards; the real `fintrack` database untouched (no collections, so still the first-run screen). Nothing on a page uses rates before step 12.
+  - **Verified:** Debug and Release 0 warnings; 1100 tests pass (1040 before), one explicit test skipped in normal runs.
+  - **Not verified:** CI (runs on the pull request); behaviour around the real daily publication time (only reasoned about, see the decision-log row).
 
 ### [ ] Step 12. Read contracts: overview and journal (M)
 - **Goal:** the stable queries the UI (and later agents) use.

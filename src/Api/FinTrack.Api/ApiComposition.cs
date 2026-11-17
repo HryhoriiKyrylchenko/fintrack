@@ -1,5 +1,6 @@
 using FinTrack.Api.Middleware;
 using FinTrack.Budget.Infrastructure;
+using FinTrack.Shared.Infrastructure.Fx;
 using FinTrack.Shared.Infrastructure.Ledger;
 using FinTrack.Shared.Infrastructure.Messaging;
 using FinTrack.Shared.Infrastructure.Mongo;
@@ -38,7 +39,7 @@ public static class ApiComposition
         return builder;
     }
 
-    /// <summary>Registers the JSON contract, MongoDB, the clock, the ledger and outbox, the Budget context, the local owner and the mediator.</summary>
+    /// <summary>Registers the JSON contract, MongoDB, the clock, the ledger and outbox, FX rates, the Budget context, the local owner and the mediator.</summary>
     public static IServiceCollection AddFinTrackApi(this IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -51,6 +52,7 @@ public static class ApiComposition
         services.AddSingleton<IClock, SystemClock>();
         services.AddFinTrackMongo(options => configuration.GetSection(MongoOptions.SectionName).Bind(options));
         services.AddMongoLedger();
+        services.AddFxRates(options => configuration.GetSection(FxRateOptions.SectionName).Bind(options));
         services.AddBudget();
 
         services.AddOptions<LocalOwnerOptions>()
