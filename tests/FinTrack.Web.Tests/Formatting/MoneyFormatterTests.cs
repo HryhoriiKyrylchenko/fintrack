@@ -28,13 +28,22 @@ public class MoneyFormatterTests
         { "de-DE", "USD", 1000m, $"1.000,00{Nbsp}USD" },
         { "fr-FR", "EUR", 1234.5m, $"1{NarrowNbsp}234,50{Nbsp}EUR" },
         { "en-IN", "USD", 1234567.5m, $"USD{Nbsp}12,34,567.50" },
-        { "de-CH", "EUR", 1234.5m, $"EUR{Nbsp}1’234.50" },
     };
 
     [Theory]
     [MemberData(nameof(Cases))]
     public void Amount_FollowsTheLocale_WithTheCurrencysPrecision(string locale, string currency, decimal amount, string expected) =>
         Format(amount, currency, locale).ShouldBe(expected);
+
+    [Fact]
+    public void Grouping_UsesTheLocalesOwnSeparator_WhateverTheCultureDataSays()
+    {
+        // de-CH groups with an apostrophe whose exact character depends on the ICU version (U+2019 on
+        // Windows, U+0027 on the Linux CI runner); the code goes before the number.
+        var separator = CultureInfo.GetCultureInfo("de-CH").NumberFormat.CurrencyGroupSeparator;
+
+        Format(1234.5m, "EUR", "de-CH").ShouldBe($"EUR{Nbsp}1{separator}234.50");
+    }
 
     [Theory]
     [InlineData("pl-PL", "\u22121\u00A0234,50\u00A0PLN")]
