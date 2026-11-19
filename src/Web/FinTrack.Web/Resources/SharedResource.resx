@@ -265,4 +265,166 @@
   <data name="Common.Dismiss" xml:space="preserve">
     <value>Dismiss</value>
   </data>
+  <data name="Nav.Buckets" xml:space="preserve">
+    <value>Buckets</value>
+  </data>
+  <data name="Buckets.PageTitle" xml:space="preserve">
+    <value>Buckets · FinTrack</value>
+  </data>
+  <data name="Buckets.Title" xml:space="preserve">
+    <value>Buckets</value>
+  </data>
+  <data name="Buckets.Description" xml:space="preserve">
+    <value>Each bucket holds money for one purpose, in one currency.</value>
+  </data>
+  <data name="Buckets.New" xml:space="preserve">
+    <value>New bucket</value>
+  </data>
+  <data name="Buckets.ShowArchived" xml:space="preserve">
+    <value>Show archived</value>
+  </data>
+  <data name="Buckets.Empty.Title" xml:space="preserve">
+    <value>No buckets yet</value>
+  </data>
+  <data name="Buckets.Empty.Text" xml:space="preserve">
+    <value>Create a bucket for each purpose you set money aside for, such as a cushion or a holiday.</value>
+  </data>
+  <data name="Buckets.Empty.Action" xml:space="preserve">
+    <value>Create your first bucket</value>
+  </data>
+  <data name="Buckets.Column.Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Buckets.Column.Currency" xml:space="preserve">
+    <value>Currency</value>
+  </data>
+  <data name="Buckets.Column.Kind" xml:space="preserve">
+    <value>Kind</value>
+  </data>
+  <data name="Buckets.Column.Actions" xml:space="preserve">
+    <value>Actions</value>
+  </data>
+  <data name="Buckets.Archived" xml:space="preserve">
+    <value>Archived</value>
+  </data>
+  <data name="Buckets.System" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="Buckets.SystemHint" xml:space="preserve">
+    <value>Created by the app for money that is not distributed yet. It cannot be renamed or archived.</value>
+  </data>
+  <data name="Buckets.Rename" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="Buckets.RenameNamed" xml:space="preserve">
+    <value>Rename {0}</value>
+  </data>
+  <data name="Buckets.Archive" xml:space="preserve">
+    <value>Archive</value>
+  </data>
+  <data name="Buckets.ArchiveNamed" xml:space="preserve">
+    <value>Archive {0}</value>
+  </data>
+  <data name="Buckets.Kind.Savings" xml:space="preserve">
+    <value>Savings</value>
+  </data>
+  <data name="Buckets.Kind.Investment" xml:space="preserve">
+    <value>Investment</value>
+  </data>
+  <data name="Buckets.Kind.Crypto" xml:space="preserve">
+    <value>Investment · Crypto</value>
+  </data>
+  <data name="Buckets.Kind.RealValueAssets" xml:space="preserve">
+    <value>Investment · Stocks and ETFs</value>
+  </data>
+  <data name="Buckets.Unallocated" xml:space="preserve">
+    <value>Unallocated ({0})</value>
+  </data>
+  <data name="Buckets.CreateTitle" xml:space="preserve">
+    <value>New bucket</value>
+  </data>
+  <data name="Buckets.RenameTitle" xml:space="preserve">
+    <value>Rename {0}</value>
+  </data>
+  <data name="Buckets.Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Buckets.Name.Help" xml:space="preserve">
+    <value>Up to 60 characters.</value>
+  </data>
+  <data name="Buckets.Name.Required" xml:space="preserve">
+    <value>Enter a name.</value>
+  </data>
+  <data name="Buckets.Name.TooLong" xml:space="preserve">
+    <value>Use at most 60 characters.</value>
+  </data>
+  <data name="Buckets.Name.Spaces" xml:space="preserve">
+    <value>Remove the spaces at the start or the end.</value>
+  </data>
+  <data name="Buckets.Name.ControlCharacters" xml:space="preserve">
+    <value>Use one line, without tabs.</value>
+  </data>
+  <data name="Buckets.Currency" xml:space="preserve">
+    <value>Currency</value>
+  </data>
+  <data name="Buckets.Currency.Help" xml:space="preserve">
+    <value>Every amount in this bucket is in this currency. It cannot be changed later.</value>
+  </data>
+  <data name="Buckets.KindLabel" xml:space="preserve">
+    <value>Kind</value>
+  </data>
+  <data name="Buckets.Kind.Savings.Help" xml:space="preserve">
+    <value>Money set aside for a purpose. Its balance never goes below zero.</value>
+  </data>
+  <data name="Buckets.Kind.Investment.Help" xml:space="preserve">
+    <value>Money put into one investment portfolio. It can receive deposits and transfers; spending from it is not possible yet.</value>
+  </data>
+  <data name="Buckets.Profile" xml:space="preserve">
+    <value>What it holds</value>
+  </data>
+  <data name="Buckets.Profile.Crypto" xml:space="preserve">
+    <value>Crypto</value>
+  </data>
+  <data name="Buckets.Profile.RealValueAssets" xml:space="preserve">
+    <value>Stocks and ETFs</value>
+  </data>
+  <data name="Buckets.Profile.Required" xml:space="preserve">
+    <value>Choose what the bucket holds.</value>
+  </data>
+  <data name="Buckets.Create" xml:space="preserve">
+    <value>Create</value>
+  </data>
+  <data name="Buckets.Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Buckets.Created" xml:space="preserve">
+    <value>Bucket {0} created.</value>
+  </data>
+  <data name="Buckets.Renamed" xml:space="preserve">
+    <value>Bucket renamed to {0}.</value>
+  </data>
+  <data name="Buckets.ArchiveTitle" xml:space="preserve">
+    <value>Archive {0}?</value>
+  </data>
+  <data name="Buckets.ArchiveText" xml:space="preserve">
+    <value>An archived bucket accepts no new entries and is hidden from this list unless you show archived buckets. Only a bucket with nothing in it can be archived.</value>
+  </data>
+  <data name="Buckets.ArchiveConfirm" xml:space="preserve">
+    <value>Archive</value>
+  </data>
+  <data name="Buckets.ArchivedDone" xml:space="preserve">
+    <value>Bucket {0} archived.</value>
+  </data>
+  <data name="Common.Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Common.Retry" xml:space="preserve">
+    <value>Try again</value>
+  </data>
+  <data name="Buckets.CardLine" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="Error.concurrency.conflict" xml:space="preserve">
+    <value>Something else changed your data at the same moment. Try again.</value>
+  </data>
 </root>

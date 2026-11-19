@@ -1,0 +1,48 @@
+@* Confirms archiving and names the bucket (DESIGN 9). A refusal, such as a bucket that still holds money
+   (bucket.not_empty), is explained here and stays until the dialog is closed. Closes with true when archived. *@
+@inject BucketsClient Buckets
+@inject IStringLocalizer<SharedResource> L
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body1" Class="mb-4">@L["Buckets.ArchiveText"]</MudText>
+        @if (error is not null)
+        {
+            <ErrorAlert Error="error" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel" Disabled="busy">@L["Common.Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" Disabled="@(busy || error is not null)" OnClick="ArchiveAsync">
+            @L["Buckets.ArchiveConfirm"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool busy;
+    private ErrorInfo? error;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>The bucket to archive.</summary>
+    [Parameter, EditorRequired]
+    public Guid BucketId { get; set; }
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task ArchiveAsync()
+    {
+        busy = true;
+        var result = await Buckets.ArchiveAsync(BucketId, CancellationToken.None);
+        if (result.IsSuccess)
+        {
+            Dialog.Close(DialogResult.Ok(true));
+            return;
+        }
+
+        error = ErrorInfo.From(result);
+        busy = false;
+    }
+}

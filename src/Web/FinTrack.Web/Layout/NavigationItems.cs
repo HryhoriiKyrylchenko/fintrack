@@ -13,6 +13,7 @@ public static class NavigationItems
     /// <summary>All items, in order.</summary>
     public static IReadOnlyList<NavigationItem> All { get; } =
     [
+        new("buckets", "Nav.Buckets", Icons.Material.Outlined.Savings, NavLinkMatch.Prefix),
         new("settings", "Nav.Settings", Icons.Material.Outlined.Settings, NavLinkMatch.Prefix),
     ];
 }
