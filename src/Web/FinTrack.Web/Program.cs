@@ -1,6 +1,7 @@
 using System.Globalization;
 using FinTrack.Web;
 using FinTrack.Web.Api;
+using FinTrack.Web.Buckets;
 using FinTrack.Web.Settings;
 using FinTrack.Web.Theme;
 using Microsoft.AspNetCore.Components.Web;
@@ -21,6 +22,7 @@ builder.Services.AddSingleton(new BrowserDefaults(TimeZoneInfo.Local.Id, Culture
 // Singletons: in WebAssembly there is one user and one scope anyway, and the settings are loaded before the app starts.
 builder.Services.AddSingleton(_ => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
 builder.Services.AddSingleton<ApiClient>();
+builder.Services.AddSingleton<BucketsClient>();
 builder.Services.AddSingleton<OwnerSettingsState>();
 builder.Services.AddScoped<ThemePreference>();
 builder.Services.AddLocalization();

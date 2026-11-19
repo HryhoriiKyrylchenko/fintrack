@@ -51,6 +51,13 @@ h1:focus {
     font-variant-numeric: tabular-nums;
 }
 
+/* Row actions in tables: as narrow as their buttons, aligned to the end. */
+.fintrack-actions-column {
+    width: 1%;
+    white-space: nowrap;
+    text-align: end;
+}
+
 /* An amount never breaks between its sign, digits and currency code (the Amount component). */
 .fintrack-amount {
     white-space: nowrap;

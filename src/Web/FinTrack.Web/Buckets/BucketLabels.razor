@@ -1,0 +1,17 @@
+@* The labels next to a bucket's name: system and archived (DESIGN 1.5: a label, never colour alone). *@
+@inject IStringLocalizer<SharedResource> L
+
+@if (Row.IsSystem)
+{
+    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Outlined.Lock">@L["Buckets.System"]</MudChip>
+}
+@if (Row.IsArchived)
+{
+    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Outlined.Archive">@L["Buckets.Archived"]</MudChip>
+}
+
+@code {
+    /// <summary>The bucket.</summary>
+    [Parameter, EditorRequired]
+    public BucketRow Row { get; set; } = default!;
+}

@@ -57,6 +57,7 @@ public sealed class ErrorTextTests : IDisposable
         "money.too_many_decimals",
         "input.amount_invalid",
         "input.amount_required",
+        "concurrency.conflict",
     ];
 
     [Theory]

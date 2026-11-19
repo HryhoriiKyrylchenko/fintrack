@@ -1,0 +1,105 @@
+@* Creates or renames a bucket (DESIGN 8: one column, label above, message under the field, primary action at the
+   bottom right). The rules are in BucketFormModel; a refusal from the Api stays visible in the dialog (DESIGN 9).
+   Closes with the bucket's name when the Api accepted it. *@
+@using FinTrack.Budget.Contracts.V1.Buckets
+@inject BucketsClient Buckets
+@inject IStringLocalizer<SharedResource> L
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="4">
+            <MudTextField T="string" Label="@L["Buckets.Name"]" HelperText="@L["Buckets.Name.Help"]" @bind-Value="Model.Name"
+                          Immediate="true" Validation="@(new Func<string, string?>(ValidateName))" Counter="BucketFormModel.MaxNameLength"
+                          Variant="Variant.Outlined" Disabled="busy" AutoFocus="true" />
+
+            @if (!Model.IsRename)
+            {
+                <MudSelect T="Currency" Label="@L["Buckets.Currency"]" HelperText="@L["Buckets.Currency.Help"]" @bind-Value="Model.Currency"
+                           ToStringFunc="CurrencyLabel" Variant="Variant.Outlined" Disabled="busy">
+                    @foreach (var currency in BucketFormModel.Currencies)
+                    {
+                        <MudSelectItem T="Currency" Value="currency">@CurrencyLabel(currency)</MudSelectItem>
+                    }
+                </MudSelect>
+
+                <div>
+                    <MudText Typo="Typo.subtitle2" HtmlTag="p">@L["Buckets.KindLabel"]</MudText>
+                    <MudRadioGroup T="BucketKind" @bind-Value="Model.Kind" Disabled="busy">
+                        <MudRadio T="BucketKind" Value="BucketKind.Savings" Color="Color.Primary">@L["Buckets.Kind.Savings"]</MudRadio>
+                        <MudRadio T="BucketKind" Value="BucketKind.Investment" Color="Color.Primary">@L["Buckets.Kind.Investment"]</MudRadio>
+                    </MudRadioGroup>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" HtmlTag="p">
+                        @(Model.Kind == BucketKind.Investment ? L["Buckets.Kind.Investment.Help"] : L["Buckets.Kind.Savings.Help"])
+                    </MudText>
+                </div>
+
+                @if (Model.Kind == BucketKind.Investment)
+                {
+                    <div>
+                        <MudText Typo="Typo.subtitle2" HtmlTag="p">@L["Buckets.Profile"]</MudText>
+                        <MudRadioGroup T="InvestmentProfile?" @bind-Value="Model.Profile" Disabled="busy">
+                            <MudRadio T="InvestmentProfile?" Value="InvestmentProfile.Crypto" Color="Color.Primary">@L["Buckets.Profile.Crypto"]</MudRadio>
+                            <MudRadio T="InvestmentProfile?" Value="InvestmentProfile.RealValueAssets" Color="Color.Primary">@L["Buckets.Profile.RealValueAssets"]</MudRadio>
+                        </MudRadioGroup>
+                        @if (Model.ProfileError is { } profileError)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" HtmlTag="p">@L[profileError]</MudText>
+                        }
+                    </div>
+                }
+            }
+
+            @if (error is not null)
+            {
+                <ErrorAlert Error="error" />
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel" Disabled="busy">@L["Common.Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" Disabled="@(busy || !Model.CanSubmit)" OnClick="SubmitAsync">
+            @(Model.IsRename ? L["Buckets.Save"] : L["Buckets.Create"])
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool busy;
+    private ErrorInfo? error;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>The values being edited; a new bucket's ID is fixed for the life of the dialog.</summary>
+    [Parameter, EditorRequired]
+    public BucketFormModel Model { get; set; } = default!;
+
+    private string? ValidateName(string? _) => Model.NameError is { } key ? L[key].Value : null;
+
+    private string CurrencyLabel(Currency? currency) => currency is null ? string.Empty : L["Currency." + currency.Code];
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        if (!Model.CanSubmit)
+        {
+            return;
+        }
+
+        busy = true;
+        error = null;
+        var result = Model.IsRename
+            ? await Buckets.RenameAsync(Model.Id, Model.ToRenameRequest(), CancellationToken.None)
+            : await Buckets.CreateAsync(Model.ToCreateRequest(), CancellationToken.None);
+
+        if (result.IsSuccess)
+        {
+            Dialog.Close(DialogResult.Ok(Model.Name));
+            return;
+        }
+
+        error = ErrorInfo.From(result);
+        busy = false;
+    }
+}

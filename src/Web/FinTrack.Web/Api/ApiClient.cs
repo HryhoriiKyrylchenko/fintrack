@@ -42,7 +42,17 @@ public sealed class ApiClient(HttpClient http)
     public Task<ApiResult> PostAsync<TBody>(string path, TBody body, CancellationToken cancellationToken) =>
         SendBodyAsync(HttpMethod.Post, path, body, cancellationToken);
 
-    /// <summary>PUTs <paramref name="body"/> as JSON to <paramref name="path"/>; otherwise like <see cref="PostAsync"/>.</summary>
+    /// <summary>
+    /// POSTs to <paramref name="path"/> without a body, for a command that its route says everything about
+    /// (archiving a bucket). Answers like <see cref="PostAsync{TBody}"/>.
+    /// </summary>
+    public async Task<ApiResult> PostAsync(string path, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, Relative(path));
+        return await SendAsync(request, static (_, _) => Task.FromResult(ApiResult.Success), ApiResult.Failure, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>PUTs <paramref name="body"/> as JSON to <paramref name="path"/>; otherwise like <see cref="PostAsync{TBody}"/>.</summary>
     public Task<ApiResult> PutAsync<TBody>(string path, TBody body, CancellationToken cancellationToken) =>
         SendBodyAsync(HttpMethod.Put, path, body, cancellationToken);
 

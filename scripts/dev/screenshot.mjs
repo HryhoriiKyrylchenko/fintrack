@@ -10,7 +10,8 @@
 // --width below 600 emulates a phone (DevTools device metrics, so widths under the browser's
 // minimum window size work). --theme sets prefers-color-scheme; the app follows it when no theme
 // was chosen (each run uses a fresh browser profile). --lang sets the browser's language, --timezone
-// its time zone. --click presses the innermost visible element whose text is exactly that text, after
+// its time zone. --click presses the innermost visible element whose text or aria-label is exactly that text (inside the open
+// dialog or popover when a dialog is open), after
 // --wait; several steps are separated by ">>" ("Reporting currency >> Euro (EUR) >> Save"), and a
 // step "type:Label=text" types into the field with that label. --eval prints the value of a JavaScript expression after all waits.
 // The browser comes from BROWSER_PATH, or the usual Edge or Chrome install location.
@@ -90,7 +91,8 @@ async function run() {
     }
 
     // Each step clicks the innermost visible element whose text is exactly the step's text
-    // (a button, a link, a list option, a field label), waiting until one appears.
+    // (a button, a link, a list option, a field label), waiting until one appears. While a dialog
+    // is open only its elements and an open popover's count, as only they can be reached.
     for (const step of (args.click ?? "").split(">>").map((text) => text.trim()).filter(Boolean)) {
         if (step.startsWith("type:")) {
             await typeInto(step.slice("type:".length));
@@ -103,8 +105,15 @@ async function run() {
             clicked = await evaluate(`(() => {
                 const wanted = ${JSON.stringify(step)};
                 const matches = [...document.querySelectorAll("body *")]
-                    .filter(element => element.offsetParent !== null && element.innerText?.trim() === wanted);
-                const target = matches.find(element => ![...element.children].some(child => matches.includes(child)));
+                    .filter(element => element.offsetParent !== null
+                        && (element.innerText?.trim() === wanted || element.getAttribute("aria-label") === wanted));
+                // An open dialog covers the page, so only its elements, and an open popover's (a select's
+                // list is rendered outside the dialog), can be pressed then, as for a person.
+                const dialog = [...document.querySelectorAll('[role="dialog"]')].filter(element => element.offsetParent !== null).pop();
+                const reachable = dialog
+                    ? matches.filter(element => dialog.contains(element) || element.closest(".mud-popover-open"))
+                    : matches;
+                const target = reachable.find(element => ![...element.children].some(child => reachable.includes(child)));
                 if (!target) return false;
                 for (const type of ["mousedown", "mouseup", "click"]) {
                     target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
