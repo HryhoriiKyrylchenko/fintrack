@@ -427,4 +427,43 @@
   <data name="Error.concurrency.conflict" xml:space="preserve">
     <value>Something else changed your data at the same moment. Try again.</value>
   </data>
+  <data name="Nav.Overview" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="Overview.PageTitle" xml:space="preserve">
+    <value>Overview · FinTrack</value>
+  </data>
+  <data name="Overview.Title" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="Overview.TotalLabel" xml:space="preserve">
+    <value>Total in {0}</value>
+  </data>
+  <data name="Overview.RateCaption" xml:space="preserve">
+    <value>Converted at the exchange rates of {0}.</value>
+  </data>
+  <data name="Overview.ByCurrency" xml:space="preserve">
+    <value>By currency</value>
+  </data>
+  <data name="Overview.Converted" xml:space="preserve">
+    <value>≈ {0}</value>
+  </data>
+  <data name="Overview.Buckets" xml:space="preserve">
+    <value>Buckets</value>
+  </data>
+  <data name="Overview.Available" xml:space="preserve">
+    <value>Available</value>
+  </data>
+  <data name="Overview.Invested" xml:space="preserve">
+    <value>Invested</value>
+  </data>
+  <data name="Overview.Empty.Title" xml:space="preserve">
+    <value>Nothing here yet</value>
+  </data>
+  <data name="Overview.Empty.Text" xml:space="preserve">
+    <value>Create a bucket for each purpose, then add opening balances and deposits. What each bucket holds appears here.</value>
+  </data>
+  <data name="Overview.Empty.Action" xml:space="preserve">
+    <value>Go to Buckets</value>
+  </data>
 </root>

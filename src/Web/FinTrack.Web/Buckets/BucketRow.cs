@@ -1,4 +1,5 @@
 using FinTrack.Budget.Contracts.V1.Buckets;
+using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Web.Resources;
 using Microsoft.Extensions.Localization;
 
@@ -40,8 +41,15 @@ public static class BucketNames
     public static string Display(BucketDto bucket, IStringLocalizer<SharedResource> localizer)
     {
         ArgumentNullException.ThrowIfNull(bucket);
+        return Display(bucket.Name, bucket.Currency, localizer);
+    }
+
+    /// <summary>The owner's <paramref name="name"/>, or for a system bucket (no name) the resource name with <paramref name="currency"/>'s code.</summary>
+    public static string Display(string? name, Currency currency, IStringLocalizer<SharedResource> localizer)
+    {
+        ArgumentNullException.ThrowIfNull(currency);
         ArgumentNullException.ThrowIfNull(localizer);
 
-        return bucket.Name ?? localizer["Buckets.Unallocated", bucket.Currency.Code];
+        return name ?? localizer["Buckets.Unallocated", currency.Code];
     }
 }

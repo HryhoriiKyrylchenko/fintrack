@@ -1,0 +1,118 @@
+@page "/"
+@using FinTrack.Web.Buckets
+@inject OverviewClient Api
+@inject IStringLocalizer<SharedResource> L
+
+@* The start page (DESIGN 8, plan 1a step 15): where the owner's money stands. Every figure is the Api's
+   (GetBudgetOverview); OverviewView only decides what to show. *@
+
+<PageTitle>@L["Overview.PageTitle"]</PageTitle>
+
+<MudText Typo="Typo.h5" HtmlTag="h1" Class="mb-4">@L["Overview.Title"]</MudText>
+
+@if (loadError is not null)
+{
+    <ErrorAlert Error="loadError" Class="mb-4" />
+    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="LoadAsync">@L["Common.Retry"]</MudButton>
+}
+else if (view is null)
+{
+    <CardSkeletons Count="1" />
+    <div class="mt-6">
+        <CardSkeletons Count="3" />
+    </div>
+}
+else if (view.IsEmpty)
+{
+    <EmptyState Icon="@Icons.Material.Outlined.Dashboard" Title="@L["Overview.Empty.Title"]" Text="@L["Overview.Empty.Text"]">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" Href="buckets" StartIcon="@Icons.Material.Outlined.Savings">
+            @L["Overview.Empty.Action"]
+        </MudButton>
+    </EmptyState>
+}
+else
+{
+    <MudCard Elevation="0" Outlined="true" Class="mb-6">
+        <MudCardContent>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" HtmlTag="p">@L["Overview.TotalLabel", view.ReportingCurrency.Code]</MudText>
+            @if (view.Total is { } total)
+            {
+                <p class="mt-1"><Amount Value="total" Class="fintrack-key-figure" /></p>
+                @if (view.RateDate is { } rateDate)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" HtmlTag="p" Class="mt-1">
+                        @L["Overview.RateCaption", rateDate.ToString("d", CultureInfo.CurrentCulture)]
+                    </MudText>
+                }
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-2" role="status">
+                    @SharedResource.ErrorText(L, view.TotalUnavailableReason ?? string.Empty)
+                </MudAlert>
+            }
+
+            @if (view.ShowCurrencyTotals)
+            {
+                <MudText Typo="Typo.subtitle2" HtmlTag="h2" Class="mt-4 mb-1">@L["Overview.ByCurrency"]</MudText>
+                <MudStack Spacing="1">
+                    @foreach (var currencyTotal in view.CurrencyTotals)
+                    {
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Baseline" Wrap="Wrap.Wrap">
+                            <MudText Typo="Typo.body1">@L["Currency." + currencyTotal.Currency.Code]</MudText>
+                            <MudStack Spacing="0" AlignItems="AlignItems.End">
+                                <MudText Typo="Typo.body1"><Amount Value="currencyTotal.Available" /></MudText>
+                                @if (currencyTotal.Conversion is { } conversion)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="fintrack-figures">
+                                        @L["Overview.Converted", MoneyText(conversion.Amount)]
+                                    </MudText>
+                                }
+                            </MudStack>
+                        </MudStack>
+                    }
+                </MudStack>
+            }
+        </MudCardContent>
+    </MudCard>
+
+    <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-2">@L["Overview.Buckets"]</MudText>
+    <MudGrid Spacing="2">
+        @foreach (var card in view.Cards)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudCard Elevation="0" Outlined="true" Class="fintrack-full-height">
+                    <MudCardContent>
+                        <MudText Typo="Typo.subtitle1" HtmlTag="h3">@BucketNames.Display(card.Bucket.Name, card.Bucket.Currency, L)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" HtmlTag="p" Class="mt-2">@L[card.AmountLabelKey]</MudText>
+                        <p><Amount Value="card.Amount" Class="fintrack-card-figure" /></p>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private OverviewView? view;
+    private ErrorInfo? loadError;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        view = null;
+        loadError = null;
+        var result = await Api.GetAsync(CancellationToken.None);
+        if (result.Value is { } overview)
+        {
+            view = OverviewView.From(overview);
+        }
+        else
+        {
+            loadError = ErrorInfo.From(result);
+        }
+    }
+
+    private static string MoneyText(Money money) => FinTrack.Web.Formatting.MoneyFormatter.Format(money, CultureInfo.CurrentCulture);
+}

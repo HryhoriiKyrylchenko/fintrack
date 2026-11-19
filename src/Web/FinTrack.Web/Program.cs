@@ -2,6 +2,7 @@ using System.Globalization;
 using FinTrack.Web;
 using FinTrack.Web.Api;
 using FinTrack.Web.Buckets;
+using FinTrack.Web.Overview;
 using FinTrack.Web.Settings;
 using FinTrack.Web.Theme;
 using Microsoft.AspNetCore.Components.Web;
@@ -23,6 +24,7 @@ builder.Services.AddSingleton(new BrowserDefaults(TimeZoneInfo.Local.Id, Culture
 builder.Services.AddSingleton(_ => new HttpClient { BaseAddress = new Uri(apiBaseUrl) });
 builder.Services.AddSingleton<ApiClient>();
 builder.Services.AddSingleton<BucketsClient>();
+builder.Services.AddSingleton<OverviewClient>();
 builder.Services.AddSingleton<OwnerSettingsState>();
 builder.Services.AddScoped<ThemePreference>();
 builder.Services.AddLocalization();
