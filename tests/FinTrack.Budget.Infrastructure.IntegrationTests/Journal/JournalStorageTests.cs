@@ -221,6 +221,17 @@ public sealed class JournalStorageTests(BudgetFixture fixture)
         await Should.ThrowAsync<FormatException>(() => ReadAsync(owner));
     }
 
+    [Fact]
+    public async Task StoredSource_ThatIsNotAString_FailsToRead()
+    {
+        var owner = BudgetFixture.NewOwner();
+        var document = ValidDocument(owner);
+        document["source"] = 1;
+        await fixture.Raw(BudgetCollections.Journal).InsertOneAsync(document, cancellationToken: Cancellation);
+
+        await Should.ThrowAsync<FormatException>(() => ReadAsync(owner));
+    }
+
     [Theory]
     [InlineData("type")]
     [InlineData("amount")]

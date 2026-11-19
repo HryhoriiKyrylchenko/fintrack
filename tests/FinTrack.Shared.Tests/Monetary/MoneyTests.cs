@@ -95,11 +95,26 @@ public class MoneyTests
     }
 
     [Fact]
+    public void Comparison_OfEqualAmounts_IsNeitherLessNorGreater()
+    {
+        // Equal amounts with different scales are equal (2 = 2.00).
+        (Pln(2m) < Pln(2.00m)).ShouldBeFalse();
+        (Pln(2m) > Pln(2.00m)).ShouldBeFalse();
+        (Pln(2m) <= Pln(2.00m)).ShouldBeTrue();
+        (Pln(2m) >= Pln(2.00m)).ShouldBeTrue();
+    }
+
+    [Fact]
     public void Comparison_DifferentCurrencies_Throws()
     {
         Should.Throw<CurrencyMismatchException>(() => Pln(1m) < Eur(2m));
         Should.Throw<CurrencyMismatchException>(() => Pln(1m) >= Eur(2m));
     }
+
+    [Fact]
+    public void CurrencyMismatch_NamesBothCurrencies() =>
+        Should.Throw<CurrencyMismatchException>(() => Pln(1m) + Eur(2m)).Message.ShouldBe(
+            "Amounts in PLN and EUR cannot be combined without an explicit conversion.");
 
     [Fact]
     public void Equality_IgnoresTrailingZeros() => Pln(1.5m).ShouldBe(Pln(1.50m));
@@ -165,6 +180,11 @@ public class MoneyTests
     [Fact]
     public void Split_UnequalWeights_FollowsWeights() =>
         Pln(1000m).Split([3m, 1m]).ShouldBe([Pln(750m), Pln(250m)]);
+
+    // With two parts, any wrong share of the second part is hidden: the first part takes the rest.
+    [Fact]
+    public void Split_ThreeUnequalWeights_EachPartFollowsItsWeight() =>
+        Pln(100m).Split([1m, 2m, 2m]).ShouldBe([Pln(20m), Pln(40m), Pln(40m)]);
 
     // With rounding to nearest, each large part (0.0167) would round up to 0.02 and the
     // first part would have to become -0.01 for the sum to stay exact.

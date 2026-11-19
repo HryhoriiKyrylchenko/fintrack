@@ -37,6 +37,48 @@ public sealed class OutboxDispatcherTests(MongoDatabaseFixture fixture) : IAsync
     }
 
     [Fact]
+    public async Task Dispatch_DeliversOnlyTheGivenEvent_AndMarksOnlyItsMessage()
+    {
+        // Two pending messages of one owner: dispatching the second leaves the first to the sweep.
+        var first = Opened(owner);
+        var second = Opened(owner);
+        await harness.CommitWithoutDispatchAsync(owner, [first], Cancellation);
+        await harness.CommitWithoutDispatchAsync(owner, [second], Cancellation);
+
+        await harness.Dispatcher.DispatchAsync(harness.Ledger, [second.EventId], Cancellation);
+
+        harness.Handled.Deliveries.ShouldBe([(second.EventId, owner)]);
+        (await harness.MessageAsync(second.EventId, Cancellation)).DispatchedAt.ShouldBe(harness.Clock.UtcNow);
+        (await harness.MessageAsync(first.EventId, Cancellation)).DispatchedAt.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Dispatch_OfAnAlreadyDispatchedEvent_DoesNothing()
+    {
+        var opened = Opened(owner);
+        await harness.CommitAsync(owner, [opened], Cancellation);
+        var dispatchedAt = harness.Clock.UtcNow;
+        harness.Clock.Advance(TimeSpan.FromMinutes(1));
+
+        await harness.Dispatcher.DispatchAsync(harness.Ledger, [opened.EventId], Cancellation);
+
+        harness.Handled.Deliveries.ShouldHaveSingleItem();
+        (await harness.MessageAsync(opened.EventId, Cancellation)).DispatchedAt.ShouldBe(dispatchedAt);
+    }
+
+    [Fact]
+    public async Task Dispatch_WhenTheOutboxCannotBeRead_LeavesItToTheSweep()
+    {
+        // The commit has already succeeded: a failed read right after it must not turn into an error for the caller.
+        using var unreachable = new MongoClient("mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=300&connectTimeoutMS=300");
+        await using var offline = new OutboxHarness(fixture, unreachable.GetDatabase("fintrack_unreachable"));
+
+        await Should.NotThrowAsync(() => offline.Dispatcher.DispatchAsync(offline.Ledger, [Guid.CreateVersion7()], Cancellation));
+
+        offline.Logs.Lines.ShouldContain(line => line.Contains($"ledger {offline.Ledger.Value} could not be read", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task UndispatchedMessage_IsDeliveredByTheSweep_Once()
     {
         var opened = Opened(owner);
@@ -162,6 +204,20 @@ public sealed class OutboxDispatcherTests(MongoDatabaseFixture fixture) : IAsync
         await harness.CommitWithoutDispatchAsync(owner, events, Cancellation);
 
         (await harness.Dispatcher.DispatchPendingAsync(Cancellation)).ShouldBe(events.Count);
+    }
+
+    [Fact]
+    public async Task Sweep_TriesAFailingMessageOncePerCall_AcrossBatches()
+    {
+        // The failing message is on the first page (its ID is the oldest); the next pages must not bring it back.
+        harness.Behaviour.FailWithCode = "test.handler_refused";
+        var failing = Deposit(owner) with { EventId = Guid.CreateVersion7(new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero)) };
+        var events = Enumerable.Range(0, OutboxDispatcher.BatchSize + 5).Select(_ => (IIntegrationEvent)Opened(owner)).ToList();
+        await harness.CommitWithoutDispatchAsync(owner, [failing, .. events], Cancellation);
+
+        (await harness.Dispatcher.DispatchPendingAsync(Cancellation)).ShouldBe(events.Count);
+
+        (await harness.MessageAsync(failing.EventId, Cancellation)).Attempts.ShouldBe(1);
     }
 
     [Fact]

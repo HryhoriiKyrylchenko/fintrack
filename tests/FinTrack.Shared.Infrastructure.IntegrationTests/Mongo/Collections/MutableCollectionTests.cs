@@ -196,6 +196,10 @@ public sealed class MutableCollectionTests(MongoDatabaseFixture fixture)
     }
 
     [Fact]
+    public async Task Delete_WithVersionZero_Throws() =>
+        await Should.ThrowAsync<ArgumentException>(() => Collection().DeleteAsync(Guid.CreateVersion7(), expectedVersion: 0, cancellationToken: Cancellation));
+
+    [Fact]
     public async Task ConcurrentReplaces_OfTheSameVersion_ExactlyOneSucceeds()
     {
         var collection = Collection();

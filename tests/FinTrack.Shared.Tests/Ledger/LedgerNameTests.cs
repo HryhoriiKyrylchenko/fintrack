@@ -7,6 +7,8 @@ public class LedgerNameTests
     [Theory]
     [InlineData("budget")]
     [InlineData("inv")]
+    [InlineData("ab")] // the shortest allowed
+    [InlineData("abcdefghijklmnopqrst")] // the longest allowed
     [InlineData("insights2")]
     public void From_ValidName_KeepsIt(string value)
     {

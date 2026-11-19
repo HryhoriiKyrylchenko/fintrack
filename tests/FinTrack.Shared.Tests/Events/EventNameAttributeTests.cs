@@ -26,5 +26,15 @@ public class EventNameAttributeTests
     public void Constructor_OtherName_Throws(string name) =>
         Should.Throw<ArgumentException>(() => new EventNameAttribute(name));
 
+    [Fact]
+    public void Of_EventThatOnlyInheritsAName_Throws() =>
+        // A stored event outlives refactorings: each type declares its own name, never its base type's.
+        Should.Throw<InvalidOperationException>(() => EventNameAttribute.Of(typeof(DerivedEvent)));
+
+    [EventName("test.base_happened")]
+    private record BaseEvent(Guid EventId, Kernel.Ids.OwnerId OwnerId, DateTimeOffset OccurredAt) : IIntegrationEvent;
+
+    private sealed record DerivedEvent(Guid EventId, Kernel.Ids.OwnerId OwnerId, DateTimeOffset OccurredAt) : BaseEvent(EventId, OwnerId, OccurredAt);
+
     private sealed record UnnamedEvent(Guid EventId, Kernel.Ids.OwnerId OwnerId, DateTimeOffset OccurredAt) : IIntegrationEvent;
 }
