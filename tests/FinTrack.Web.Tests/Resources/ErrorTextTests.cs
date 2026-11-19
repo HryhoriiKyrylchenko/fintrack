@@ -58,6 +58,13 @@ public sealed class ErrorTextTests : IDisposable
         "input.amount_invalid",
         "input.amount_required",
         "concurrency.conflict",
+        "input.target_required",
+        "input.note_invalid",
+        "input.tag_invalid",
+        "input.tag_duplicate",
+        "input.tags_too_many",
+        "input.rate_required",
+        "input.rate_invalid",
     ];
 
     [Theory]

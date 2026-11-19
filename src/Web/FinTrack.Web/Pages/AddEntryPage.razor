@@ -1,0 +1,333 @@
+@page "/entries/new"
+@using FinTrack.Web.Buckets
+@using FinTrack.Web.Entries
+@using FinTrack.Web.Formatting
+@inject BucketsClient Buckets
+@inject EntriesClient Entries
+@inject OwnerSettingsState Settings
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IStringLocalizer<SharedResource> L
+
+@* "Add entry" (plan 1a step 16): one form for opening balance, deposit, spend and transfer, then a summary to
+   confirm before anything is written (DESIGN 1.6). The rules live in EntryFormModel; a refusal from the Api is
+   explained from its code in the summary (DESIGN 9). One ID per form, so a double click writes once. *@
+
+<PageTitle>@L["Entries.PageTitle"]</PageTitle>
+
+<div class="fintrack-narrow">
+    <MudText Typo="Typo.h5" HtmlTag="h1" GutterBottom="true">@(reviewing ? L["Entries.SummaryTitle"] : L["Entries.Title"])</MudText>
+    @if (!reviewing)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">@L["Entries.Description"]</MudText>
+    }
+
+    @if (loadError is not null)
+    {
+        <ErrorAlert Error="loadError" Class="mb-4" />
+        <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="LoadAsync">@L["Common.Retry"]</MudButton>
+    }
+    else if (model is null)
+    {
+        <TableSkeleton Rows="6" />
+    }
+    else if (!reviewing)
+    {
+        <MudCard Elevation="0" Outlined="true">
+            <MudCardContent>
+                <MudStack Spacing="4">
+                    <MudSelect T="EntryKind" Label="@L["Entries.Kind"]" HelperText="@L["Entries.Kind." + model.Kind + ".Help"]"
+                               Value="model.Kind" ValueChanged="KindChanged" ToStringFunc="KindLabel" Variant="Variant.Outlined">
+                        @foreach (var kind in Enum.GetValues<EntryKind>())
+                        {
+                            <MudSelectItem T="EntryKind" Value="kind">@KindLabel(kind)</MudSelectItem>
+                        }
+                    </MudSelect>
+
+                    @if (model.Kind != EntryKind.Transfer)
+                    {
+                        <TargetSelect Label="@L["Entries.Target"]" Targets="model.Targets" @bind-Key="model.TargetKey" Error="@FieldError(EntryField.Target)" />
+                        <MudTextField T="string" @bind-Value="model.AmountText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
+                                      Label="@(model.Target is { } target ? L["Entries.AmountIn", target.Currency.Code] : L["Entries.Amount"])"
+                                      Error="@(FieldError(EntryField.Amount) is not null)" ErrorText="@FieldError(EntryField.Amount)" Class="fintrack-figures" />
+                    }
+                    else
+                    {
+                        <TargetSelect Label="@L["Entries.From"]" Targets="model.TransferTargets" @bind-Key="model.FromKey" Error="@FieldError(EntryField.From)" />
+                        <TargetSelect Label="@L["Entries.To"]" Targets="model.TransferTargets" @bind-Key="model.ToKey" Error="@FieldError(EntryField.To)" />
+                        <MudTextField T="string" @bind-Value="model.AmountText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
+                                      Label="@(model.From is { } from ? L["Entries.SentIn", from.Currency.Code] : L["Entries.Amount"])"
+                                      Error="@(FieldError(EntryField.Amount) is not null)" ErrorText="@FieldError(EntryField.Amount)" Class="fintrack-figures" />
+                        @if (model.From is { } source)
+                        {
+                            <MudTextField T="string" @bind-Value="model.FeeText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
+                                          Label="@L["Entries.FeeIn", source.Currency.Code]"
+                                          Error="@(FieldError(EntryField.Fee) is not null)" ErrorText="@FieldError(EntryField.Fee)" Class="fintrack-figures" />
+                        }
+
+                        @if (model.IsCrossCurrencyTransfer)
+                        {
+                            <div>
+                                <MudText Typo="Typo.subtitle2" HtmlTag="p">@L["Entries.TransferInput"]</MudText>
+                                <MudRadioGroup T="TransferInput" @bind-Value="model.TransferInput">
+                                    <MudRadio T="TransferInput" Value="TransferInput.ReceivedAmount" Color="Color.Primary">@L["Entries.TransferInput.Received"]</MudRadio>
+                                    <MudRadio T="TransferInput" Value="TransferInput.Rate" Color="Color.Primary">@L["Entries.TransferInput.Rate"]</MudRadio>
+                                </MudRadioGroup>
+                            </div>
+                            @if (model.TransferInput == TransferInput.ReceivedAmount)
+                            {
+                                <MudTextField T="string" @bind-Value="model.ReceivedText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
+                                              Label="@L["Entries.ReceivedIn", model.To!.Currency.Code]"
+                                              Error="@(FieldError(EntryField.Received) is not null)" ErrorText="@FieldError(EntryField.Received)" Class="fintrack-figures" />
+                            }
+                            else
+                            {
+                                <MudTextField T="string" @bind-Value="model.RateText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
+                                              Label="@L["Entries.RateFor", model.From!.Currency.Code, model.To!.Currency.Code]"
+                                              Error="@(FieldError(EntryField.Rate) is not null)" ErrorText="@FieldError(EntryField.Rate)" Class="fintrack-figures" />
+                            }
+                        }
+                        else if (model.IsSameCurrencyTransfer && model.ToDraft() is { ToAmount: { } arrives })
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@L["Entries.Arrives", Money(arrives)]</MudText>
+                        }
+                    }
+
+                    <MudDatePicker Label="@L["Entries.Date"]" HelperText="@L["Entries.Date.Help"]" Date="DateValue" DateChanged="DateChanged"
+                                   MaxDate="model.Today.ToDateTime(TimeOnly.MinValue)" Variant="Variant.Outlined" Culture="CultureInfo.CurrentCulture"
+                                   Error="@(FieldError(EntryField.Date) is not null)" ErrorText="@FieldError(EntryField.Date)" />
+
+                    <MudTextField T="string" @bind-Value="model.Note" Immediate="true" Label="@L["Entries.Note"]" Variant="Variant.Outlined"
+                                  Lines="2" Sizing="InputSizing.Auto" Counter="EntryFormModel.MaxNoteLength"
+                                  Error="@(FieldError(EntryField.Note) is not null)" ErrorText="@FieldError(EntryField.Note)" />
+
+                    <div>
+                        <MudTextField T="string" @bind-Value="tagText" Immediate="true" Label="@L["Entries.Tags"]" HelperText="@L["Entries.Tags.Help"]"
+                                      Variant="Variant.Outlined" OnKeyDown="TagKeyDown"
+                                      Error="@(tagError is not null)" ErrorText="@(tagError is null ? null : SharedResource.ErrorText(L, tagError, CultureInfo.CurrentCulture))" />
+                        @if (model.Tags.Count > 0)
+                        {
+                            <MudChipSet T="string" AllClosable="true" OnClose="RemoveTag" Class="mt-2">
+                                @foreach (var tag in model.Tags)
+                                {
+                                    <MudChip T="string" Value="tag" Text="@tag" Variant="Variant.Outlined" aria-label="@L["Entries.RemoveTag", tag]" />
+                                }
+                            </MudChipSet>
+                        }
+                    </div>
+
+                    <div class="fintrack-form-actions">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" OnClick="Review">@L["Entries.Review"]</MudButton>
+                    </div>
+                </MudStack>
+            </MudCardContent>
+        </MudCard>
+    }
+    else if (draft is not null)
+    {
+        <MudCard Elevation="0" Outlined="true">
+            <MudCardContent>
+                <dl class="fintrack-summary">
+                    <dt>@L["Entries.Summary.Kind"]</dt>
+                    <dd>@KindLabel(draft.Kind)</dd>
+                    @if (draft.Kind != EntryKind.Transfer)
+                    {
+                        <dt>@L["Entries.Summary.Bucket"]</dt>
+                        <dd>@TargetLabel(draft.Target!)</dd>
+                        <dt>@L["Entries.Summary.Amount"]</dt>
+                        <dd><Amount Value="draft.Amount!" Class="fintrack-card-figure" /></dd>
+                    }
+                    else
+                    {
+                        <dt>@L["Entries.Summary.From"]</dt>
+                        <dd>@TargetLabel(draft.From!)</dd>
+                        <dt>@L["Entries.Summary.To"]</dt>
+                        <dd>@TargetLabel(draft.To!)</dd>
+                        <dt>@L["Entries.Summary.Sent"]</dt>
+                        <dd><Amount Value="draft.FromAmount!" Class="fintrack-card-figure" /></dd>
+                        @if (draft.Fee is { } fee)
+                        {
+                            <dt>@L["Entries.Summary.Fee"]</dt>
+                            <dd><Amount Value="fee" /></dd>
+                        }
+                        <dt>@L["Entries.Summary.Received"]</dt>
+                        <dd><Amount Value="draft.ToAmount!" Class="fintrack-card-figure" /></dd>
+                        @if (draft.From!.Currency != draft.To!.Currency)
+                        {
+                            <dt>@L["Entries.Summary.Rate"]</dt>
+                            <dd class="fintrack-figures">@L["Entries.RateValue", draft.From.Currency.Code, RateInput.Format(draft.Rate!.Value, CultureInfo.CurrentCulture), draft.To.Currency.Code]</dd>
+                        }
+                    }
+                    <dt>@L["Entries.Summary.Date"]</dt>
+                    <dd>@draft.OccurredOn.ToString("d", CultureInfo.CurrentCulture)</dd>
+                    @if (draft.Note is { } note)
+                    {
+                        <dt>@L["Entries.Summary.Note"]</dt>
+                        <dd class="fintrack-note">@note</dd>
+                    }
+                    @if (draft.Tags.Count > 0)
+                    {
+                        <dt>@L["Entries.Summary.Tags"]</dt>
+                        <dd>
+                            @foreach (var tag in draft.Tags)
+                            {
+                                <MudChip T="string" Text="@tag" Size="Size.Small" Variant="Variant.Outlined" />
+                            }
+                        </dd>
+                    }
+                </dl>
+
+                @if (submitError is not null)
+                {
+                    <ErrorAlert Error="submitError" Class="mt-4" />
+                }
+            </MudCardContent>
+            <MudCardActions Class="fintrack-review-actions">
+                <MudButton Variant="Variant.Text" OnClick="Back" Disabled="busy">@L["Entries.Back"]</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" OnClick="ConfirmAsync" Disabled="@(busy || submitError is not null)">
+                    @L["Entries.Confirm"]
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    }
+</div>
+
+@code {
+    // Amounts and rates open the numeric keyboard on phones.
+    private const InputMode DecimalKeyboard = InputMode.@decimal;
+
+    private EntryFormModel? model;
+    private EntryDraft? draft;
+    private ErrorInfo? loadError;
+    private ErrorInfo? submitError;
+    private ErrorInfo? tagError;
+    private string? tagText;
+    private bool reviewing;
+    private bool showErrors;
+    private bool busy;
+
+    /// <summary>The kind to start with, from <c>?kind=</c> (for example <c>transfer</c>); a deposit when absent or unknown.</summary>
+    [SupplyParameterFromQuery(Name = "kind")]
+    public string? KindQuery { get; set; }
+
+    private DateTime? DateValue => model?.OccurredOn.ToDateTime(TimeOnly.MinValue);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loadError = null;
+        var result = await Buckets.ListAsync(includeArchived: false, CancellationToken.None);
+        if (result.Value is not { } buckets)
+        {
+            loadError = ErrorInfo.From(result);
+            return;
+        }
+
+        // The layout shows pages only with saved settings.
+        var today = OwnerDate.Today(DateTimeOffset.UtcNow, Settings.Settings!.TimeZone);
+        var kind = Enum.TryParse<EntryKind>(KindQuery, ignoreCase: true, out var asked) ? asked : EntryKind.Deposit;
+        model = EntryFormModel.Create(kind, buckets, today, CultureInfo.CurrentCulture);
+    }
+
+    private string? FieldError(string field) =>
+        showErrors && model!.Validate().TryGetValue(field, out var error) ? SharedResource.ErrorText(L, error, CultureInfo.CurrentCulture) : null;
+
+    private string KindLabel(EntryKind kind) => L["Entries.Kind." + kind];
+
+    private string TargetLabel(EntryTarget target) =>
+        target.IsUnallocated ? BucketNames.Display(null, target.Currency, L) : L["Entries.TargetOption", target.Name!, target.Currency.Code];
+
+    private static string Money(Money money) => MoneyFormatter.Format(money, CultureInfo.CurrentCulture);
+
+    private void KindChanged(EntryKind kind)
+    {
+        model!.Kind = kind;
+        if (model.Target is null)
+        {
+            model.TargetKey = null;
+        }
+    }
+
+    private void DateChanged(DateTime? date)
+    {
+        if (date is { } value)
+        {
+            model!.OccurredOn = DateOnly.FromDateTime(value);
+        }
+    }
+
+    private void TagKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key != "Enter" || string.IsNullOrEmpty(tagText))
+        {
+            return;
+        }
+
+        tagError = model!.AddTag(tagText);
+        if (tagError is null)
+        {
+            tagText = null;
+        }
+    }
+
+    private void RemoveTag(MudChip<string> chip)
+    {
+        if (chip.Value is { } tag)
+        {
+            model!.RemoveTag(tag);
+        }
+    }
+
+    private void Review()
+    {
+        showErrors = true;
+        draft = model!.ToDraft();
+        if (draft is not null)
+        {
+            submitError = null;
+            reviewing = true;
+        }
+    }
+
+    private void Back()
+    {
+        reviewing = false;
+        submitError = null;
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (busy || draft is null)
+        {
+            return;
+        }
+
+        // Set before the first await: a second click finds the button disabled, and it would send the same ID anyway.
+        busy = true;
+        var result = await Entries.SubmitAsync(draft.ToRequest(), CancellationToken.None);
+        busy = false;
+
+        if (!result.IsSuccess)
+        {
+            submitError = ErrorInfo.From(result);
+            return;
+        }
+
+        Snackbar.Add(L["Entries.Saved." + draft.Kind], Severity.Success, config =>
+        {
+            config.Action = L["Entries.ToOverview"];
+            config.ActionColor = Color.Inherit;
+            config.OnClick = _ =>
+            {
+                Navigation.NavigateTo(string.Empty);
+                return Task.CompletedTask;
+            };
+        });
+
+        model!.StartAnother();
+        draft = null;
+        reviewing = false;
+        showErrors = false;
+    }
+}

@@ -8,7 +8,12 @@
 
 <PageTitle>@L["Overview.PageTitle"]</PageTitle>
 
-<MudText Typo="Typo.h5" HtmlTag="h1" Class="mb-4">@L["Overview.Title"]</MudText>
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Class="mb-4">
+    <MudText Typo="Typo.h5" HtmlTag="h1">@L["Overview.Title"]</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" Href="entries/new" StartIcon="@Icons.Material.Outlined.Add">
+        @L["Overview.AddEntry"]
+    </MudButton>
+</MudStack>
 
 @if (loadError is not null)
 {

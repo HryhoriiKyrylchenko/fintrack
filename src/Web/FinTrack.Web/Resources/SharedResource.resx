@@ -466,4 +466,193 @@
   <data name="Overview.Empty.Action" xml:space="preserve">
     <value>Go to Buckets</value>
   </data>
+  <data name="Error.input.target_required" xml:space="preserve">
+    <value>Choose a bucket.</value>
+  </data>
+  <data name="Error.input.note_invalid" xml:space="preserve">
+    <value>A note has at most 500 characters, with no spaces at the start or the end.</value>
+  </data>
+  <data name="Error.input.tag_invalid" xml:space="preserve">
+    <value>A tag has 1 to 30 characters, with no spaces at the start or the end.</value>
+  </data>
+  <data name="Error.input.tag_duplicate" xml:space="preserve">
+    <value>This tag is already added.</value>
+  </data>
+  <data name="Error.input.tags_too_many" xml:space="preserve">
+    <value>An entry has at most 10 tags.</value>
+  </data>
+  <data name="Error.input.rate_required" xml:space="preserve">
+    <value>Enter the exchange rate.</value>
+  </data>
+  <data name="Error.input.rate_invalid" xml:space="preserve">
+    <value>Enter the rate as a number above zero.</value>
+  </data>
+  <data name="Error.input.rate_invalid.WithParams" xml:space="preserve">
+    <value>Enter the rate as a number above zero, for example {example}.</value>
+  </data>
+  <data name="Overview.AddEntry" xml:space="preserve">
+    <value>Add entry</value>
+  </data>
+  <data name="Entries.PageTitle" xml:space="preserve">
+    <value>Add entry · FinTrack</value>
+  </data>
+  <data name="Entries.Title" xml:space="preserve">
+    <value>Add entry</value>
+  </data>
+  <data name="Entries.Description" xml:space="preserve">
+    <value>Record money as it moves. Nothing is saved until you confirm.</value>
+  </data>
+  <data name="Entries.Kind" xml:space="preserve">
+    <value>What happened</value>
+  </data>
+  <data name="Entries.Kind.OpeningBalance" xml:space="preserve">
+    <value>Opening balance</value>
+  </data>
+  <data name="Entries.Kind.Deposit" xml:space="preserve">
+    <value>Deposit</value>
+  </data>
+  <data name="Entries.Kind.Spend" xml:space="preserve">
+    <value>Spend</value>
+  </data>
+  <data name="Entries.Kind.Transfer" xml:space="preserve">
+    <value>Transfer</value>
+  </data>
+  <data name="Entries.Kind.OpeningBalance.Help" xml:space="preserve">
+    <value>What a bucket held when you started using FinTrack. It is not counted as income.</value>
+  </data>
+  <data name="Entries.Kind.Deposit.Help" xml:space="preserve">
+    <value>New money coming in. Deposits are your income.</value>
+  </data>
+  <data name="Entries.Kind.Spend.Help" xml:space="preserve">
+    <value>Money that leaves for good. A spend cannot come from an investment bucket.</value>
+  </data>
+  <data name="Entries.Kind.Transfer.Help" xml:space="preserve">
+    <value>Money moved between your buckets, also between currencies. A transfer is never income.</value>
+  </data>
+  <data name="Entries.Target" xml:space="preserve">
+    <value>Bucket</value>
+  </data>
+  <data name="Entries.From" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="Entries.To" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="Entries.TargetOption" xml:space="preserve">
+    <value>{0} · {1}</value>
+  </data>
+  <data name="Entries.Amount" xml:space="preserve">
+    <value>Amount</value>
+  </data>
+  <data name="Entries.AmountIn" xml:space="preserve">
+    <value>Amount in {0}</value>
+  </data>
+  <data name="Entries.SentIn" xml:space="preserve">
+    <value>Amount sent in {0}, fee included</value>
+  </data>
+  <data name="Entries.FeeIn" xml:space="preserve">
+    <value>Fee in {0} (optional)</value>
+  </data>
+  <data name="Entries.ReceivedIn" xml:space="preserve">
+    <value>Amount received in {0}</value>
+  </data>
+  <data name="Entries.RateFor" xml:space="preserve">
+    <value>{1} for 1 {0}</value>
+  </data>
+  <data name="Entries.TransferInput" xml:space="preserve">
+    <value>I know</value>
+  </data>
+  <data name="Entries.TransferInput.Received" xml:space="preserve">
+    <value>the amount received</value>
+  </data>
+  <data name="Entries.TransferInput.Rate" xml:space="preserve">
+    <value>the rate</value>
+  </data>
+  <data name="Entries.Arrives" xml:space="preserve">
+    <value>{0} arrives.</value>
+  </data>
+  <data name="Entries.Date" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="Entries.Date.Help" xml:space="preserve">
+    <value>The day the money moved. It cannot be later than today.</value>
+  </data>
+  <data name="Entries.Note" xml:space="preserve">
+    <value>Note (optional)</value>
+  </data>
+  <data name="Entries.Tags" xml:space="preserve">
+    <value>Tag (optional)</value>
+  </data>
+  <data name="Entries.Tags.Help" xml:space="preserve">
+    <value>Type a tag and press Enter. Up to 10 tags.</value>
+  </data>
+  <data name="Entries.RemoveTag" xml:space="preserve">
+    <value>Remove tag {0}</value>
+  </data>
+  <data name="Entries.Review" xml:space="preserve">
+    <value>Review</value>
+  </data>
+  <data name="Entries.SummaryTitle" xml:space="preserve">
+    <value>Check before saving</value>
+  </data>
+  <data name="Entries.Summary.Kind" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="Entries.Summary.Bucket" xml:space="preserve">
+    <value>Bucket</value>
+  </data>
+  <data name="Entries.Summary.From" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="Entries.Summary.To" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="Entries.Summary.Amount" xml:space="preserve">
+    <value>Amount</value>
+  </data>
+  <data name="Entries.Summary.Sent" xml:space="preserve">
+    <value>Sent, fee included</value>
+  </data>
+  <data name="Entries.Summary.Fee" xml:space="preserve">
+    <value>Fee</value>
+  </data>
+  <data name="Entries.Summary.Received" xml:space="preserve">
+    <value>Received</value>
+  </data>
+  <data name="Entries.Summary.Rate" xml:space="preserve">
+    <value>Rate</value>
+  </data>
+  <data name="Entries.Summary.Date" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="Entries.Summary.Note" xml:space="preserve">
+    <value>Note</value>
+  </data>
+  <data name="Entries.Summary.Tags" xml:space="preserve">
+    <value>Tags</value>
+  </data>
+  <data name="Entries.RateValue" xml:space="preserve">
+    <value>1 {0} = {1} {2}</value>
+  </data>
+  <data name="Entries.Back" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="Entries.Confirm" xml:space="preserve">
+    <value>Confirm and save</value>
+  </data>
+  <data name="Entries.Saved.OpeningBalance" xml:space="preserve">
+    <value>Opening balance saved.</value>
+  </data>
+  <data name="Entries.Saved.Deposit" xml:space="preserve">
+    <value>Deposit saved.</value>
+  </data>
+  <data name="Entries.Saved.Spend" xml:space="preserve">
+    <value>Spend saved.</value>
+  </data>
+  <data name="Entries.Saved.Transfer" xml:space="preserve">
+    <value>Transfer saved.</value>
+  </data>
+  <data name="Entries.ToOverview" xml:space="preserve">
+    <value>Overview</value>
+  </data>
 </root>
