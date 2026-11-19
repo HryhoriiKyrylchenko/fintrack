@@ -40,6 +40,7 @@ public class EntryInfoTests
     [Theory]
     [InlineData("car repair")]
     [InlineData("2026")]
+    [InlineData("exactly-thirty-characters-long")]
     public void ValidTags(string tag) => EntryInfo.IsValidTag(tag).ShouldBeTrue();
 
     [Theory]
@@ -57,6 +58,14 @@ public class EntryInfoTests
         EntryInfo.AreValidTags([.. Enumerable.Range(1, 11).Select(number => $"t{number}")]).ShouldBeFalse();
         EntryInfo.AreValidTags(["Car", "car"]).ShouldBeFalse();
     }
+
+    [Fact]
+    public void Tags_WithOneInvalidAmongValidOnes_AreInvalid() =>
+        EntryInfo.AreValidTags(["work", "family", " padded"]).ShouldBeFalse();
+
+    [Fact]
+    public void MissingSource_IsABug() =>
+        Should.Throw<ArgumentException>(() => new EntryInfo(null, [], default));
 
     [Fact]
     public void InvalidValues_AreBugs()

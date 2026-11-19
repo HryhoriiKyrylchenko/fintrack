@@ -141,8 +141,10 @@ public class GetJournalHandlerTests
     public async Task BucketFilter_MayNameAnArchivedBucket()
     {
         var old = Bucket("Old", Currency.Pln, 4, BucketStatus.Archived);
+        var oldEntry = Deposit(old, 5m, Today.AddDays(-20));
+        Deposit(cushion, 7m, Today.AddDays(-10));
 
-        (await Journal(new GetJournal(BucketId: old.Id))).IsSuccess.ShouldBeTrue();
+        (await Ids(new GetJournal(BucketId: old.Id))).ShouldBe([oldEntry.Id]);
     }
 
     [Fact]

@@ -170,6 +170,21 @@ public class BucketTests
             .ShouldBe(expected);
     }
 
+    [Theory]
+    [InlineData(" Cushion")]
+    [InlineData("")]
+    [InlineData("Cush\tion")]
+    public void Rename_ToAnInvalidName_IsABug(string name)
+    {
+        // Input is validated before it reaches the domain; an invalid name here means a caller skipped it.
+        var bucket = Create("Cushion").Value;
+
+        Should.Throw<ArgumentException>(() => bucket.Rename(name, [bucket]));
+    }
+
+    [Fact]
+    public void Id_CannotBeEmpty() => Should.Throw<ArgumentException>(() => BucketId.From(Guid.Empty));
+
     [Fact]
     public void Ids_FromClient_MustBeVersion7()
     {

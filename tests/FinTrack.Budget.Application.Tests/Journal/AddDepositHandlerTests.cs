@@ -195,6 +195,10 @@ public class AddDepositHandlerTests
         store.Buckets.Add(crypto);
 
         (await Add(new AddDeposit(Guid.CreateVersion7(), Money.From(10m, Currency.Usd), Today, crypto.Id, null, null, []))).IsSuccess.ShouldBeTrue();
+
+        var deposit = ledger.Commits.ShouldHaveSingleItem().Appends.ShouldHaveSingleItem().ShouldBeOfType<Deposit>();
+        deposit.BucketId.ShouldBe(crypto.BucketId);
+        deposit.Amount.ShouldBe(Money.From(10m, Currency.Usd));
     }
 
     [Theory]

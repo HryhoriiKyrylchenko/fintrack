@@ -203,6 +203,31 @@ public class BucketHandlerTests
             .Errors.ShouldContain(error => error.PropertyName == "Profile" && error.ErrorCode == rule);
 
     [Fact]
+    public void CreateValidator_RejectsAMissingCurrency_AndKindsOrProfilesOutsideTheirEnums()
+    {
+        var validator = new CreateBucketValidator();
+
+        validator.Validate(new CreateBucket(Guid.CreateVersion7(), "Cushion", null!, BucketKind.Savings, null)).Errors
+            .ShouldContain(error => error.PropertyName == "Currency" && error.ErrorCode == "NotNullValidator");
+        validator.Validate(new CreateBucket(Guid.CreateVersion7(), "Cushion", Currency.Pln, (BucketKind)7, null)).Errors
+            .ShouldContain(error => error.PropertyName == "Kind" && error.ErrorCode == "EnumValidator");
+        validator.Validate(new CreateBucket(Guid.CreateVersion7(), "Crypto", Currency.Usd, BucketKind.Investment, (InvestmentProfile)7)).Errors
+            .ShouldContain(error => error.PropertyName == "Profile" && error.ErrorCode == "EnumValidator");
+    }
+
+    [Fact]
+    public async Task List_OfBucketsCreatedAtTheSameInstant_IsOrderedByTheirIds()
+    {
+        // One commit can create two buckets (a transfer between two new Unallocated buckets); their order must not
+        // depend on the store's order.
+        var (low, high) = OrderedIds();
+        store.Buckets.Add(Stored(high, "Second", Currency.Pln));
+        store.Buckets.Add(Stored(low, "First", Currency.Pln));
+
+        (await Get(new GetBuckets())).Value.Select(bucket => bucket.Id).ShouldBe([low, high]);
+    }
+
+    [Fact]
     public void Validators_AcceptOrdinaryCommands()
     {
         new CreateBucketValidator().Validate(new CreateBucket(Guid.CreateVersion7(), "Crypto", Currency.Usd, BucketKind.Investment, InvestmentProfile.Crypto)).IsValid.ShouldBeTrue();
@@ -222,6 +247,13 @@ public class BucketHandlerTests
 
     private Task<FluentResults.Result<IReadOnlyList<BucketDto>>> Get(GetBuckets query) =>
         new GetBucketsHandler(new BudgetStateLoader(ledger, store)).Handle(query, Cancellation).AsTask();
+
+    private static (Guid Low, Guid High) OrderedIds()
+    {
+        var first = Guid.CreateVersion7();
+        var second = Guid.CreateVersion7(DateTimeOffset.UtcNow.AddMinutes(1));
+        return first.CompareTo(second) < 0 ? (first, second) : (second, first);
+    }
 
     private static DomainBucket Stored(
         Guid id,
