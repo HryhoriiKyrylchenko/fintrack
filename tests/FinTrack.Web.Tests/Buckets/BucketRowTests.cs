@@ -28,6 +28,7 @@ public sealed class BucketRowTests : IDisposable
         row.IsSystem.ShouldBeFalse();
         row.CanRename.ShouldBeTrue();
         row.CanArchive.ShouldBeTrue();
+        row.CanUnarchive.ShouldBeFalse();
         Localizer[row.KindKey].Value.ShouldBe("Savings");
     }
 
@@ -40,16 +41,18 @@ public sealed class BucketRowTests : IDisposable
         row.IsSystem.ShouldBeTrue();
         row.CanRename.ShouldBeFalse();
         row.CanArchive.ShouldBeFalse();
+        row.CanUnarchive.ShouldBeFalse();
     }
 
     [Fact]
-    public void ArchivedBucket_CannotBeRenamedOrArchivedAgain()
+    public void ArchivedBucket_CannotBeRenamedOrArchivedAgain_ButCanBeUnarchived()
     {
         var row = new BucketRow(Bucket("Old") with { Status = BucketStatus.Archived });
 
         row.IsArchived.ShouldBeTrue();
         row.CanRename.ShouldBeFalse();
         row.CanArchive.ShouldBeFalse();
+        row.CanUnarchive.ShouldBeTrue();
     }
 
     [Theory]

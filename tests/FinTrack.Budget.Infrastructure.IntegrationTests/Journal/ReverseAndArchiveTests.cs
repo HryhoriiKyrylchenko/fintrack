@@ -55,6 +55,41 @@ public sealed class ReverseAndArchiveTests(BudgetFixture fixture)
     }
 
     [Fact]
+    public async Task UnarchivedBucket_KeepsItsHistory_AndAcceptsEntriesAndReversalsAgain()
+    {
+        var owner = await NewOwnerAsync();
+        var holiday = await CreateBucketAsync(owner, "Holiday");
+        var spend = Guid.CreateVersion7();
+        await SendAsync<AddDepositHandler, AddDeposit>(owner, new AddDeposit(Guid.CreateVersion7(), Pln(50m), Today.AddDays(-5), holiday, null, null, []));
+        await SendAsync<AddSpendHandler, AddSpend>(owner, new AddSpend(spend, Pln(50m), Today.AddDays(-4), holiday, null, null, []));
+        (await SendAsync<ArchiveBucketHandler, ArchiveBucket>(owner, new ArchiveBucket(holiday))).IsSuccess.ShouldBeTrue();
+
+        // Archiving freed the name; while another active bucket has it, unarchiving is refused and writes nothing.
+        var other = await CreateBucketAsync(owner, "holiday");
+        var before = await StateAsync(owner);
+        (await SendAsync<UnarchiveBucketHandler, UnarchiveBucket>(owner, new UnarchiveBucket(holiday)))
+            .ShouldFailWith(BudgetErrorCodes.BucketNameTaken, ErrorKind.BusinessRule);
+        (await StateAsync(owner)).Version.ShouldBe(before.Version);
+
+        await SendAsync<RenameBucketHandler, RenameBucket>(owner, new RenameBucket(other, "Trips"));
+        (await SendAsync<UnarchiveBucketHandler, UnarchiveBucket>(owner, new UnarchiveBucket(holiday))).IsSuccess.ShouldBeTrue();
+        var afterUnarchive = await StateAsync(owner);
+        (await SendAsync<UnarchiveBucketHandler, UnarchiveBucket>(owner, new UnarchiveBucket(holiday))).IsSuccess.ShouldBeTrue();
+        (await StateAsync(owner)).Version.ShouldBe(afterUnarchive.Version, "unarchiving an active bucket wrote something");
+
+        var stored = await fixture.Raw(BudgetCollections.Buckets).Find(new BsonDocument("_id", new BsonBinaryData(holiday, GuidRepresentation.Standard))).SingleAsync(Cancellation);
+        stored["status"].AsString.ShouldBe("Active");
+        stored["name"].AsString.ShouldBe("Holiday");
+        stored["version"].AsInt64.ShouldBe(3);
+
+        // Its history is intact, an old entry can be reversed again, and new entries are accepted.
+        afterUnarchive.Journal.Select(entry => entry.Id).ShouldBe(before.Journal.Select(entry => entry.Id));
+        (await SendAsync<ReverseEntryHandler, ReverseEntry>(owner, new ReverseEntry(Guid.CreateVersion7(), spend, Today, "Refunded", []))).IsSuccess.ShouldBeTrue();
+        (await SendAsync<AddDepositHandler, AddDeposit>(owner, new AddDeposit(Guid.CreateVersion7(), Pln(20m), Today, holiday, null, null, []))).IsSuccess.ShouldBeTrue();
+        (await StateAsync(owner)).State.BalanceOf(BucketId.From(holiday)).Available.ShouldBe(Pln(70m));
+    }
+
+    [Fact]
     public async Task ReversingADepositThatWasSpent_IsRejected_AndWritesNothing()
     {
         var owner = await NewOwnerAsync();

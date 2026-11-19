@@ -18,7 +18,7 @@ namespace FinTrack.Budget.Application.Tests.Histories;
 /// <summary>
 /// The model test of plan 1a step 10: random sequences of every Budget command (buckets in three
 /// currencies, opening balances, deposits, spends, transfers with and without fee and across
-/// currencies, reversals, archiving, renaming, backdating, and repeats of earlier commands) run through
+/// currencies, reversals, archiving, unarchiving (plan 1b step 2), renaming, backdating, and repeats of earlier commands) run through
 /// the real handlers. After every command and at the end, invariants 1, 2, 10, 11 and 13 must hold. At the
 /// end, the read queries (step 12) must agree with the state: the overview's balances and totals, and the
 /// journal read page by page.
@@ -39,6 +39,7 @@ public class BudgetModelTests
         Transfer,
         Reverse,
         Archive,
+        Unarchive,
         Rename,
         Repeat,
     }
@@ -319,6 +320,14 @@ public class BudgetModelTests
                         ? newest.Id
                         : all.Count == 0 ? Guid.CreateVersion7() : all[operation.A % all.Count].Id);
 
+                case Kind.Unarchive:
+                    // Half of the time an archived bucket, so that unarchiving succeeds often enough to matter (its
+                    // name may have been taken again by then); otherwise any bucket, active and system ones included.
+                    var archived = all.Where(bucket => bucket.Status == BucketStatus.Archived).ToList();
+                    return new UnarchiveBucket(operation.Unallocated && archived.Count > 0
+                        ? archived[operation.A % archived.Count].Id
+                        : all.Count == 0 ? Guid.CreateVersion7() : all[operation.A % all.Count].Id);
+
                 case Kind.Rename:
                     return new RenameBucket(all.Count == 0 ? Guid.CreateVersion7() : all[operation.A % all.Count].Id, $"Bucket {operation.B % 6}");
 
@@ -366,6 +375,7 @@ public class BudgetModelTests
                 CreateBucket create => new CreateBucketHandler(loader, budget, owner).Handle(create, cancellation),
                 RenameBucket rename => new RenameBucketHandler(loader, budget).Handle(rename, cancellation),
                 ArchiveBucket archive => new ArchiveBucketHandler(loader, budget).Handle(archive, cancellation),
+                UnarchiveBucket unarchive => new UnarchiveBucketHandler(loader, budget).Handle(unarchive, cancellation),
                 AddOpeningBalance opening => new AddOpeningBalanceHandler(entries).Handle(opening, cancellation),
                 AddDeposit deposit => new AddDepositHandler(entries).Handle(deposit, cancellation),
                 AddSpend spend => new AddSpendHandler(entries).Handle(spend, cancellation),

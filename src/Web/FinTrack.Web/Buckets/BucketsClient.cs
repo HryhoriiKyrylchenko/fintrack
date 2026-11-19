@@ -23,4 +23,8 @@ public sealed class BucketsClient(ApiClient api)
     /// <summary>Archives the bucket <paramref name="id"/>; only an empty bucket can be archived (<c>bucket.not_empty</c>).</summary>
     public Task<ApiResult> ArchiveAsync(Guid id, CancellationToken cancellationToken) =>
         api.PostAsync($"{Path}/{id:D}/archive", cancellationToken);
+
+    /// <summary>Makes the archived bucket <paramref name="id"/> active again; refused while an active bucket has its name (<c>bucket.name_taken</c>).</summary>
+    public Task<ApiResult> UnarchiveAsync(Guid id, CancellationToken cancellationToken) =>
+        api.PostAsync($"{Path}/{id:D}/unarchive", cancellationToken);
 }

@@ -25,6 +25,8 @@ All three can be changed later under **Settings**. **Settings → System status*
 
 On **Buckets**, create one bucket for each purpose you set money aside for (a cushion, a car, a holiday). Each bucket has one currency, which cannot change later. Choose **Investment** for money put into a portfolio: it records what you put in (no market value yet), and spending from it is not possible.
 
+A bucket you no longer need can be archived on **Buckets** once it is empty: it disappears from the lists and accepts no entries, but keeps its history. Nothing is archived automatically; a bucket you have emptied stays active. **Show archived** lists archived buckets, and **Unarchive** makes one active again with all its entries (if another bucket has taken its name meanwhile, rename one of them first).
+
 You never create **Unallocated** yourself: there is one per currency for money that has arrived but is not distributed yet, created the first time an entry names it. It cannot be renamed or archived.
 
 ## Enter your starting point

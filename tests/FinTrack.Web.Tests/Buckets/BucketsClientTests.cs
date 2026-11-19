@@ -57,6 +57,15 @@ public class BucketsClientTests
         sent.ShouldHaveSingleItem().ShouldBe((HttpMethod.Post, Base + "v1/buckets/" + IdText + "/archive", null));
     }
 
+    [Fact]
+    public async Task Unarchive_PostsWithoutABody()
+    {
+        var result = await Client().UnarchiveAsync(Id, Cancellation);
+
+        result.IsSuccess.ShouldBeTrue();
+        sent.ShouldHaveSingleItem().ShouldBe((HttpMethod.Post, Base + "v1/buckets/" + IdText + "/unarchive", null));
+    }
+
     private BucketsClient Client(string? answer = null) =>
         new(new ApiClient(new HttpClient(new RecordingHandler(sent, answer)) { BaseAddress = new Uri(Base) }));
 
