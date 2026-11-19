@@ -33,6 +33,13 @@ public class GetJournalValidatorTests
         Failure(new GetJournal(From: new DateOnly(2026, 1, 16), To: new DateOnly(2026, 1, 15))).ShouldBe(("To", GetJournalValidator.FromNotAfterTo));
 
     [Fact]
+    public void Period_WithOnlyOneEnd_IsValid()
+    {
+        validator.Validate(new GetJournal(To: new DateOnly(2026, 1, 15))).IsValid.ShouldBeTrue();
+        validator.Validate(new GetJournal(From: new DateOnly(2026, 1, 15))).IsValid.ShouldBeTrue();
+    }
+
+    [Fact]
     public void Cursor_FromAPage_IsValid() =>
         validator.Validate(new GetJournal(Cursor: JournalCursor.Encode(Position))).IsValid.ShouldBeTrue();
 
@@ -53,7 +60,7 @@ public class GetJournalValidatorTests
     [Fact]
     public void Cursor_RoundTrips_TheExtremes()
     {
-        var earliest = new ReplayPosition(DateOnly.MinValue, DateTimeOffset.UnixEpoch, Guid.Empty);
+        var earliest = new ReplayPosition(DateOnly.MinValue, DateTimeOffset.MinValue, Guid.Empty);
         var latest = new ReplayPosition(DateOnly.MaxValue, new DateTimeOffset(9999, 12, 31, 23, 59, 59, 999, TimeSpan.Zero), Guid.AllBitsSet);
 
         JournalCursor.TryParse(JournalCursor.Encode(earliest), out var first).ShouldBeTrue();
@@ -74,6 +81,23 @@ public class GetJournalValidatorTests
         JournalCursor.TryParse("Ag" + cursor[2..], out _).ShouldBeFalse();
         JournalCursor.TryParse(cursor[..^1], out _).ShouldBeFalse();
         JournalCursor.TryParse(cursor + "A", out _).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(int.MaxValue, 0L)]
+    [InlineData(-1, 0L)]
+    [InlineData(739_000, long.MaxValue)]
+    [InlineData(739_000, long.MinValue)]
+    public void Cursor_WithAValueOutOfRange_IsNotOne(int dayNumber, long milliseconds)
+    {
+        // Well-formed bytes, but a day or an instant no DateOnly or DateTimeOffset can hold.
+        var bytes = new byte[29];
+        bytes[0] = 1;
+        Guid.CreateVersion7().TryWriteBytes(bytes.AsSpan(1, 16), bigEndian: true, out _);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(17, 4), dayNumber);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt64BigEndian(bytes.AsSpan(21, 8), milliseconds);
+
+        JournalCursor.TryParse(System.Buffers.Text.Base64Url.EncodeToString(bytes), out _).ShouldBeFalse();
     }
 
     [Fact]

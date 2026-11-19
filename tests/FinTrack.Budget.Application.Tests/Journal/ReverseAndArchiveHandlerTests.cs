@@ -143,6 +143,23 @@ public class ReverseAndArchiveHandlerTests
         (await Archive(Guid.CreateVersion7())).ShouldFailWith(BudgetErrorCodes.BucketNotFound, ErrorKind.NotFound);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ReversingATransfer_ThatTouchesAnArchivedBucket_OnEitherSide_IsRejected(bool archivedIsTheDestination)
+    {
+        // The other side is active: one archived bucket is enough, because reversing would change its balance.
+        var old = StoredBuckets.Of(Guid.CreateVersion7(), "Old", Currency.Pln, 2, FakeClock.DefaultStart, BucketStatus.Archived);
+        store.Buckets.Add(old);
+        var (from, to) = archivedIsTheDestination ? (cushion.BucketId, old.BucketId) : (old.BucketId, cushion.BucketId);
+        var transfer = Transfer.Create(JournalEntryId.From(Guid.CreateVersion7()), FakeOwnerContext.Owner, from, to, Money.From(10m, Currency.Pln),
+            Money.From(10m, Currency.Pln), null, Today.AddDays(-5), Today, EntryInfo.None, FakeClock.DefaultStart.AddSeconds(1)).Value;
+        store.Journal.Add(transfer);
+
+        (await Reverse(transfer.Id)).ShouldFailWith(BudgetErrorCodes.BucketArchived, ErrorKind.BusinessRule);
+        ledger.Commits.ShouldBeEmpty();
+    }
+
     private Task<FluentResults.Result> Reverse(Guid target) => Send(new ReverseEntry(Guid.CreateVersion7(), target, Today, null, []));
 
     private Task<FluentResults.Result> Send(ReverseEntry command) =>

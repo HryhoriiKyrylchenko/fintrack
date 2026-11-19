@@ -118,6 +118,18 @@ public class BudgetStateTests
         ReplayOrder.CompareIds(Guid.Parse(higher), Guid.Parse(lower)).ShouldBeGreaterThan(0);
     }
 
+    [Fact]
+    public void Available_IsNetContributed_LessOutstandingPrincipal()
+    {
+        // ARCHITECTURE 4.3's example: 1,000,000 contributed, 100,000 borrowed and not yet returned. Until loans
+        // exist (phase 1b) no replay produces a principal, so the formula (invariant 2) is pinned here directly.
+        var balance = new BucketBalance(
+            BucketId.From(Guid.CreateVersion7()), BucketKind.Savings, Money.From(1_000_000m, Currency.Pln), Money.From(100_000m, Currency.Pln),
+            Money.Zero(Currency.Pln), HasOpeningBalance: false, FirstNegativeOn: null);
+
+        balance.Available.ShouldBe(Money.From(900_000m, Currency.Pln));
+    }
+
     private static Bucket Savings(string name, Currency currency) =>
         Bucket.Create(BucketId.From(Guid.CreateVersion7()), Owner, name, currency, BucketKind.Savings, null, []).Value;
 

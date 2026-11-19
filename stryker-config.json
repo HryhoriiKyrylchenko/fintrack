@@ -1,0 +1,13 @@
+{
+  "stryker-config": {
+    "test-runner": "mtp",
+    "target-framework": "net10.0",
+    "reporters": [ "html", "json", "progress" ],
+    "ignore-methods": [
+      "ConfigureAwait",
+      "*.ThrowIfNull",
+      "*.ThrowIfNegativeOrZero",
+      "*Exception.ctor"
+    ]
+  }
+}

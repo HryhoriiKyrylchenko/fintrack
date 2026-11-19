@@ -98,6 +98,14 @@ public class AddTransferHandlerTests
     }
 
     [Fact]
+    public async Task UnknownDestination_IsNotFound()
+    {
+        (await Send(new AddTransfer(Guid.CreateVersion7(), Pln(1m), Pln(1m), null, Today, cushion.Id, null, Guid.CreateVersion7(), null, null, [])))
+            .ShouldFailWith(BudgetErrorCodes.BucketNotFound, ErrorKind.NotFound);
+        ledger.Commits.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task UnknownSource_IsNotFound() =>
         (await Send(new AddTransfer(Guid.CreateVersion7(), Pln(1m), Pln(1m), null, Today, Guid.CreateVersion7(), null, holiday.Id, null, null, [])))
             .ShouldFailWith(BudgetErrorCodes.BucketNotFound, ErrorKind.NotFound);
