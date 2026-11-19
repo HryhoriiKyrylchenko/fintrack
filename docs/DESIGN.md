@@ -59,10 +59,11 @@ Beyond eight series, group the rest as "Other". The system items `Unallocated` a
 
 ## 6. Numbers and money
 
-- Always show the currency code or symbol next to an amount. Never show a bare number where currency could be unclear.
+- Always show the currency's ISO code next to an amount (`1 234,56 PLN`, `USD 1,234.56`), never a symbol: `$` is shared by many currencies and a locale's own symbol belongs to its own currency. The code goes where the owner's locale puts its currency symbol, joined by a no-break space. Never show a bare number where currency could be unclear.
 - Amounts use the precision of their currency (`Currency.DecimalPlaces`: PLN, EUR and USD have 2, some currencies 0 or 3); input with more decimals is rejected, never rounded. Crypto quantities: up to 8 significant decimals, trailing zeros trimmed. Percentages: 1 or 2 decimals.
 - Thousands separators follow the user's locale setting.
 - Gain and loss: explicit sign and an arrow icon plus colour (`+2.4% ▲` in success, `−1.1% ▼` in error). Use the real minus sign.
+- A negative amount starts with the real minus sign (`−`, U+2212), before the currency code too (`−PLN 12.30`), whatever the locale's own pattern; movements may show `+` for money in. Money is shown only through `MoneyFormatter` (the `Amount` component) and read only through `MoneyInput`, which accepts the locale's own decimal separator and grouping and rejects anything else instead of guessing (`12.50` typed in `de-DE` is not an amount).
 - Amounts in tables are right-aligned; labels are left-aligned.
 - A converted total shows its reporting currency and the rate date in a caption or tooltip.
 - Numbers, dates and times are formatted by the owner's locale setting, and times are shown in the owner's time zone, both from Settings (not the browser's).

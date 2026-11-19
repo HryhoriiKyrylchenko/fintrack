@@ -1,0 +1,16 @@
+@* A table or list while its rows load (DESIGN 9). Rows are full-width lines, so the same skeleton suits
+   the table on desktop and the cards that replace it on mobile (DESIGN 8). *@
+@inject IStringLocalizer<SharedResource> L
+
+<MudPaper Elevation="0" Outlined="true" Class="pa-4" aria-busy="true" aria-label="@L["Common.Loading"]">
+    @for (var index = 0; index < Rows; index++)
+    {
+        <MudSkeleton SkeletonType="SkeletonType.Text" Height="32px" />
+    }
+</MudPaper>
+
+@code {
+    /// <summary>How many rows to suggest.</summary>
+    [Parameter]
+    public int Rows { get; set; } = 5;
+}

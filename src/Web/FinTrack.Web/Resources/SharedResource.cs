@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Localization;
 
 namespace FinTrack.Web.Resources;
@@ -7,10 +9,11 @@ namespace FinTrack.Web.Resources;
 /// inject <c>IStringLocalizer&lt;SharedResource&gt;</c>; a new language is a new <c>.resx</c> file,
 /// not a code change.
 /// </summary>
-public sealed class SharedResource
+public sealed partial class SharedResource
 {
     private const string ErrorPrefix = "Error.";
     private const string UnknownError = "Error.unknown";
+    private const string WithParamsSuffix = ".WithParams";
 
     /// <summary>
     /// The text for an error code (<c>Error.&lt;code&gt;</c> in the resources), or a general text
@@ -23,4 +26,42 @@ public sealed class SharedResource
         var text = localizer[ErrorPrefix + code];
         return text.ResourceNotFound ? localizer[UnknownError] : text;
     }
+
+    /// <summary>
+    /// The text for <paramref name="error"/> with its parameters: the template <c>Error.&lt;code&gt;.WithParams</c>
+    /// when the code has one and every <c>{name}</c> in it has a parameter; otherwise the plain text
+    /// (<see cref="ErrorText(IStringLocalizer{SharedResource}, string)"/>). A parameter written as a business date
+    /// (<c>yyyy-MM-dd</c>) is shown in <paramref name="culture"/>'s short date; any other value as it is.
+    /// </summary>
+    public static string ErrorText(IStringLocalizer<SharedResource> localizer, ErrorInfo error, CultureInfo culture)
+    {
+        ArgumentNullException.ThrowIfNull(localizer);
+        ArgumentNullException.ThrowIfNull(error);
+        ArgumentNullException.ThrowIfNull(culture);
+
+        var template = localizer[ErrorPrefix + error.Code + WithParamsSuffix];
+        if (template.ResourceNotFound)
+        {
+            return ErrorText(localizer, error.Code);
+        }
+
+        var complete = true;
+        var text = Placeholder().Replace(template.Value, match =>
+        {
+            if (!error.Parameters.TryGetValue(match.Groups[1].Value, out var value))
+            {
+                complete = false;
+                return match.Value;
+            }
+
+            return DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+                ? date.ToString("d", culture)
+                : value;
+        });
+
+        return complete ? text : ErrorText(localizer, error.Code);
+    }
+
+    [GeneratedRegex(@"\{([A-Za-z][A-Za-z0-9]*)\}")]
+    private static partial Regex Placeholder();
 }

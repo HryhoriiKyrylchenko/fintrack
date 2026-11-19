@@ -23,7 +23,7 @@
     @if (Model.Preview() is { } preview)
     {
         <MudText Typo="Typo.body2" Color="Color.Secondary" Class="fintrack-figures">
-            @L["Settings.Preview", preview.Number, preview.Date]
+            @L["Settings.Preview", preview.Amount, preview.Date]
         </MudText>
     }
 

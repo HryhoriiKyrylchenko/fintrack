@@ -1,0 +1,23 @@
+@* Cards while their content loads (DESIGN 9: skeletons, not a full-page spinner); the shape of a summary
+   card: a caption line and a key figure. *@
+@inject IStringLocalizer<SharedResource> L
+
+<MudGrid Spacing="2" aria-busy="true" aria-label="@L["Common.Loading"]">
+    @for (var index = 0; index < Count; index++)
+    {
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="0" Outlined="true">
+                <MudCardContent>
+                    <MudSkeleton SkeletonType="SkeletonType.Text" Width="45%" />
+                    <MudSkeleton SkeletonType="SkeletonType.Text" Width="70%" Height="40px" />
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    }
+</MudGrid>
+
+@code {
+    /// <summary>How many cards to suggest.</summary>
+    [Parameter]
+    public int Count { get; set; } = 3;
+}

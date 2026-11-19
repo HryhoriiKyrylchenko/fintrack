@@ -1,0 +1,24 @@
+@* A rejected operation, in plain words from its code and parameters (DESIGN 9). It stays until the owner
+   dismisses it: with OnDismiss set it has a close button, otherwise the page removes it. *@
+@inject IStringLocalizer<SharedResource> L
+
+<MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="@Class" role="alert"
+          ShowCloseIcon="@OnDismiss.HasDelegate" CloseIconClicked="DismissAsync">
+    @SharedResource.ErrorText(L, Error, CultureInfo.CurrentCulture)
+</MudAlert>
+
+@code {
+    /// <summary>The error to explain.</summary>
+    [Parameter, EditorRequired]
+    public ErrorInfo Error { get; set; } = default!;
+
+    /// <summary>Called when the owner closes the alert; without it the alert has no close button.</summary>
+    [Parameter]
+    public EventCallback OnDismiss { get; set; }
+
+    /// <summary>More classes, for example spacing.</summary>
+    [Parameter]
+    public string? Class { get; set; }
+
+    private Task DismissAsync() => OnDismiss.InvokeAsync();
+}

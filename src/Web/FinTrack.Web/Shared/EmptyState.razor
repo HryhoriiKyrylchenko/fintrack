@@ -1,0 +1,32 @@
+@* An empty list or area (DESIGN 9): what the area is for, and the first action. The caller passes texts
+   from the resources and the action as child content. *@
+
+<MudPaper Elevation="0" Outlined="true" Class="pa-6 fintrack-empty">
+    <MudStack AlignItems="AlignItems.Center" Spacing="2">
+        <MudIcon Icon="@Icon" Color="Color.Primary" Size="Size.Large" aria-hidden="true" />
+        <MudText Typo="Typo.h6" HtmlTag="h2" Align="Align.Center">@Title</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">@Text</MudText>
+        @if (ChildContent is not null)
+        {
+            <div class="mt-2">@ChildContent</div>
+        }
+    </MudStack>
+</MudPaper>
+
+@code {
+    /// <summary>A Material icon for the area.</summary>
+    [Parameter, EditorRequired]
+    public string Icon { get; set; } = default!;
+
+    /// <summary>What is empty, for example "No buckets yet".</summary>
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = default!;
+
+    /// <summary>What the area is for and how to start.</summary>
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = default!;
+
+    /// <summary>The first action, usually one button.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}
