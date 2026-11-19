@@ -3,6 +3,7 @@ using FinTrack.Shared.Infrastructure.Ledger;
 using FinTrack.Shared.Infrastructure.Mongo;
 using FinTrack.Shared.Infrastructure.Owners;
 using FinTrack.Shared.Kernel.Ids;
+using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Shared.Kernel.Time;
 using FinTrack.Tests.Common;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +20,8 @@ namespace FinTrack.Budget.Infrastructure.IntegrationTests;
 /// Budget registered as the Api registers it (shared MongoDB setup, ledger, <see cref="BudgetServiceCollectionExtensions.AddBudget"/>)
 /// against a real MongoDB, in a database of its own that is dropped at the end. The server comes from
 /// <c>FINTRACK_TEST_MONGO</c> (default: the local single-node replica set). The clock is a
-/// <see cref="FakeClock"/>, so stored instants are known.
+/// <see cref="FakeClock"/>, so stored instants are known; exchange rates come from <see cref="FixedFxRates"/>,
+/// never from the network.
 /// </summary>
 public sealed class BudgetFixture : IAsyncLifetime
 {
@@ -35,6 +37,7 @@ public sealed class BudgetFixture : IAsyncLifetime
         Services = new ServiceCollection()
             .AddSingleton(typeof(ILogger<>), typeof(NullLogger<>))
             .AddSingleton<IClock>(new FakeClock())
+            .AddSingleton<IFxRateProvider>(FixedFxRates.Instance)
             .AddFinTrackMongo(options =>
             {
                 options.ConnectionString = connectionString;
