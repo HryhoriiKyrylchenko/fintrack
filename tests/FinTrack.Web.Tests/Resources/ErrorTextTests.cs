@@ -49,6 +49,7 @@ public sealed class ErrorTextTests : IDisposable
         "entry.not_reversible",
         "settings.time_zone_unknown",
         "settings.locale_unknown",
+        "fx.rate_unavailable",
     ];
 
     [Theory]

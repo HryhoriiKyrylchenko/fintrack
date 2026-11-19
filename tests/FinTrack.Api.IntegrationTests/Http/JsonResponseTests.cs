@@ -3,6 +3,8 @@ using FinTrack.Api.Http;
 using FinTrack.Api.IntegrationTests.Middleware;
 using FinTrack.Api.Middleware;
 using FinTrack.Budget.Contracts.V1.Buckets;
+using FinTrack.Budget.Contracts.V1.Journal;
+using FinTrack.Budget.Contracts.V1.Overview;
 using FinTrack.Budget.Contracts.V1.Settings;
 using FinTrack.Shared.Infrastructure.Health;
 using FinTrack.Shared.Kernel.Monetary;
@@ -128,6 +130,73 @@ public sealed class JsonResponseTests : IDisposable
         response.Body.ShouldBe(
             "[{\"id\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b\",\"name\":\"Crypto\",\"currency\":\"USD\",\"kind\":\"Investment\",\"profile\":\"Crypto\",\"status\":\"Active\",\"systemRole\":\"None\"},"
             + "{\"id\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b\",\"name\":null,\"currency\":\"PLN\",\"kind\":\"Savings\",\"profile\":null,\"status\":\"Active\",\"systemRole\":\"Unallocated\"}]");
+    }
+
+    [Fact]
+    public async Task Overview_HasTheV1Shape()
+    {
+        var id = Guid.Parse("0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b");
+        var overview = new BudgetOverviewDto(
+            Currency.Pln,
+            new DateOnly(2026, 1, 15),
+            [
+                new CurrencyTotalDto(Currency.Pln, Money.From(10.50m, Currency.Pln), null),
+                new CurrencyTotalDto(Currency.Eur, Money.From(2.00m, Currency.Eur), new ConversionDto(Money.From(8.55m, Currency.Pln), 4.2735m, new DateOnly(2026, 1, 14))),
+            ],
+            new ReportingTotalDto(Money.From(19.05m, Currency.Pln), new DateOnly(2026, 1, 14), null),
+            [new BucketSummaryDto(id, null, Currency.Pln, BucketKind.Savings, null, BucketSystemRole.Unallocated, Money.From(10.50m, Currency.Pln), Money.From(10.50m, Currency.Pln), Money.From(0.00m, Currency.Pln))]);
+
+        var response = await ExecuteAsync(ProblemDetailsMapper.ToActionResult(Result.Ok(overview)));
+
+        response.Body.ShouldBe(
+            "{\"reportingCurrency\":\"PLN\",\"asOf\":\"2026-01-15\",\"totals\":["
+            + "{\"currency\":\"PLN\",\"available\":{\"amount\":\"10.50\",\"currency\":\"PLN\"},\"conversion\":null},"
+            + "{\"currency\":\"EUR\",\"available\":{\"amount\":\"2.00\",\"currency\":\"EUR\"},\"conversion\":{\"amount\":{\"amount\":\"8.55\",\"currency\":\"PLN\"},\"rate\":\"4.2735\",\"rateDate\":\"2026-01-14\"}}],"
+            + "\"reportingTotal\":{\"amount\":{\"amount\":\"19.05\",\"currency\":\"PLN\"},\"rateDate\":\"2026-01-14\",\"unavailableReason\":null},"
+            + "\"buckets\":[{\"id\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b\",\"name\":null,\"currency\":\"PLN\",\"kind\":\"Savings\",\"profile\":null,\"systemRole\":\"Unallocated\","
+            + "\"available\":{\"amount\":\"10.50\",\"currency\":\"PLN\"},\"netContributed\":{\"amount\":\"10.50\",\"currency\":\"PLN\"},\"outstandingPrincipal\":{\"amount\":\"0.00\",\"currency\":\"PLN\"}}]}");
+    }
+
+    [Fact]
+    public async Task OverviewWithoutItsTotal_HasTheReasonInstead()
+    {
+        var overview = new BudgetOverviewDto(Currency.Pln, new DateOnly(2026, 1, 15), [], new ReportingTotalDto(null, null, "fx.rate_unavailable"), []);
+
+        var response = await ExecuteAsync(ProblemDetailsMapper.ToActionResult(Result.Ok(overview)));
+
+        response.Body.ShouldBe(
+            """{"reportingCurrency":"PLN","asOf":"2026-01-15","totals":[],"reportingTotal":{"amount":null,"rateDate":null,"unavailableReason":"fx.rate_unavailable"},"buckets":[]}""");
+    }
+
+    [Fact]
+    public async Task JournalPage_HasTheV1Shape()
+    {
+        var transfer = Guid.Parse("0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b");
+        var reversal = Guid.Parse("0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2c");
+        var from = Guid.Parse("0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2d");
+        var to = Guid.Parse("0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2e");
+        var page = new JournalPageDto(
+            [
+                new JournalEntryDto(reversal, JournalEntryType.Reversal, new DateOnly(2026, 1, 15), Instant, "Typo", [], null, "Manual", null,
+                    null, null, null, null, null, null, null, null, transfer, null),
+                new JournalEntryDto(transfer, JournalEntryType.Transfer, new DateOnly(2026, 1, 14), Instant, null, ["move"], null, "Manual", null,
+                    null, null, from, to, Money.From(43.50m, Currency.Pln), Money.From(10.00m, Currency.Eur), Money.From(0.50m, Currency.Pln), 0.232558139535m, null, reversal),
+            ],
+            "AQGQ");
+
+        var response = await ExecuteAsync(ProblemDetailsMapper.ToActionResult(Result.Ok(page)));
+
+        response.Body.ShouldBe(
+            "{\"entries\":["
+            + "{\"id\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2c\",\"type\":\"Reversal\",\"occurredOn\":\"2026-01-15\",\"recordedAt\":\"2026-01-15T09:30:00.123Z\",\"note\":\"Typo\",\"tags\":[],"
+            + "\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,\"bucketId\":null,\"amount\":null,\"fromBucketId\":null,\"toBucketId\":null,\"fromAmount\":null,\"toAmount\":null,"
+            + "\"fee\":null,\"rate\":null,\"reversedEntryId\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b\",\"reversedBy\":null},"
+            + "{\"id\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b\",\"type\":\"Transfer\",\"occurredOn\":\"2026-01-14\",\"recordedAt\":\"2026-01-15T09:30:00.123Z\",\"note\":null,\"tags\":[\"move\"],"
+            + "\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,\"bucketId\":null,\"amount\":null,"
+            + "\"fromBucketId\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2d\",\"toBucketId\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2e\","
+            + "\"fromAmount\":{\"amount\":\"43.50\",\"currency\":\"PLN\"},\"toAmount\":{\"amount\":\"10.00\",\"currency\":\"EUR\"},\"fee\":{\"amount\":\"0.50\",\"currency\":\"PLN\"},"
+            + "\"rate\":\"0.232558139535\",\"reversedEntryId\":null,\"reversedBy\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2c\"}],"
+            + "\"nextCursor\":\"AQGQ\"}");
     }
 
     public void Dispose() => host.Dispose();

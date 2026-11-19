@@ -29,29 +29,35 @@ internal static class BucketContractMapping
         bucket.Id,
         bucket.Name,
         bucket.Currency,
-        bucket.Kind switch
-        {
-            Model.BucketKind.Savings => BucketKind.Savings,
-            Model.BucketKind.Investment => BucketKind.Investment,
-            _ => throw new ArgumentOutOfRangeException(nameof(bucket), bucket.Kind, "Unknown bucket kind."),
-        },
-        bucket.Profile switch
-        {
-            null => null,
-            Model.InvestmentProfile.Crypto => InvestmentProfile.Crypto,
-            Model.InvestmentProfile.RealValueAssets => InvestmentProfile.RealValueAssets,
-            _ => throw new ArgumentOutOfRangeException(nameof(bucket), bucket.Profile, "Unknown investment profile."),
-        },
+        ToContract(bucket.Kind),
+        ToContract(bucket.Profile),
         bucket.Status switch
         {
             Model.BucketStatus.Active => BucketStatus.Active,
             Model.BucketStatus.Archived => BucketStatus.Archived,
             _ => throw new ArgumentOutOfRangeException(nameof(bucket), bucket.Status, "Unknown bucket status."),
         },
-        bucket.SystemRole switch
-        {
-            Model.BucketSystemRole.None => BucketSystemRole.None,
-            Model.BucketSystemRole.Unallocated => BucketSystemRole.Unallocated,
-            _ => throw new ArgumentOutOfRangeException(nameof(bucket), bucket.SystemRole, "Unknown system role."),
-        });
+        ToContract(bucket.SystemRole));
+
+    public static BucketKind ToContract(Model.BucketKind kind) => kind switch
+    {
+        Model.BucketKind.Savings => BucketKind.Savings,
+        Model.BucketKind.Investment => BucketKind.Investment,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown bucket kind."),
+    };
+
+    public static InvestmentProfile? ToContract(Model.InvestmentProfile? profile) => profile switch
+    {
+        null => null,
+        Model.InvestmentProfile.Crypto => InvestmentProfile.Crypto,
+        Model.InvestmentProfile.RealValueAssets => InvestmentProfile.RealValueAssets,
+        _ => throw new ArgumentOutOfRangeException(nameof(profile), profile, "Unknown investment profile."),
+    };
+
+    public static BucketSystemRole ToContract(Model.BucketSystemRole role) => role switch
+    {
+        Model.BucketSystemRole.None => BucketSystemRole.None,
+        Model.BucketSystemRole.Unallocated => BucketSystemRole.Unallocated,
+        _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Unknown system role."),
+    };
 }

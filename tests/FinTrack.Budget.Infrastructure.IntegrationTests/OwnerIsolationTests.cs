@@ -1,8 +1,11 @@
 using FinTrack.Budget.Application;
 using FinTrack.Budget.Application.Buckets;
 using FinTrack.Budget.Application.Journal;
+using FinTrack.Budget.Application.Overview;
 using FinTrack.Budget.Application.Settings;
 using FinTrack.Budget.Contracts.V1.Buckets;
+using FinTrack.Budget.Contracts.V1.Journal;
+using FinTrack.Budget.Contracts.V1.Overview;
 using FinTrack.Budget.Contracts.V1.Settings;
 using FinTrack.Budget.Domain;
 using FinTrack.Shared.Kernel.Ids;
@@ -54,6 +57,11 @@ public sealed class OwnerIsolationTests(BudgetFixture fixture)
         (await QueryAsync<GetOwnerSettingsHandler, GetOwnerSettings, OwnerSettingsDto>(b, new GetOwnerSettings()))
             .ShouldFailWith(BudgetErrorCodes.SettingsNotFound, ErrorKind.NotFound);
         (await QueryAsync<GetBucketsHandler, GetBuckets, IReadOnlyList<BucketDto>>(b, new GetBuckets(IncludeArchived: true))).Value.ShouldBeEmpty();
+        (await QueryAsync<GetBudgetOverviewHandler, GetBudgetOverview, BudgetOverviewDto>(b, new GetBudgetOverview()))
+            .ShouldFailWith(BudgetErrorCodes.SettingsNotFound, ErrorKind.NotFound);
+        (await QueryAsync<GetJournalHandler, GetJournal, JournalPageDto>(b, new GetJournal())).Value.Entries.ShouldBeEmpty();
+        (await QueryAsync<GetJournalHandler, GetJournal, JournalPageDto>(b, new GetJournal(BucketId: cushion)))
+            .ShouldFailWith(BudgetErrorCodes.BucketNotFound, ErrorKind.NotFound);
         var state = await StateAsync(b);
         state.Buckets.ShouldBeEmpty();
         state.Journal.ShouldBeEmpty();

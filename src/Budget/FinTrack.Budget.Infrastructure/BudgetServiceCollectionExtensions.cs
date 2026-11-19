@@ -2,6 +2,7 @@ using FinTrack.Budget.Application;
 using FinTrack.Budget.Application.Buckets;
 using FinTrack.Budget.Application.Journal;
 using FinTrack.Budget.Application.Settings;
+using FinTrack.Budget.Contracts.V1.Journal;
 using FinTrack.Budget.Domain.Buckets;
 using FinTrack.Budget.Domain.Journal;
 using FinTrack.Budget.Domain.Settings;
@@ -51,6 +52,7 @@ public static class BudgetServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<AddSpend>, AddSpendValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<AddTransfer>, AddTransferValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<ReverseEntry>, ReverseEntryValidator>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<GetJournal>, GetJournalValidator>());
 
         return services;
     }

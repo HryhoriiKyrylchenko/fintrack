@@ -1,6 +1,7 @@
 using CsCheck;
 using FinTrack.Budget.Application.Buckets;
 using FinTrack.Budget.Application.Journal;
+using FinTrack.Budget.Application.Overview;
 using FinTrack.Budget.Application.Settings;
 using FinTrack.Budget.Domain.Buckets;
 using FinTrack.Budget.Domain.Journal;
@@ -9,6 +10,8 @@ using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Tests.Common;
 using FluentResults;
 using Contract = FinTrack.Budget.Contracts.V1.Buckets;
+using GetBudgetOverview = FinTrack.Budget.Contracts.V1.Overview.GetBudgetOverview;
+using GetJournal = FinTrack.Budget.Contracts.V1.Journal.GetJournal;
 
 namespace FinTrack.Budget.Application.Tests.Histories;
 
@@ -16,7 +19,9 @@ namespace FinTrack.Budget.Application.Tests.Histories;
 /// The model test of plan 1a step 10: random sequences of every Budget command (buckets in three
 /// currencies, opening balances, deposits, spends, transfers with and without fee and across
 /// currencies, reversals, archiving, renaming, backdating, and repeats of earlier commands) run through
-/// the real handlers. After every command and at the end, invariants 1, 2, 10, 11 and 13 must hold.
+/// the real handlers. After every command and at the end, invariants 1, 2, 10, 11 and 13 must hold. At the
+/// end, the read queries (step 12) must agree with the state: the overview's balances and totals, and the
+/// journal read page by page.
 /// </summary>
 public class BudgetModelTests
 {
@@ -195,6 +200,67 @@ public class BudgetModelTests
             // Archived buckets are empty, and nothing references a bucket that does not exist.
             bucketList.Where(bucket => bucket.Status == BucketStatus.Archived)
                 .ShouldAllBe(bucket => sums[bucket.BucketId] == 0m);
+
+            CheckOverview(state, bucketList);
+            CheckJournalPages(journal);
+        }
+
+        // The overview shows the replayed balances; each currency's total is the sum of its active buckets,
+        // and the reporting total converts each subtotal once.
+        private void CheckOverview(BudgetState state, List<Bucket> bucketList)
+        {
+            var rateDates = new Dictionary<Currency, DateOnly> { [Currency.Eur] = Today.AddDays(-1), [Currency.Usd] = Today.AddDays(-3) };
+            var rates = new FakeFxRateProvider()
+                .With(Currency.Eur, Currency.Pln, 4.2735m, rateDates[Currency.Eur])
+                .With(Currency.Usd, Currency.Pln, 3.6125m, rateDates[Currency.Usd]);
+            var overview = new GetBudgetOverviewHandler(new BudgetStateLoader(budget, budget), rates, clock)
+                .Handle(new GetBudgetOverview(), TestContext.Current.CancellationToken).AsTask().GetAwaiter().GetResult().Value;
+
+            var active = bucketList.Where(bucket => bucket.Status == BucketStatus.Active).ToList();
+            overview.Buckets.Select(summary => summary.Id).ShouldBe(active.OrderBy(bucket => bucket.CreatedAt).ThenBy(bucket => bucket.Id).Select(bucket => bucket.Id));
+            foreach (var summary in overview.Buckets)
+            {
+                var balance = state.BalanceOf(BucketId.From(summary.Id));
+                summary.Available.ShouldBe(balance.Available);
+                summary.NetContributed.ShouldBe(balance.NetContributed);
+                summary.OutstandingPrincipal.ShouldBe(balance.OutstandingPrincipal);
+            }
+
+            var expected = Currencies
+                .Select(currency => (Currency: currency, Buckets: active.Where(bucket => bucket.Currency == currency).ToList()))
+                .Where(group => group.Buckets.Count > 0)
+                .ToDictionary(group => group.Currency, group => group.Buckets.Sum(bucket => state.BalanceOf(bucket.BucketId).Available.Amount));
+            overview.Totals.Select(total => total.Currency).ShouldBe(expected.Keys, ignoreOrder: true);
+            overview.Totals.ShouldAllBe(total => total.Available.Amount == expected[total.Currency] && total.Available.Currency == total.Currency);
+
+            var converted = expected.Sum(pair => pair.Key == Currency.Pln
+                ? pair.Value
+                : decimal.Round(pair.Value * (pair.Key == Currency.Eur ? 4.2735m : 3.6125m), 2, MidpointRounding.ToEven));
+            var used = expected.Keys.Where(currency => currency != Currency.Pln).Select(currency => rateDates[currency]).ToList();
+            overview.ReportingTotal.Amount.ShouldBe(Money.From(converted, Currency.Pln));
+            overview.ReportingTotal.RateDate.ShouldBe(used.Count > 0 ? used.Min() : null);
+            overview.ReportingTotal.UnavailableReason.ShouldBeNull();
+        }
+
+        // Read page by page, the journal is every entry exactly once, newest first, and each reversed entry
+        // names its reversal.
+        private void CheckJournalPages(List<JournalEntry> journal)
+        {
+            var handler = new GetJournalHandler(new BudgetStateLoader(budget, budget));
+            var read = new List<Contracts.V1.Journal.JournalEntryDto>();
+            string? cursor = null;
+            do
+            {
+                var page = handler.Handle(new GetJournal(Limit: 3, Cursor: cursor), TestContext.Current.CancellationToken).AsTask().GetAwaiter().GetResult().Value;
+                page.Entries.Count.ShouldBeLessThanOrEqualTo(3);
+                read.AddRange(page.Entries);
+                cursor = page.NextCursor;
+            }
+            while (cursor is not null);
+
+            read.Select(entry => entry.Id).ShouldBe(ReplayOrder.Sort(journal).Reverse().Select(entry => entry.Id));
+            var reversals = journal.OfType<Reversal>().ToDictionary(reversal => reversal.ReversedEntryId.Value, reversal => reversal.Id);
+            read.ShouldAllBe(entry => entry.ReversedBy == (reversals.ContainsKey(entry.Id) ? reversals[entry.Id] : null));
         }
 
         private static IEnumerable<(BucketId Bucket, decimal Change)> Changes(JournalEntry entry) => entry switch

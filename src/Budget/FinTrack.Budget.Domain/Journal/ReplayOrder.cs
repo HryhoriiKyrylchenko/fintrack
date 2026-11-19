@@ -45,13 +45,6 @@ public sealed class ReplayOrder : IComparer<JournalEntry>
         ArgumentNullException.ThrowIfNull(x);
         ArgumentNullException.ThrowIfNull(y);
 
-        var byDate = x.OccurredOn.CompareTo(y.OccurredOn);
-        if (byDate != 0)
-        {
-            return byDate;
-        }
-
-        var byRecordedAt = x.RecordedAt.CompareTo(y.RecordedAt);
-        return byRecordedAt != 0 ? byRecordedAt : CompareIds(x.Id, y.Id);
+        return ReplayPosition.Of(x).CompareTo(ReplayPosition.Of(y));
     }
 }

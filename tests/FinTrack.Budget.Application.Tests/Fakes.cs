@@ -91,11 +91,23 @@ internal sealed class FakeOwnerContext : IOwnerContext
 /// <summary>Builds buckets as the database returns them (through the private constructor, as the mapping does).</summary>
 internal static class StoredBuckets
 {
-    public static Bucket Of(Guid id, string name, Currency currency, long version, DateTimeOffset createdAt, BucketStatus status)
+    public static Bucket Of(Guid id, string name, Currency currency, long version, DateTimeOffset createdAt, BucketStatus status) =>
+        Of(id, name, currency, createdAt, status, BucketKind.Savings, null, BucketSystemRole.None, version);
+
+    public static Bucket Of(
+        Guid id,
+        string? name,
+        Currency currency,
+        DateTimeOffset createdAt,
+        BucketStatus status,
+        BucketKind kind,
+        InvestmentProfile? profile,
+        BucketSystemRole role,
+        long version = 1)
     {
         var constructor = typeof(Bucket).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic).Single();
         return (Bucket)constructor.Invoke(
-            [id, FakeOwnerContext.Owner, Bucket.CurrentSchemaVersion, version, createdAt, createdAt, name, currency, BucketKind.Savings, null, status, BucketSystemRole.None]);
+            [id, FakeOwnerContext.Owner, Bucket.CurrentSchemaVersion, version, createdAt, createdAt, name, currency, kind, profile, status, role]);
     }
 }
 
@@ -109,5 +121,44 @@ internal static class StoredSettings
         var constructor = typeof(OwnerSettings).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic).Single();
         return (OwnerSettings)constructor.Invoke(
             [Id, FakeOwnerContext.Owner, OwnerSettings.CurrentSchemaVersion, version, FakeClock.DefaultStart, FakeClock.DefaultStart, currency, timeZone, locale]);
+    }
+}
+
+/// <summary>
+/// Exchange rates from a fixed table: a pair that is not in it fails with <c>fx.rate_unavailable</c>, as
+/// the real provider does when nothing is stored. Records every request. Safe for CsCheck's threads.
+/// </summary>
+internal sealed class FakeFxRateProvider : IFxRateProvider
+{
+    private readonly Dictionary<(Currency From, Currency To), FxRate> rates = [];
+    private readonly List<(Currency From, Currency To)> requests = [];
+
+    public IReadOnlyList<(Currency From, Currency To)> Requests
+    {
+        get
+        {
+            lock (requests)
+            {
+                return [.. requests];
+            }
+        }
+    }
+
+    public FakeFxRateProvider With(Currency from, Currency to, decimal rate, DateOnly date)
+    {
+        rates[(from, to)] = new FxRate(from, to, rate, date);
+        return this;
+    }
+
+    public Task<Result<FxRate>> GetRateAsync(Currency from, Currency to, CancellationToken cancellationToken)
+    {
+        lock (requests)
+        {
+            requests.Add((from, to));
+        }
+
+        return Task.FromResult(rates.TryGetValue((from, to), out var rate)
+            ? Result.Ok(rate)
+            : Result.Fail<FxRate>(AppError.Unavailable(ErrorCodes.FxRateUnavailable)));
     }
 }
