@@ -655,4 +655,142 @@
   <data name="Entries.ToOverview" xml:space="preserve">
     <value>Overview</value>
   </data>
+  <data name="Error.input.period_invalid" xml:space="preserve">
+    <value>The end of the period is before its start.</value>
+  </data>
+  <data name="Nav.Journal" xml:space="preserve">
+    <value>Journal</value>
+  </data>
+  <data name="Journal.PageTitle" xml:space="preserve">
+    <value>Journal · FinTrack</value>
+  </data>
+  <data name="Journal.Title" xml:space="preserve">
+    <value>Journal</value>
+  </data>
+  <data name="Journal.Description" xml:space="preserve">
+    <value>Every movement of your money, newest first. A mistake is corrected by reversing the entry, never by editing it.</value>
+  </data>
+  <data name="Journal.Type.OpeningBalance" xml:space="preserve">
+    <value>Opening balance</value>
+  </data>
+  <data name="Journal.Type.Deposit" xml:space="preserve">
+    <value>Deposit</value>
+  </data>
+  <data name="Journal.Type.Spend" xml:space="preserve">
+    <value>Spend</value>
+  </data>
+  <data name="Journal.Type.Transfer" xml:space="preserve">
+    <value>Transfer</value>
+  </data>
+  <data name="Journal.Type.Reversal" xml:space="preserve">
+    <value>Reversal</value>
+  </data>
+  <data name="Journal.TheType.OpeningBalance" xml:space="preserve">
+    <value>the opening balance</value>
+  </data>
+  <data name="Journal.TheType.Deposit" xml:space="preserve">
+    <value>the deposit</value>
+  </data>
+  <data name="Journal.TheType.Spend" xml:space="preserve">
+    <value>the spend</value>
+  </data>
+  <data name="Journal.TheType.Transfer" xml:space="preserve">
+    <value>the transfer</value>
+  </data>
+  <data name="Journal.TheType.Reversal" xml:space="preserve">
+    <value>the reversal</value>
+  </data>
+  <data name="Journal.TransferLine" xml:space="preserve">
+    <value>{0} → {1}</value>
+  </data>
+  <data name="Journal.InBucket" xml:space="preserve">
+    <value>in {0}</value>
+  </data>
+  <data name="Journal.FromBucket" xml:space="preserve">
+    <value>from {0}</value>
+  </data>
+  <data name="Journal.FromTo" xml:space="preserve">
+    <value>from {0} to {1}</value>
+  </data>
+  <data name="Journal.UnknownBucket" xml:space="preserve">
+    <value>Unknown bucket</value>
+  </data>
+  <data name="Journal.Cancels" xml:space="preserve">
+    <value>Cancels {0} of {1} {2}</value>
+  </data>
+  <data name="Journal.CancelsEarlier" xml:space="preserve">
+    <value>Cancels an earlier entry</value>
+  </data>
+  <data name="Journal.ReverseTitle" xml:space="preserve">
+    <value>Reverse {0} of {1} {2} on {3}?</value>
+  </data>
+  <data name="Journal.ReverseTransferTitle" xml:space="preserve">
+    <value>Reverse the transfer of {0} from {1} to {2} on {3}?</value>
+  </data>
+  <data name="Journal.ReverseText" xml:space="preserve">
+    <value>The entry will count as if it never happened, on its original date. A reversal cannot be undone; to enter it again, add a new entry.</value>
+  </data>
+  <data name="Journal.ReverseNote" xml:space="preserve">
+    <value>Why (optional)</value>
+  </data>
+  <data name="Journal.ReverseConfirm" xml:space="preserve">
+    <value>Reverse</value>
+  </data>
+  <data name="Journal.ReversedDone" xml:space="preserve">
+    <value>Entry reversed.</value>
+  </data>
+  <data name="Journal.Reversed" xml:space="preserve">
+    <value>Reversed</value>
+  </data>
+  <data name="Journal.Reverse" xml:space="preserve">
+    <value>Reverse</value>
+  </data>
+  <data name="Journal.ReverseNamed" xml:space="preserve">
+    <value>Reverse {0} of {1}</value>
+  </data>
+  <data name="Journal.Filter.Bucket" xml:space="preserve">
+    <value>Bucket</value>
+  </data>
+  <data name="Journal.Filter.AllBuckets" xml:space="preserve">
+    <value>All buckets</value>
+  </data>
+  <data name="Journal.Filter.From" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="Journal.Filter.To" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="Journal.Filter.Clear" xml:space="preserve">
+    <value>Clear filters</value>
+  </data>
+  <data name="Journal.Column.Date" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="Journal.Column.Entry" xml:space="preserve">
+    <value>Entry</value>
+  </data>
+  <data name="Journal.Column.Amount" xml:space="preserve">
+    <value>Amount</value>
+  </data>
+  <data name="Journal.Column.Actions" xml:space="preserve">
+    <value>Actions</value>
+  </data>
+  <data name="Journal.LoadMore" xml:space="preserve">
+    <value>Load more</value>
+  </data>
+  <data name="Journal.Empty.Title" xml:space="preserve">
+    <value>No entries yet</value>
+  </data>
+  <data name="Journal.Empty.Text" xml:space="preserve">
+    <value>Opening balances, deposits, spends and transfers you add appear here.</value>
+  </data>
+  <data name="Journal.NoMatch.Title" xml:space="preserve">
+    <value>No entries match these filters</value>
+  </data>
+  <data name="Journal.NoMatch.Text" xml:space="preserve">
+    <value>Change the filters, or clear them to see every entry.</value>
+  </data>
+  <data name="Journal.Archived" xml:space="preserve">
+    <value>archived</value>
+  </data>
 </root>

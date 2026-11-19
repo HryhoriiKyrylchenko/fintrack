@@ -1,0 +1,255 @@
+@page "/journal"
+@using FinTrack.Budget.Contracts.V1.Buckets
+@using FinTrack.Budget.Contracts.V1.Journal
+@using FinTrack.Web.Buckets
+@using FinTrack.Web.Formatting
+@inject JournalClient Journal
+@inject BucketsClient Buckets
+@inject OwnerSettingsState Settings
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject IStringLocalizer<SharedResource> L
+
+@* The journal (plan 1a step 17): every entry, newest first, filtered by bucket and period, a page at a time.
+   Reversed entries carry a label and an icon and their amount is struck through (never colour alone, DESIGN 1.5).
+   A table on wide screens, cards below the md breakpoint (DESIGN 8). JournalRow decides what each entry reads. *@
+
+<PageTitle>@L["Journal.PageTitle"]</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Class="mb-1">
+    <MudText Typo="Typo.h5" HtmlTag="h1">@L["Journal.Title"]</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" Href="entries/new" StartIcon="@Icons.Material.Outlined.Add">
+        @L["Overview.AddEntry"]
+    </MudButton>
+</MudStack>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">@L["Journal.Description"]</MudText>
+
+@if (buckets is not null)
+{
+    <MudGrid Spacing="2" Class="mb-4">
+        <MudItem xs="12" md="6">
+            <MudSelect T="Guid?" Label="@L["Journal.Filter.Bucket"]" Value="filter.BucketId" ValueChanged="BucketChangedAsync"
+                       ToStringFunc="BucketLabel" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem T="Guid?" Value="null">@L["Journal.Filter.AllBuckets"]</MudSelectItem>
+                @foreach (var bucket in buckets.Values)
+                {
+                    <MudSelectItem T="Guid?" Value="bucket.Id">@BucketLabel(bucket.Id)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudDatePicker Label="@L["Journal.Filter.From"]" Date="ToDateTime(filter.From)" DateChanged="FromChangedAsync" Clearable="true" Editable="true"
+                           Variant="Variant.Outlined" Culture="CultureInfo.CurrentCulture" Margin="Margin.Dense" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudDatePicker Label="@L["Journal.Filter.To"]" Date="ToDateTime(filter.To)" DateChanged="ToChangedAsync" Clearable="true" Editable="true"
+                           Variant="Variant.Outlined" Culture="CultureInfo.CurrentCulture" Margin="Margin.Dense"
+                           Error="@(filter.PeriodError is not null)"
+                           ErrorText="@(filter.PeriodError is { } periodError ? SharedResource.ErrorText(L, periodError, CultureInfo.CurrentCulture) : null)" />
+        </MudItem>
+    </MudGrid>
+}
+
+@if (loadError is not null)
+{
+    <ErrorAlert Error="loadError" Class="mb-4" />
+    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="ReloadAsync">@L["Common.Retry"]</MudButton>
+}
+else if (rows is null)
+{
+    <TableSkeleton Rows="6" />
+}
+else if (rows.Count == 0 && filter.IsActive)
+{
+    <EmptyState Icon="@Icons.Material.Outlined.FilterAltOff" Title="@L["Journal.NoMatch.Title"]" Text="@L["Journal.NoMatch.Text"]">
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="ClearFiltersAsync">@L["Journal.Filter.Clear"]</MudButton>
+    </EmptyState>
+}
+else if (rows.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Outlined.ReceiptLong" Title="@L["Journal.Empty.Title"]" Text="@L["Journal.Empty.Text"]">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" Href="entries/new" StartIcon="@Icons.Material.Outlined.Add">
+            @L["Overview.AddEntry"]
+        </MudButton>
+    </EmptyState>
+}
+else
+{
+    <MudHidden Breakpoint="Breakpoint.SmAndDown">
+        <MudSimpleTable Elevation="0" Outlined="true" Hover="true">
+            <thead>
+                <tr>
+                    <th scope="col">@L["Journal.Column.Date"]</th>
+                    <th scope="col">@L["Journal.Column.Entry"]</th>
+                    <th scope="col" class="fintrack-amount-column">@L["Journal.Column.Amount"]</th>
+                    <th scope="col" class="fintrack-actions-column">@L["Journal.Column.Actions"]</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in rows)
+                {
+                    <tr>
+                        <td class="fintrack-nowrap">@row.Entry.OccurredOn.ToString("d", CultureInfo.CurrentCulture)</td>
+                        <td><JournalEntryText Row="row" /></td>
+                        <td class="fintrack-amount-column"><JournalAmount Row="row" /></td>
+                        <td class="fintrack-actions-column">
+                            @if (row.CanReverse)
+                            {
+                                <MudTooltip Text="@L["Journal.Reverse"]">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Undo" aria-label="@ReverseLabel(row)" OnClick="() => ReverseAsync(row)" />
+                                </MudTooltip>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    </MudHidden>
+
+    <MudHidden Breakpoint="Breakpoint.MdAndUp">
+        <MudStack Spacing="2">
+            @foreach (var row in rows)
+            {
+                <MudCard Elevation="0" Outlined="true">
+                    <MudCardContent>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Spacing="2">
+                            <div>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" HtmlTag="p">@row.Entry.OccurredOn.ToString("d", CultureInfo.CurrentCulture)</MudText>
+                                <JournalEntryText Row="row" />
+                            </div>
+                            <div class="fintrack-amount-column"><JournalAmount Row="row" /></div>
+                        </MudStack>
+                    </MudCardContent>
+                    @if (row.CanReverse)
+                    {
+                        <MudCardActions>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Undo" aria-label="@ReverseLabel(row)" OnClick="() => ReverseAsync(row)">
+                                @L["Journal.Reverse"]
+                            </MudButton>
+                        </MudCardActions>
+                    }
+                </MudCard>
+            }
+        </MudStack>
+    </MudHidden>
+
+    @if (nextCursor is not null)
+    {
+        <div class="d-flex justify-center mt-4">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadMoreAsync" Disabled="loadingMore">@L["Journal.LoadMore"]</MudButton>
+        </div>
+    }
+}
+
+@code {
+    private static readonly DialogOptions Options = new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+
+    private IReadOnlyDictionary<Guid, BucketDto>? buckets;
+    private readonly List<JournalEntryDto> entries = [];
+    private List<JournalRow>? rows;
+    private JournalFilter filter = JournalFilter.None;
+    private string? nextCursor;
+    private ErrorInfo? loadError;
+    private bool loadingMore;
+
+    protected override Task OnInitializedAsync() => ReloadAsync();
+
+    // Buckets (archived ones too, to name every entry) and the first page for the current filter.
+    private async Task ReloadAsync()
+    {
+        loadError = null;
+        rows = null;
+        entries.Clear();
+        nextCursor = null;
+
+        if (buckets is null)
+        {
+            var listed = await Buckets.ListAsync(includeArchived: true, CancellationToken.None);
+            if (listed.Value is not { } all)
+            {
+                loadError = ErrorInfo.From(listed);
+                return;
+            }
+
+            buckets = all.ToDictionary(bucket => bucket.Id);
+        }
+
+        if (filter.PeriodError is not null)
+        {
+            rows = [];
+            return;
+        }
+
+        await LoadPageAsync();
+    }
+
+    private async Task LoadPageAsync()
+    {
+        var page = await Journal.PageAsync(filter, nextCursor, CancellationToken.None);
+        if (page.Value is not { } loaded)
+        {
+            loadError = ErrorInfo.From(page);
+            return;
+        }
+
+        entries.AddRange(loaded.Entries);
+        nextCursor = loaded.NextCursor;
+        var byId = entries.ToDictionary(entry => entry.Id);
+        rows = [.. entries.Select(entry => new JournalRow(entry, buckets!, byId))];
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        loadingMore = true;
+        await LoadPageAsync();
+        loadingMore = false;
+    }
+
+    private Task BucketChangedAsync(Guid? bucketId)
+    {
+        filter = filter with { BucketId = bucketId };
+        return ReloadAsync();
+    }
+
+    private Task FromChangedAsync(DateTime? date)
+    {
+        filter = filter with { From = date is { } value ? DateOnly.FromDateTime(value) : null };
+        return ReloadAsync();
+    }
+
+    private Task ToChangedAsync(DateTime? date)
+    {
+        filter = filter with { To = date is { } value ? DateOnly.FromDateTime(value) : null };
+        return ReloadAsync();
+    }
+
+    private Task ClearFiltersAsync()
+    {
+        filter = JournalFilter.None;
+        return ReloadAsync();
+    }
+
+    private static DateTime? ToDateTime(DateOnly? date) => date?.ToDateTime(TimeOnly.MinValue);
+
+    private string BucketLabel(Guid? id) => id is { } value && buckets!.TryGetValue(value, out var bucket)
+        ? bucket.Status == BucketStatus.Archived
+            ? L["Entries.TargetOption", BucketNames.Display(bucket, L), L["Journal.Archived"]]
+            : BucketNames.Display(bucket, L)
+        : L["Journal.Filter.AllBuckets"];
+
+    private string ReverseLabel(JournalRow row) =>
+        L["Journal.ReverseNamed", L[JournalRow.TypeKeyOf(row.Entry.Type)], row.Entry.OccurredOn.ToString("d", CultureInfo.CurrentCulture)];
+
+    private async Task ReverseAsync(JournalRow row)
+    {
+        // The layout shows pages only with saved settings.
+        var today = OwnerDate.Today(DateTimeOffset.UtcNow, Settings.Settings!.TimeZone);
+        var parameters = new DialogParameters<ReverseEntryDialog> { { dialog => dialog.Form, new ReversalForm(row.Entry.Id, today) } };
+        var reference = await Dialogs.ShowAsync<ReverseEntryDialog>(row.ReversalTitle(L, CultureInfo.CurrentCulture), parameters, Options);
+        if (await reference.Result is { Canceled: false })
+        {
+            Snackbar.Add(L["Journal.ReversedDone"], Severity.Success);
+            await ReloadAsync();
+        }
+    }
+}

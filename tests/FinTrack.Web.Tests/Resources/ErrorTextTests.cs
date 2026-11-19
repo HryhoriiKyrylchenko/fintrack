@@ -65,6 +65,7 @@ public sealed class ErrorTextTests : IDisposable
         "input.tags_too_many",
         "input.rate_required",
         "input.rate_invalid",
+        "input.period_invalid",
     ];
 
     [Theory]

@@ -1,0 +1,30 @@
+@* What an entry is: its type, the "Reversed" label (with an icon, never colour alone), the buckets, note and tags. *@
+@inject IStringLocalizer<SharedResource> L
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
+    <MudText Typo="Typo.body1" HtmlTag="span" Class="fintrack-strong">@L[Row.TypeKey]</MudText>
+    @if (Row.IsReversed)
+    {
+        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Outlined.Undo">@L["Journal.Reversed"]</MudChip>
+    }
+</MudStack>
+<MudText Typo="Typo.body2" Color="Color.Secondary" HtmlTag="p">@Row.Describe(L, CultureInfo.CurrentCulture)</MudText>
+@if (Row.Entry.Note is { } note)
+{
+    <MudText Typo="Typo.body2" HtmlTag="p" Class="fintrack-note">@note</MudText>
+}
+@if (Row.Entry.Tags.Count > 0)
+{
+    <div class="mt-1">
+        @foreach (var tag in Row.Entry.Tags)
+        {
+            <MudChip T="string" Text="@tag" Size="Size.Small" Variant="Variant.Text" />
+        }
+    </div>
+}
+
+@code {
+    /// <summary>The entry.</summary>
+    [Parameter, EditorRequired]
+    public JournalRow Row { get; set; } = default!;
+}
