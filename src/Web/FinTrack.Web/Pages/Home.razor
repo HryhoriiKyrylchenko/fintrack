@@ -1,8 +1,0 @@
-@page "/"
-@inject NavigationManager Navigation
-
-@* The start page is the Overview (DESIGN 8), which arrives in plan 1a step 15; until then the start page is Settings. *@
-
-@code {
-    protected override void OnInitialized() => Navigation.NavigateTo("settings", replace: true);
-}

@@ -58,6 +58,24 @@ h1:focus {
     text-align: end;
 }
 
+/* DESIGN 5: key figures on cards are 24 to 28 px, weight 600. */
+.fintrack-key-figure {
+    font-size: 1.75rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+/* Cards in one grid row share their height. */
+.fintrack-full-height {
+    height: 100%;
+}
+
+.fintrack-card-figure {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
 /* An amount never breaks between its sign, digits and currency code (the Amount component). */
 .fintrack-amount {
     white-space: nowrap;

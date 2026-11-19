@@ -371,11 +371,20 @@ Rules for every step: branch from an up-to-date `main`; tests first; when the co
   - **Verified:** Debug and Release 0 warnings; 1305 tests pass (1279 before), one explicit test skipped. With `run-local.ps1` against `fintrack_e2e_step14` (dropped afterwards; `fintrack` untouched): the empty state (1280 light, 360 dark); the create dialog with the live name message and the profile choice (360 light); a bucket created (1280 dark); "CUSHION" refused in the dialog as a taken name (360 dark); archiving a bucket with money refused in the dialog (360 light); a rename (360 dark); an EUR bucket created through the currency list (1280 light); an empty bucket archived after the confirmation naming it (1280 dark); archived buckets shown only on request (360 light); an investment bucket with profile Crypto stored as such.
   - **Not verified:** CI (runs on the pull request); screen readers beyond the accessible names given to the icon buttons and the "Loading…" label.
 
-### [ ] Step 15. Web: Overview screen (M)
+### [x] Step 15. Web: Overview screen (M)
 - **Goal:** where things stand, at a glance.
 - **What we do:** totals per currency and in the reporting currency with the rate date in a caption; one card per bucket with its available amount (investment buckets: "Invested"); `Unallocated` shown when it holds money; skeletons, empty state.
 - **Done when:** numbers match the Api for a prepared data set; offline shows per-currency totals and says why the converted total is missing.
 - **Depends on:** 12, 13.
+- **Result:**
+  - **Start page:** `/` is the Overview (the redirect to Settings is gone); "Overview" comes first in the navigation (DESIGN 8).
+  - **Page:** the total in the reporting currency as the key figure (28 px, weight 600) with the caption "Converted at the exchange rates of {date}" in the owner's date format, no caption when nothing was converted; when the total is missing, its reason in plain words (`fx.rate_unavailable`, an info alert with an icon) in its place; "By currency" with each currency's total and its converted amount ("≈ 441,18 PLN") when there is a currency other than the reporting one; a card per bucket with "Available", or "Invested" for an investment bucket (may be below zero, with the real minus sign); `Unallocated` only while it holds money; card skeletons while loading; an error with "Try again"; the empty state links to Buckets.
+  - **Plain classes:** `OverviewClient`, `OverviewView` and `OverviewCard`; nothing is computed in the Web app, every figure is the Api's. `BucketNames.Display` gained an overload by name and currency.
+  - **Decisions:** the currency list only with a second currency; bucket colours (DESIGN 4) deferred to the phase-2 charts (decision-log row, DESIGN 8).
+  - **Tests:** the view (total and rate date, one currency, a missing rate, a reporting currency without a bucket, card order and labels, `Unallocated` with and without money, empty) and the client's route.
+  - **Mutations,** each compiling and each caught: an empty `Unallocated` shown (2), an empty bucket of the owner hidden (2), the currency list only with two currencies (1), an investment bucket labelled "Available" (1), a rate date without a conversion (2).
+  - **Verified:** Debug and Release 0 warnings; 1315 tests pass (1305 before), one explicit test skipped. With `run-local.ps1` against `fintrack_e2e_step15` (dropped afterwards; `fintrack` untouched): the empty state right after the first run (360 dark); a prepared data set with invented amounts (an opening balance, a deposit to `Unallocated`, transfers between PLN, EUR and USD buckets including an investment bucket that went below zero, a spend) where every figure on the page, read from the browser, equals the Api's answer (total 6 130,63 PLN at the rate date 18.11.2026 from the real service, the three currency totals with their conversions, five cards), at 1280 light and 360 dark. Offline (the rate source unreachable): with the stored rate dated back a day the total still shows with its rate date and nothing new is stored; with no stored rate the reason replaces the total and every other figure stays (1280 dark, 360 light).
+  - **Not verified:** CI (runs on the pull request).
 
 ### [ ] Step 16. Web: entry forms with confirmation (C)
 - **Goal:** enter opening balances, deposits, spends and transfers.

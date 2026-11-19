@@ -78,9 +78,9 @@ Beyond eight series, group the rest as "Other". The system items `Unallocated` a
 ## 8. Layout
 
 - Spacing on an 8 px grid (4 px for dense table cells).
-- Navigation: left drawer on desktop, bottom navigation on mobile. Top-level items: Overview, Buckets, Plans, Loans, Investments, Journal, Settings; an item appears once its page exists. Overview is the start page; until it exists, the start page opens Settings. The system status page (does the app reach its server and database) sits under Settings (`/settings/status`), and Settings stays highlighted there.
+- Navigation: left drawer on desktop, bottom navigation on mobile. Top-level items: Overview, Buckets, Plans, Loans, Investments, Journal, Settings; an item appears once its page exists. Overview is the start page (`/`). The system status page (does the app reach its server and database) sits under Settings (`/settings/status`), and Settings stays highlighted there.
 - First run: until the settings are saved, the app shows only the setup screen, without navigation; when the server cannot be reached at start, it shows why and a retry.
-- Overview shows: totals in the reporting currency, a card per bucket (available, progress to limit, due by plan, open loans), and the items that need attention.
+- Overview shows: totals in the reporting currency, a card per bucket (available, progress to limit, due by plan, open loans), and the items that need attention. In phase 1a: the total in the reporting currency with its rate date (or why it is missing), the total of each currency when there is more than one, and a card per bucket with its available amount ("Invested" for an investment bucket); `Unallocated` only while it holds money. Bucket colours (section 4) arrive with the charts of phase 2, where they must match across screens.
 - Cards for summaries, tables for journals and lists. On mobile a wide table turns into a list of cards instead of scrolling sideways.
 - Corner radius 8 px on controls, 12 px on cards. Flat surfaces: elevation only for dialogs and menus.
 - Forms: one column, label above the field, validation message under the field, primary action at the bottom right (full width on mobile).
