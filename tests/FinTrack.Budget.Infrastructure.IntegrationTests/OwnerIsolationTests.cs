@@ -71,6 +71,7 @@ public sealed class OwnerIsolationTests(BudgetFixture fixture)
         await SendAsync<SaveOwnerSettingsHandler, SaveOwnerSettings>(b, new SaveOwnerSettings(Currency.Eur, "Europe/Berlin", "de-DE"));
         (await SendAsync<RenameBucketHandler, RenameBucket>(b, new RenameBucket(cushion, "Mine"))).ShouldFailWith(BudgetErrorCodes.BucketNotFound, ErrorKind.NotFound);
         (await SendAsync<ArchiveBucketHandler, ArchiveBucket>(b, new ArchiveBucket(holiday))).ShouldFailWith(BudgetErrorCodes.BucketNotFound, ErrorKind.NotFound);
+        (await SendAsync<UnarchiveBucketHandler, UnarchiveBucket>(b, new UnarchiveBucket(holiday))).ShouldFailWith(BudgetErrorCodes.BucketNotFound, ErrorKind.NotFound);
         (await SendAsync<AddDepositHandler, AddDeposit>(b, new AddDeposit(Guid.CreateVersion7(), Pln(1m), Today, cushion, null, null, [])))
             .ShouldFailWith(BudgetErrorCodes.BucketNotFound, ErrorKind.NotFound);
         (await SendAsync<AddSpendHandler, AddSpend>(b, new AddSpend(Guid.CreateVersion7(), Pln(1m), Today, cushion, null, null, [])))

@@ -21,6 +21,9 @@ public sealed record BucketRow(BucketDto Bucket)
     /// <summary>Whether archiving can be offered; the server still refuses a bucket that holds money (<c>bucket.not_empty</c>).</summary>
     public bool CanArchive => !IsSystem && !IsArchived;
 
+    /// <summary>Whether unarchiving can be offered; the server still refuses a name that an active bucket now has (<c>bucket.name_taken</c>).</summary>
+    public bool CanUnarchive => !IsSystem && IsArchived;
+
     /// <summary>The resource key that describes the bucket's kind and profile.</summary>
     public string KindKey => (Bucket.Kind, Bucket.Profile) switch
     {

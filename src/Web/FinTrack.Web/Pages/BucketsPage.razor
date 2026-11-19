@@ -82,6 +82,12 @@ else
                                     <MudIconButton Icon="@Icons.Material.Outlined.Archive" aria-label="@L["Buckets.ArchiveNamed", name]" OnClick="() => ArchiveAsync(row)" />
                                 </MudTooltip>
                             }
+                            else if (row.CanUnarchive)
+                            {
+                                <MudTooltip Text="@L["Buckets.Unarchive"]">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Unarchive" aria-label="@L["Buckets.UnarchiveNamed", name]" OnClick="() => UnarchiveAsync(row)" />
+                                </MudTooltip>
+                            }
                         </td>
                     </tr>
                 }
@@ -114,6 +120,14 @@ else
                             </MudButton>
                             <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Archive" aria-label="@L["Buckets.ArchiveNamed", name]" OnClick="() => ArchiveAsync(row)">
                                 @L["Buckets.Archive"]
+                            </MudButton>
+                        </MudCardActions>
+                    }
+                    else if (row.CanUnarchive)
+                    {
+                        <MudCardActions>
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Unarchive" aria-label="@L["Buckets.UnarchiveNamed", name]" OnClick="() => UnarchiveAsync(row)">
+                                @L["Buckets.Unarchive"]
                             </MudButton>
                         </MudCardActions>
                     }
@@ -185,6 +199,22 @@ else
         if (await reference.Result is { Canceled: false })
         {
             Snackbar.Add(L["Buckets.ArchivedDone", name], Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task UnarchiveAsync(BucketRow row)
+    {
+        var name = row.DisplayName(L);
+        var parameters = new DialogParameters<ArchiveBucketDialog>
+        {
+            { dialog => dialog.BucketId, row.Bucket.Id },
+            { dialog => dialog.Unarchive, true },
+        };
+        var reference = await Dialogs.ShowAsync<ArchiveBucketDialog>(L["Buckets.UnarchiveTitle", name], parameters, Options);
+        if (await reference.Result is { Canceled: false })
+        {
+            Snackbar.Add(L["Buckets.UnarchivedDone", name], Severity.Success);
             await LoadAsync();
         }
     }

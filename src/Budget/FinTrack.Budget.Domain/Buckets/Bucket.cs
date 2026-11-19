@@ -14,8 +14,8 @@ namespace FinTrack.Budget.Domain.Buckets;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Created with <see cref="Create"/> or <see cref="Unallocated"/>, changed with <see cref="Rename"/>;
-/// each returns a new object. The constructor is private: the database mapping restores stored
+/// Created with <see cref="Create"/> or <see cref="Unallocated"/>, changed with <see cref="Rename"/>,
+/// <see cref="Archive"/> and <see cref="Unarchive"/>; each returns a new object. The constructor is private: the database mapping restores stored
 /// buckets through it.
 /// </para>
 /// <para>
@@ -199,6 +199,31 @@ public sealed class Bucket : IMutableDocument
         return balance.Available.Amount != 0m
             ? Result.Fail<Bucket>(AppError.BusinessRule(BudgetErrorCodes.BucketNotEmpty))
             : Result.Ok(new Bucket(Id, OwnerId, SchemaVersion, Version, CreatedAt, UpdatedAt, Name, Currency, Kind, Profile, BucketStatus.Archived, SystemRole));
+    }
+
+    /// <summary>
+    /// The same bucket, active again (ARCHITECTURE 4.1, plan 1b B23), with its identity, name and history. An
+    /// archived bucket is always empty, lends to no open loan and has no active plan, and nothing was written to
+    /// it while archived, so no replayed figure changes. Fails with <see cref="BudgetErrorCodes.BucketSystemBucket"/>
+    /// for a system bucket (never archived) and with <see cref="BudgetErrorCodes.BucketNameTaken"/> when an active
+    /// bucket of <paramref name="ownersBuckets"/> now has its name (archiving freed it). An active bucket is
+    /// returned unchanged. Identity and version are kept.
+    /// </summary>
+    public Result<Bucket> Unarchive(IEnumerable<Bucket> ownersBuckets)
+    {
+        if (SystemRole != BucketSystemRole.None)
+        {
+            return Result.Fail<Bucket>(AppError.BusinessRule(BudgetErrorCodes.BucketSystemBucket));
+        }
+
+        if (Status == BucketStatus.Active)
+        {
+            return Result.Ok(this);
+        }
+
+        return NameTaken(Name!, ownersBuckets, except: Id)
+            ? Result.Fail<Bucket>(AppError.BusinessRule(BudgetErrorCodes.BucketNameTaken))
+            : Result.Ok(new Bucket(Id, OwnerId, SchemaVersion, Version, CreatedAt, UpdatedAt, Name, Currency, Kind, Profile, BucketStatus.Active, SystemRole));
     }
 
     /// <summary>

@@ -14,7 +14,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace FinTrack.Api.IntegrationTests.Budget;
 
 /// <summary>
-/// <c>GET</c> and <c>POST /api/v1/buckets</c> and <c>POST /api/v1/buckets/{id}/rename</c> through the
+/// <c>GET</c> and <c>POST /api/v1/buckets</c>, <c>POST /api/v1/buckets/{id}/rename</c> and
+/// <c>POST /api/v1/buckets/{id}/unarchive</c> (with archiving) through the
 /// Api's own container: route, query and body reading, the pipeline (validation, retry), the handlers
 /// and MongoDB. Each test is a new owner.
 /// </summary>
@@ -124,6 +125,46 @@ public sealed class BucketFunctionTests(ApiFixture fixture)
     public async Task List_WithArchivedRequested_IsOk() =>
         (await ListAsync("?includeArchived=true")).ShouldBeOfType<OkObjectResult>();
 
+    [Fact]
+    public async Task Unarchive_Is204_AndTheBucketIsActiveAgain_AndRepeatingIt_Is204()
+    {
+        var id = Guid.CreateVersion7();
+        await CreateAsync(Body(id, "Holiday"));
+        (await ArchiveAsync(id.ToString())).ShouldBeOfType<NoContentResult>();
+        Buckets(await ListAsync()).ShouldBeEmpty();
+
+        (await UnarchiveAsync(id.ToString())).ShouldBeOfType<NoContentResult>();
+        (await UnarchiveAsync(id.ToString())).ShouldBeOfType<NoContentResult>();
+
+        Buckets(await ListAsync()).ShouldHaveSingleItem().Status.ShouldBe(BucketStatus.Active);
+    }
+
+    [Fact]
+    public async Task Unarchive_WhileTheNameIsTaken_Is422NameTaken()
+    {
+        var id = Guid.CreateVersion7();
+        await CreateAsync(Body(id, "Holiday"));
+        await ArchiveAsync(id.ToString());
+        await CreateAsync(Body(Guid.CreateVersion7(), "HOLIDAY"));
+
+        Code(await UnarchiveAsync(id.ToString()), 422).ShouldBe("bucket.name_taken");
+    }
+
+    [Fact]
+    public async Task Unarchive_OfAnUnknownBucket_Is404() =>
+        Code(await UnarchiveAsync(Guid.CreateVersion7().ToString()), 404).ShouldBe("bucket.not_found");
+
+    [Theory]
+    [InlineData("not-a-guid")]
+    [InlineData("")]
+    public async Task Unarchive_WithAMalformedId_Is400RouteFormat(string id)
+    {
+        var parameters = Parameters(await UnarchiveAsync(id), 400);
+
+        parameters["field"].ShouldBe("id");
+        parameters["rule"].ShouldBe(RequestValues.RouteFormatRule);
+    }
+
     private static string Body(Guid id, string name) =>
         $$"""{"id":"{{id}}","name":"{{name}}","currency":"PLN","kind":"Savings"}""";
 
@@ -137,6 +178,18 @@ public sealed class BucketFunctionTests(ApiFixture fixture)
     {
         await using var scope = await ScopeAsync();
         return await ActivatorUtilities.CreateInstance<RenameBucketFunction>(scope.ServiceProvider).Run(JsonRequest(json), id, Cancellation);
+    }
+
+    private async Task<IActionResult> ArchiveAsync(string id)
+    {
+        await using var scope = await ScopeAsync();
+        return await ActivatorUtilities.CreateInstance<ArchiveBucketFunction>(scope.ServiceProvider).Run(new DefaultHttpContext().Request, id, Cancellation);
+    }
+
+    private async Task<IActionResult> UnarchiveAsync(string id)
+    {
+        await using var scope = await ScopeAsync();
+        return await ActivatorUtilities.CreateInstance<UnarchiveBucketFunction>(scope.ServiceProvider).Run(new DefaultHttpContext().Request, id, Cancellation);
     }
 
     private async Task<IActionResult> ListAsync(string query = "")
