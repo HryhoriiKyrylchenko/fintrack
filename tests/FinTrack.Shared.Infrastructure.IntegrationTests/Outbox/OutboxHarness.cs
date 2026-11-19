@@ -26,14 +26,16 @@ internal sealed class OutboxHarness : IAsyncDisposable
 {
     private readonly ServiceProvider provider;
 
-    public OutboxHarness(MongoDatabaseFixture fixture)
+    /// <param name="fixture">The test database.</param>
+    /// <param name="database">Another database for the dispatcher, for example one on a server that cannot be reached.</param>
+    public OutboxHarness(MongoDatabaseFixture fixture, IMongoDatabase? database = null)
     {
         Ledger = LedgerName.From($"ob{Guid.NewGuid():N}"[..20]);
-        Database = fixture.Database;
+        Database = database ?? fixture.Database;
 
         provider = new ServiceCollection()
             .AddSingleton(fixture.Client)
-            .AddSingleton(fixture.Database)
+            .AddSingleton(Database)
             .AddSingleton<IClock>(Clock)
             .AddSingleton<ILoggerFactory>(Logs)
             .AddSingleton(typeof(ILogger<>), typeof(Logger<>))

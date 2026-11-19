@@ -20,6 +20,7 @@ public sealed class LedgerDocumentsTests
     [Theory]
     [InlineData("journal")]
     [InlineData("otherledger_journal")]
+    [InlineData("testledger2_journal")] // another ledger's name that starts with this one
     [InlineData("testledger_")]
     [InlineData("testledger_ledger_heads")]
     [InlineData("testledger_outbox")]

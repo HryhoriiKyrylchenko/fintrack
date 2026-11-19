@@ -56,6 +56,18 @@ public class RetryOnConflictBehaviorTests
     }
 
     [Fact]
+    public async Task ConflictTogetherWithAnotherFailure_IsNotRetried()
+    {
+        // A retry would only repeat the other failure: retry when a conflict is the whole reason.
+        var handler = new CountingHandler<AddTestEntry, Result>(Result.Fail(AppError.Conflict(ErrorCodes.ConcurrencyConflict))
+            .WithError(AppError.BusinessRule("bucket.insufficient_funds")));
+
+        await new RetryOnConflictBehavior<AddTestEntry, Result>().Handle(Command(), handler.Next, Cancellation);
+
+        handler.Calls.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task OtherConflictCode_IsNotRetried()
     {
         var handler = new CountingHandler<AddTestEntry, Result>(Result.Fail(AppError.Conflict("bucket.already_archived")));

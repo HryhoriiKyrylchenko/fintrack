@@ -38,6 +38,8 @@ public sealed class MongoRegistrationTests
     [InlineData(ValidConnectionString, "fin track")]
     [InlineData(ValidConnectionString, "fin/track")]
     [InlineData(ValidConnectionString, "fintrack$")]
+    [InlineData(ValidConnectionString, ".fintrack")] // a forbidden character at the start
+    [InlineData(ValidConnectionString, "fin\u0001track")] // a control character
     public void InvalidOptions_FailWhenTheClientIsResolved(string connectionString, string databaseName)
     {
         using var provider = BuildProvider(connectionString, databaseName);
@@ -51,6 +53,36 @@ public sealed class MongoRegistrationTests
         using var provider = BuildProvider(ValidConnectionString, new string('a', 64));
 
         Should.Throw<OptionsValidationException>(() => provider.GetRequiredService<IMongoClient>());
+    }
+
+    [Fact]
+    public void DatabaseNameOf63Characters_IsAccepted()
+    {
+        using var provider = BuildProvider(ValidConnectionString, new string('a', 63));
+
+        provider.GetRequiredService<IMongoDatabase>().DatabaseNamespace.DatabaseName.ShouldBe(new string('a', 63));
+    }
+
+    [Fact]
+    public void ValidationFailures_NameEachSettingThatIsWrong()
+    {
+        using var provider = BuildProvider("not a connection string", string.Empty);
+
+        var exception = Should.Throw<OptionsValidationException>(() => provider.GetRequiredService<IMongoClient>());
+
+        exception.Failures.ShouldBe([
+            "ConnectionString is not a valid MongoDB connection string.",
+            "DatabaseName must have 1 to 63 characters and none of: /\\. \"$*<>:|?",
+        ]);
+    }
+
+    [Fact]
+    public void MissingConnectionString_IsNamedAsMissing()
+    {
+        using var provider = BuildProvider(" ", "fintrack");
+
+        Should.Throw<OptionsValidationException>(() => provider.GetRequiredService<IMongoClient>())
+            .Failures.ShouldBe(["ConnectionString is required."]);
     }
 
     [Fact]

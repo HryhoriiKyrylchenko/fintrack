@@ -71,6 +71,19 @@ public class ValidationBehaviorTests
     }
 
     [Fact]
+    public async Task RuleOnTheWholeMessage_HasAnEmptyField()
+    {
+        var handler = new CountingHandler<AddTestEntry, Result>(Result.Ok());
+        var behavior = new ValidationBehavior<AddTestEntry, Result>([new WholeMessageValidator()]);
+
+        var result = await behavior.Handle(Valid(), handler.Next, Cancellation);
+
+        var error = AppErrors(result).ShouldHaveSingleItem();
+        error.Parameters["field"].ShouldBe(string.Empty);
+        error.Parameters["rule"].ShouldBe("WholeMessage");
+    }
+
+    [Fact]
     public async Task AllValidatorsRun()
     {
         var handler = new CountingHandler<AddTestEntry, Result>(Result.Ok());
@@ -116,6 +129,13 @@ public class ValidationBehaviorTests
     private sealed class NoteLengthValidator : AbstractValidator<AddTestEntry>
     {
         public NoteLengthValidator() => RuleFor(command => command.Note).MaximumLength(200);
+    }
+
+    private sealed class WholeMessageValidator : AbstractValidator<AddTestEntry>
+    {
+        public WholeMessageValidator() =>
+            RuleFor(command => command.Note).Custom((_, context) =>
+                context.AddFailure(new FluentValidation.Results.ValidationFailure(string.Empty, "Never valid.") { ErrorCode = "WholeMessage" }));
     }
 
     private sealed class SplitTestPaymentValidator : AbstractValidator<SplitTestPayment>

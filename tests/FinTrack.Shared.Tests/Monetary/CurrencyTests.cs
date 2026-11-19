@@ -55,6 +55,7 @@ public class CurrencyTests
     [InlineData("A1", 0)]
     [InlineData("USDT", 6)]
     [InlineData("ETH", 18)]
+    [InlineData("ABCDEFGHIJ", 2)] // the longest code allowed
     public void Define_ValidDefinition_Works(string code, int decimalPlaces) =>
         Currency.Define(code, decimalPlaces).DecimalPlaces.ShouldBe(decimalPlaces);
 

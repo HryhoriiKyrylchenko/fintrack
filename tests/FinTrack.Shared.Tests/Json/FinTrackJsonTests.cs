@@ -231,6 +231,7 @@ public class FinTrackJsonTests
     [InlineData("\"2026-01-15\"")]
     [InlineData("\"15.01.2026 09:30Z\"")]
     [InlineData("1768469400000")]
+    [InlineData("\"\"")]
     public void Instant_ThatIsNotUtcIso8601_IsRejected(string json) =>
         Should.Throw<JsonException>(() => Deserialize<DateTimeOffset>(json));
 

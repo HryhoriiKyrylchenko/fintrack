@@ -134,8 +134,10 @@ node scripts/dev/screenshot.mjs --url <url> --out <png> [--width 360] [--theme d
                                 # headless Edge/Chrome screenshot for UI checks (options at the top of the script)
 dotnet tool restore             # once: installs the local tools of dotnet-tools.json (Stryker.NET)
 dotnet stryker --config-file ../../stryker-config.json --project FinTrack.Budget.Domain.csproj
-                                # mutation testing, run from tests/FinTrack.Budget.Domain.Tests (Application likewise);
-                                # report in StrykerOutput/ (ignored). Not for the Web project (Blazor) or projects needing MongoDB
+                                # mutation testing, run from tests/FinTrack.Budget.Domain.Tests (Application, Kernel and the
+                                # Infrastructure projects likewise, the latter with MongoDB: commands in docs/plans/test-audit.md);
+                                # report in StrykerOutput/ (ignored). Not for the Web project (Blazor). Afterwards
+                                # `dotnet build --no-incremental`: Stryker leaves its mutated build in bin/
 ```
 
 Local prerequisites: .NET SDK, Azure Functions Core Tools, MongoDB Community 8.0 or later running as a single-node replica set, Node.js and Azurite. Setup: `docs/LOCAL-SETUP.md`. Docker is optional, never required (`docker-compose.yml`).

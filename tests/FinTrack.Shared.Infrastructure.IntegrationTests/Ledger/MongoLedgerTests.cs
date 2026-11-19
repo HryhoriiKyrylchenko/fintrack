@@ -286,6 +286,44 @@ public sealed class MongoLedgerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task IndexInitializer_CreatesTheOutboxIndexForTheSweep()
+    {
+        using var cursor = await fixture.Database.GetCollection<BsonDocument>("testledger_outbox").Indexes.ListAsync(Cancellation);
+
+        (await cursor.ToListAsync(Cancellation)).ShouldContain(index => index["name"].AsString == "pending"
+            && index["key"].AsBsonDocument == new BsonDocument { { "dispatchedAt", 1 }, { "_id", 1 } });
+    }
+
+    [Fact]
+    public async Task IndexInitializer_CreatesEveryCollection_EvenWhereItCreatesNoIndex()
+    {
+        // A ledger nobody has written to yet: its collections exist before any transaction uses them.
+        var fresh = LedgerName.From($"l{Guid.NewGuid():N}"[..20]);
+        var freshCollections = new LedgerCollections([new LedgerDocuments(fresh).AppendOnly<TestJournalEntry>($"{fresh.Value}_journal")]);
+
+        await new LedgerIndexInitializer(freshCollections).CreateIndexesAsync(fixture.Database, Cancellation);
+
+        var names = await (await fixture.Database.ListCollectionNamesAsync(cancellationToken: Cancellation)).ToListAsync(Cancellation);
+        names.ShouldContain($"{fresh.Value}_journal");
+        names.ShouldContain(LedgerCollections.HeadsCollection(fresh));
+        names.ShouldContain(LedgerCollections.OutboxCollection(fresh));
+        names.ShouldContain(LedgerCollections.ProcessedEventsCollection(fresh));
+    }
+
+    [Fact]
+    public async Task UnregisteredLedger_Throws_AndCreatesNoCollection()
+    {
+        // Without the check, a commit would create the ledger's collections on the fly, without their indexes.
+        var unknown = LedgerName.From("unknownledger");
+
+        await Should.ThrowAsync<InvalidOperationException>(() => Ledger().GetVersionAsync(unknown, Cancellation));
+        await Should.ThrowAsync<InvalidOperationException>(() => Ledger().CommitAsync(new LedgerCommit(unknown, 0, events: [Opened()]), Cancellation));
+
+        var names = await (await fixture.Database.ListCollectionNamesAsync(cancellationToken: Cancellation)).ToListAsync(Cancellation);
+        names.ShouldAllBe(name => !name.StartsWith("unknownledger", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task IndexInitializer_CreatesTheUniqueIndexes()
     {
         var heads = await IndexesAsync("testledger_ledger_heads");
