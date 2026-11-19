@@ -6,7 +6,7 @@ Stage 0 is complete (PR #19, `3c372b6`, 424 tests): kernel (`Money`, `Currency`,
 
 Phase 1a is the first version that can be used next to the spreadsheet: buckets, `Unallocated`, `OpeningBalance`, `Deposit`, `Spend`, `Transfer`, `Reversal`, multi-currency, balances, a simple overview and a journal screen (ARCHITECTURE 8). The largest risk named in the decision log is never reaching real use, so every step below is a vertical slice and the UI arrives as early as the back end allows.
 
-Status: approved 16 Nov 2026, with every decision as written, including the three rule changes D8, D9 and D14 and the new package `Microsoft.Extensions.Http`. Tick a step's `[ ]` when its pull request is merged.
+Status: approved 16 Nov 2026, with every decision as written, including the three rule changes D8, D9 and D14 and the new package `Microsoft.Extensions.Http`. Tick a step's `[ ]` when its pull request is merged. **Complete: all 18 steps merged and every item of "Phase 1a is complete when…" ticked with its evidence (19 Nov 2026).**
 
 ## Phase 1a scope
 
@@ -418,28 +418,53 @@ Rules for every step: branch from an up-to-date `main`; tests first; when the co
   - **Verified:** Debug and Release 0 warnings; 1385 tests pass (1367 before), one explicit test skipped. With `run-local.ps1` against `fintrack_e2e_step17` (dropped afterwards; `fintrack` untouched) and 32 entries of invented amounts: the empty state; the first page of 25 rows and all 32 after "Load more", which then disappears; no reverse action on the two entries of the archived bucket; reversing a deposit that was moved on refused in the dialog with the date 12.11.2026; reversing a spend with a note and a simultaneous double click: one reversal stored, dated today with its note, and one more `ReverseEntry` call in the Api's log (the other was the refused one); the spend then labelled "Reversed" with its amount struck through and the reversal naming it; filters by an active and an archived bucket, a period, an invalid period and no matches, and "Clear filters". Screenshots at 360 px and 1280 px, light and dark.
   - **Not verified:** CI (runs on the pull request).
 
-### [ ] Step 18. Phase 1a verification and docs sync (R)
+### [x] Step 18. Phase 1a verification and docs sync (R)
 - **Goal:** 1a is closed and real use next to the spreadsheet can start.
 - **What we do:** walk the checklist below with evidence; fix drift in ARCHITECTURE, CLAUDE.md, README, LOCAL-SETUP and DESIGN; write a short "how to start using it" note (first run, opening balances, where the data lives, that there is no backup feature yet and how to run `mongodump` by hand); set "Current phase" to 1b.
 - **Done when:** every checklist item is ticked with its evidence.
 - **Depends on:** all.
+- **Result:**
+  - **Clean clone** of `main` at `20e43bb` (all of steps 1 to 17) from GitHub into a scratch folder: `check-prereqs.ps1` all required items OK; `dotnet build -c Release` 0 warnings, 0 errors; `dotnet test` 1385 passed, 1 skipped (the explicit call to the real rate service). The folder was removed afterwards.
+  - **Prepared scenario,** written down before it was run, entered only through the UI against the empty database `fintrack_e2e_phase1a` (locale `pl-PL`, time zone `Europe/Warsaw`, reporting currency PLN, every entry dated 19.11.2026; invented amounts):
+
+    | # | Action in the UI | Expected | Seen |
+    |---|---|---|---|
+    | 1 | First run: PLN, Europe/Warsaw, pl-PL | the empty Overview | the empty Overview; every collection had been empty |
+    | 2 | Buckets "Cushion" (PLN) and "Holiday" (EUR), savings | both listed | both listed |
+    | 3 | Opening balances Cushion 8 000,00 PLN, Holiday 150,00 EUR | saved | saved |
+    | 4 | Deposit 2 500,00 PLN to Unallocated (PLN) | Unallocated (PLN) created | created |
+    | 5 | Transfer Unallocated (PLN) to Cushion, 1 500,00 PLN | saved | saved |
+    | 6 | Transfer Cushion to Holiday: 860,00 PLN sent, fee 4,00, 200,00 EUR received | rate 200 / 856 | stored rate 0.233644859813 |
+    | 7 | Spend 120,40 PLN from Cushion | saved | saved |
+    | 8 | Reverse the spend in the Journal, note "Returned the purchase" | the spend marked "Reversed" | labelled and struck through; the reversal names it |
+    | - | Overview | Cushion 8 640,00 PLN; Unallocated (PLN) 1 000,00 PLN; Holiday 350,00 EUR; PLN 9 640,00; EUR converted at the day's rate | exactly these; EUR 350,00 = 1 544,13 PLN at 4,4118 of 18.11.2026; total 11 184,13 PLN, equal to the Api's figures |
+    | - | Journal | 7 rows, newest first: reversal, spend (reversed), both transfers, deposit, two opening balances | exactly these |
+
+  - **Offline** (the stored rates' fetch dated back a day, the rate source unreachable): the Overview still shows the per-currency totals and the total of 11 184,13 PLN at the last known rate of 18.11.2026; the Api logged "FX rate request failed (time-out, HTTP status 0)." and "Using the stored FX rates of 2026-11-18.", without any rate or amount. The database was dropped afterwards; `fintrack` untouched.
+  - **Scans for the checklist:** no colour value outside `Theme/FinTrackTheme.cs` and no inline `style` in any component; every visible string comes from the resources; the 11 log messages carry IDs, names, codes, counts, an exception type or a rate date, never an amount, a balance or a rate; error parameters are only `field`, `rule`, `date`, `currency`, `maxDecimalPlaces` and `example` (an invented 1234.56 or 4.2735 in the owner's format). Of the 42 error codes declared in the source, `currency.unknown` (kernel) had no text; it cannot reach the UI today (it arises only while reading JSON or stored documents), but it has one now, and a new test requires a text for every code in the kernel's `ErrorCodes` (a renamed resource made it fail).
+  - **Docs:** `docs/GETTING-STARTED.md` (new; linked from README and LOCAL-SETUP): first run, buckets, the starting point with opening balances, the kinds of entries, fixing a mistake by reversal, exchange rates and offline, where the data lives and that the local owner ID must never change, backups by hand with MongoDB Database Tools (`mongodump`, `mongorestore`; where Windows installs them), what is not there yet. README: the status of phase 1a and how to start. LOCAL-SETUP: the database name and owner, a test database by environment variable, the first-run screen and the status page under Settings, backups. ARCHITECTURE 8: phase 1a complete (19 Nov 2026). CLAUDE.md: current phase 1b (its plan is to be written and approved first), the branch pattern `stage-<phase>/NN-short-name`, the new docs in the layout, the structure of the Web app. DESIGN: checked, already current (navigation, Overview, money, states).
+  - **Small fixes** (the IDE's suggestion-level hints in the Web app, found before this step): `Program.cs` discards the result of applying the saved locale on purpose and says why; `var`, a block-bodied constructor and an expression-bodied test as `.editorconfig` prefers; a collection expression in `tests/Common/AssemblyGraph.cs`; IDE0058 ("value never used") off for `tests/**` only, because Shouldly's assertions return their value. The Web project and its tests now have no analyzer finding even at suggestion level. Rider's errors in six `.razor` files are a tooling matter (the compiler and the browser are fine) and were not changed here.
+  - **Found during the step:** a quotation mark had been deleted in `Settings/SettingsForm.razor` in the working copy (not in any commit), which broke the Web build; restored from `main` with the developer's approval.
+  - **Verified:** Debug and Release 0 warnings; 1387 tests pass (1385 before), one explicit test skipped; screenshots of the scenario at 360 px and 1280 px, light and dark.
+  - **Backup and restore checked** after the developer installed MongoDB Database Tools 100.20.1 (in `C:\Program Files\MongoDB\Tools\100\bin`, not on PATH; the note says so): the two commands of `GETTING-STARTED.md`, run against a throwaway database with invented documents and an extra index, wrote every collection; after the database was dropped, the restore brought back all documents and the index, identical to before (decimal amounts with their scale). The throwaway database and the dump were removed; `fintrack` untouched.
+  - **Not verified:** CI of this pull request (it runs on the pull request).
 
 ## Phase 1a is complete when…
 
-- [ ] A fresh database leads through first-run setup to an empty overview.
-- [ ] Buckets can be created, renamed and archived; `Unallocated` appears per currency on first use and cannot be renamed or archived.
-- [ ] Opening balance, deposit, spend, transfer (same and different currencies) and reversal can each be entered in the UI with a confirmation step, and appear in the journal.
-- [ ] `Available = NetContributed − OutstandingPrincipal` and never below zero for savings buckets at any point of the replay order (property tests, invariants 1 and 2).
-- [ ] State always comes from replaying the journal; building it step by step gives the same result (invariant 10).
-- [ ] The journal collection is never updated or deleted from; corrections are reversals (invariant 3).
-- [ ] Repeating any command with the same ID writes nothing new (invariant 13).
-- [ ] Two owners never see or affect each other's data; reference data holds no owner data (invariant 12 with its two documented exceptions).
-- [ ] Stored journal entries carry explicit, stable type names; a guard test fails for a new entry type without one.
-- [ ] The overview shows totals per currency and in the reporting currency with the rate date; it still works offline.
-- [ ] Every failure reaches the UI as a code with a resource text; no amount appears in logs or error parameters.
-- [ ] All screens work at 360 px and at desktop width, in light and dark, with no hard-coded colour or string.
-- [ ] `dotnet build -c Release` has zero warnings and `dotnet test` passes locally and in CI (MongoDB 8.0).
-- [ ] ARCHITECTURE, CLAUDE.md, DESIGN, README and LOCAL-SETUP describe what was built; "Current phase" is 1b.
+- [x] A fresh database leads through first-run setup to an empty overview. *Step 18 scenario, row 1 (and steps 4, 15).*
+- [x] Buckets can be created, renamed and archived; `Unallocated` appears per currency on first use and cannot be renamed or archived. *Step 14 in the browser; `bucket.system_bucket` tests (steps 5, 9); step 18 scenario row 4.*
+- [x] Opening balance, deposit, spend, transfer (same and different currencies) and reversal can each be entered in the UI with a confirmation step, and appear in the journal. *Step 18 scenario rows 3 to 8 and the Journal row; steps 16 and 17.*
+- [x] `Available = NetContributed − OutstandingPrincipal` and never below zero for savings buckets at any point of the replay order (property tests, invariants 1 and 2). *`NeverNegativePropertyTests`, `BudgetStatePropertyTests` (steps 6 to 9) and `BudgetModelTests` (step 10), also run for 10 s.*
+- [x] State always comes from replaying the journal; building it step by step gives the same result (invariant 10). *`BudgetStatePropertyTests` and `BudgetModelTests`; reads only through `BudgetStateLoader`; the read contracts checked against the state in the model (step 12).*
+- [x] The journal collection is never updated or deleted from; corrections are reversals (invariant 3). *`AppendOnlyCollection` has no update or delete (Stage 0 guard); `Journal_IsNeverChanged_OnlyAppendedTo` against MongoDB (step 9).*
+- [x] Repeating any command with the same ID writes nothing new (invariant 13). *Repeat tests of every command (steps 3 to 9), repeats in `BudgetModelTests`; a double click on save and on reverse wrote once in the browser (steps 16, 17).*
+- [x] Two owners never see or affect each other's data; reference data holds no owner data (invariant 12 with its two documented exceptions). *`OwnerIsolationTests` through every handler and query (steps 10, 12); `ReferenceCollection` guards in both directions (step 11).*
+- [x] Stored journal entries carry explicit, stable type names; a guard test fails for a new entry type without one. *`EveryEntryType_HasAnExplicitStableName` (step 6); the contract's `JournalEntryType` guarded against the stored names (step 12).*
+- [x] The overview shows totals per currency and in the reporting currency with the rate date; it still works offline. *Step 15 (with and without a stored rate); step 18 scenario and offline check.*
+- [x] Every failure reaches the UI as a code with a resource text; no amount appears in logs or error parameters. *`ErrorTextTests` (`KnownCodes` and every kernel code); step 18 scans of codes, log messages and error parameters; the provider's log test (step 11).*
+- [x] All screens work at 360 px and at desktop width, in light and dark, with no hard-coded colour or string. *Screenshots in steps 4 and 13 to 18; step 18 scans for colours and strings.*
+- [x] `dotnet build -c Release` has zero warnings and `dotnet test` passes locally and in CI (MongoDB 8.0). *Step 18 clean clone and this branch; CI green on every pull request and on `main` after every merge (#20 to #36).*
+- [x] ARCHITECTURE, CLAUDE.md, DESIGN, README and LOCAL-SETUP describe what was built; "Current phase" is 1b. *Step 18, docs; `docs/GETTING-STARTED.md` added.*
 
 ## Deliberately deferred
 

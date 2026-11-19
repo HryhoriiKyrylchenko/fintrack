@@ -793,4 +793,7 @@
   <data name="Journal.Archived" xml:space="preserve">
     <value>archived</value>
   </data>
+  <data name="Error.currency.unknown" xml:space="preserve">
+    <value>This currency is not supported.</value>
+  </data>
 </root>
