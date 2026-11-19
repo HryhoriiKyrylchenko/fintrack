@@ -1,0 +1,40 @@
+@* A bucket to choose for an entry: the owner's buckets with their currency, then Unallocated of each currency. *@
+@using FinTrack.Web.Buckets
+@inject IStringLocalizer<SharedResource> L
+
+<MudSelect T="string" Label="@Label" Value="Key" ValueChanged="KeyChanged" ToStringFunc="Display" Variant="Variant.Outlined"
+           Error="@(Error is not null)" ErrorText="@Error">
+    @foreach (var target in Targets)
+    {
+        <MudSelectItem T="string" Value="target.Key">@Display(target.Key)</MudSelectItem>
+    }
+</MudSelect>
+
+@code {
+    /// <summary>The field's label.</summary>
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = default!;
+
+    /// <summary>The buckets to offer.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<EntryTarget> Targets { get; set; } = default!;
+
+    /// <summary>The chosen target's key.</summary>
+    [Parameter]
+    public string? Key { get; set; }
+
+    /// <summary>Called with the newly chosen key.</summary>
+    [Parameter]
+    public EventCallback<string?> KeyChanged { get; set; }
+
+    /// <summary>The message under the field, or <c>null</c>.</summary>
+    [Parameter]
+    public string? Error { get; set; }
+
+    private string Display(string? key) => Targets.FirstOrDefault(target => target.Key == key) switch
+    {
+        null => string.Empty,
+        { IsUnallocated: true } target => BucketNames.Display(null, target.Currency, L),
+        var target => L["Entries.TargetOption", target.Name!, target.Currency.Code],
+    };
+}

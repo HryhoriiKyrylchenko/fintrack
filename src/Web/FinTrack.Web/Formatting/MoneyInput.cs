@@ -32,7 +32,6 @@ public static class MoneyInput
 
     private const decimal ExampleAmount = 1234.56m;
     private const int MaxDecimalScale = 28;
-    private static readonly string[] SpaceSeparators = [" ", "\u00A0", "\u202F"];
 
     /// <summary>The amount typed as <paramref name="text"/> in <paramref name="currency"/>, read in <paramref name="culture"/>.</summary>
     public static Result<Money> Parse(string? text, Currency currency, CultureInfo culture)
@@ -46,18 +45,7 @@ public static class MoneyInput
             return Result.Fail<Money>(AppError.Validation(Required));
         }
 
-        var negative = trimmed[0] is '-' or MoneyFormatter.MinusSign;
-        var unsigned = negative ? trimmed[1..] : trimmed;
-
-        var format = culture.NumberFormat;
-        var parts = unsigned.Split(format.CurrencyDecimalSeparator);
-        if (parts.Length > 2 || !TryReadInteger(parts[0], format, out var integer))
-        {
-            return InvalidIn(currency, culture);
-        }
-
-        var fraction = parts.Length == 2 ? parts[1] : string.Empty;
-        if ((parts.Length == 2 && fraction.Length == 0) || !fraction.All(char.IsAsciiDigit))
+        if (!LocaleNumber.TryRead(trimmed, culture.NumberFormat, out var negative, out var integer, out var fraction))
         {
             return InvalidIn(currency, culture);
         }
@@ -79,51 +67,6 @@ public static class MoneyInput
 
         var amount = Money.Create(negative ? -value : value, currency);
         return amount.IsFailed ? amount : Result.Ok(Money.From(WithScale(amount.Value.Amount, currency.DecimalPlaces), currency));
-    }
-
-    // The integer part: digits, grouped exactly as the locale groups them, or not grouped at all.
-    private static bool TryReadInteger(string text, NumberFormatInfo format, out string digits)
-    {
-        digits = string.Empty;
-        var separator = format.CurrencyGroupSeparator;
-        var separators = SpaceSeparators.Contains(separator) ? SpaceSeparators : [separator];
-        var groups = text.Split(separators, StringSplitOptions.None);
-
-        if (groups.Any(group => group.Length == 0 || !group.All(char.IsAsciiDigit)))
-        {
-            return false;
-        }
-
-        if (groups.Length > 1 && !FitsGrouping(groups, format.CurrencyGroupSizes))
-        {
-            return false;
-        }
-
-        digits = string.Concat(groups);
-        return true;
-    }
-
-    // Group sizes are counted from the decimal separator leftwards; the last size repeats (en-IN: 3, then 2s).
-    // Every group but the leftmost has exactly its size; the leftmost has 1 up to its size.
-    private static bool FitsGrouping(string[] groups, int[] sizes)
-    {
-        for (var index = 0; index < groups.Length; index++)
-        {
-            var fromRight = groups.Length - 1 - index;
-            var size = sizes.Length == 0 ? 3 : sizes[Math.Min(fromRight, sizes.Length - 1)];
-            if (size <= 0)
-            {
-                return false;
-            }
-
-            var leftmost = index == 0;
-            if (leftmost ? groups[index].Length > size : groups[index].Length != size)
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     // The same value with exactly `places` decimals: only trailing zeros are added or removed.

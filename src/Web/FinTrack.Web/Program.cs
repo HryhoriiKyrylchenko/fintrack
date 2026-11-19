@@ -2,6 +2,7 @@ using System.Globalization;
 using FinTrack.Web;
 using FinTrack.Web.Api;
 using FinTrack.Web.Buckets;
+using FinTrack.Web.Entries;
 using FinTrack.Web.Overview;
 using FinTrack.Web.Settings;
 using FinTrack.Web.Theme;
@@ -25,6 +26,7 @@ builder.Services.AddSingleton(_ => new HttpClient { BaseAddress = new Uri(apiBas
 builder.Services.AddSingleton<ApiClient>();
 builder.Services.AddSingleton<BucketsClient>();
 builder.Services.AddSingleton<OverviewClient>();
+builder.Services.AddSingleton<EntriesClient>();
 builder.Services.AddSingleton<OwnerSettingsState>();
 builder.Services.AddScoped<ThemePreference>();
 builder.Services.AddLocalization();
