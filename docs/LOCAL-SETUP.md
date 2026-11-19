@@ -75,7 +75,8 @@ Skip this when the check script already reports the replica set as `OK`.
 - MongoDB keeps its data in `storage.dbPath` of its configuration file (Windows default: `C:\Program Files\MongoDB\Server\<version>\data`), outside the repository. Never point it inside the repository folder.
 - Integration tests create one uniquely named database per run and drop it afterwards; they never touch other databases.
 - When a new major MongoDB version is installed, the installer creates a new folder; the data stays where `dbPath` points. Read MongoDB's upgrade notes first: a server cannot open data files written by a newer major version.
-- Backups (scheduled `mongodump` to a folder you choose) and app exports are planned (ARCHITECTURE 2.4). Keep them outside the repository as well.
+- The app's database is `fintrack` (`Mongo__DatabaseName` in `local.settings.json`); all local data belongs to the owner `FinTrack__LocalOwnerId` there, which must never change. Running the Api against another database for a test: set the environment variable `Mongo__DatabaseName` before `run-local.ps1`.
+- There is no backup feature yet (scheduled `mongodump` and app exports are planned, ARCHITECTURE 2.4). How to back up and restore by hand with MongoDB Database Tools: [GETTING-STARTED.md](GETTING-STARTED.md#backups). Keep backups outside the repository as well.
 
 ## Run everything
 
@@ -96,7 +97,7 @@ The sections below do the same by hand.
 
 ## Run the Web app
 
-With the Api running, from `src/Web/FinTrack.Web` run `dotnet run`, then open `http://localhost:5180`. The status page shows whether the Api and MongoDB answer. The Api address is in `wwwroot/appsettings.json`; the Api allows the origins `http://localhost:5180` and `https://localhost:7180` (CORS in `local.settings.json`).
+With the Api running, from `src/Web/FinTrack.Web` run `dotnet run`, then open `http://localhost:5180`. A new database leads to the first-run screen; **Settings → System status** (`/settings/status`) shows whether the Api and MongoDB answer. How to use the app: [GETTING-STARTED.md](GETTING-STARTED.md). The Api address is in `wwwroot/appsettings.json`; the Api allows the origins `http://localhost:5180` and `https://localhost:7180` (CORS in `local.settings.json`).
 
 In Rider, the Web run configuration needs a Chromium-based browser (Edge or Chrome) under "Browser / Live Edit": Rider debugs Blazor WebAssembly through the browser's DevTools and refuses the "default system browser".
 

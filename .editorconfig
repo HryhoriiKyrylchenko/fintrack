@@ -230,3 +230,8 @@ generated_code = true
 
 [*.{g.cs,generated.cs,designer.cs,Designer.cs}]
 generated_code = true
+
+# Tests: Shouldly's assertions return their value so they can be chained; a discard before every assertion would be
+# noise. In production code an ignored result stays a hint (IDE0058), because there it can be a real bug.
+[tests/**.cs]
+dotnet_diagnostic.IDE0058.severity = none

@@ -49,10 +49,12 @@ tests/
   FinTrack.Budget.Application.Tests
   FinTrack.Budget.Infrastructure.IntegrationTests   Budget storage format and handlers against a real MongoDB (created in phase 1a, step 3)
   FinTrack.Api.IntegrationTests
-  FinTrack.Web.Tests                      plain unit tests of the Web app's non-UI code (Api client, error texts); no UI test library
-scripts/                                  PowerShell 7 scripts (prerequisite check, local run)
+  FinTrack.Web.Tests                      plain unit tests of the Web app's non-UI code (Api client, formatting and input, form and view models, error texts); no UI test library
+scripts/                                  PowerShell 7 scripts (prerequisite check, local run); scripts/dev: screenshot helper (Node)
 docs/ARCHITECTURE.md                      specification (source of truth)
 docs/DESIGN.md                            UI rules, colours, typography
+docs/LOCAL-SETUP.md                       prerequisites and running locally
+docs/GETTING-STARTED.md                   how to start using the app; where data lives; backups by hand
 docs/plans/                               step-by-step plans per stage
 infra/                                    Bicep (cloud phase)
 ```
@@ -106,14 +108,14 @@ Any new domain behaviour needs tests for the invariants it touches. A new Budget
 - Follow the phases in `docs/ARCHITECTURE.md` section 8. Do not implement items tagged `[P2]`, `[Later]` or listed as out of scope unless asked. Do leave the extension points the spec describes.
 - Do not add libraries, projects or patterns beyond this file without asking.
 - **Licences**: the project is AGPL-3.0; dependencies must use permissive open-source licences (MIT, Apache-2.0, BSD). Before proposing any package, check its current licence and say what it is. Never add a package that needs a paid or copyleft licence for commercial use. One accepted exception, for fonts only: Inter, self-hosted under OFL-1.1.
-- **Git workflow**: `main` is protected. Each plan step is one branch (`stage-0/NN-short-name`) and one pull request, merged by the developer only when CI is green. Never commit to `main` directly.
+- **Git workflow**: `main` is protected. Each plan step is one branch (`stage-<phase>/NN-short-name`, for example `stage-1a/12-read-contracts`) and one pull request, merged by the developer only when CI is green. Never commit to `main` directly.
 - The step-by-step plan for the current stage is in `docs/plans/`. Tick a step when its pull request is merged.
 - UI work follows `docs/DESIGN.md`: use its theme tokens, never hard-coded colours in components.
 - **Deferred is not dropped.** Everything in the spec stays planned; simplifications in early phases are steps, so keep the extension points and do not design them away.
 - Prefer clarity over cleverness: this is financial code and must be easy to audit.
 - Before saying a task is done: build, run the tests, and state what was verified and what was not.
 
-**Current phase: 1a (first usable version).** Stage 0 (Foundation) is complete; `docs/plans/stage-0-plan.md` records what exists and why, step by step. Phase 1a: buckets, `Unallocated`, opening balances, deposit, spend, transfer, reversal, multi-currency, balances, a simple overview and journal screen. Plan: `docs/plans/stage-1a-plan.md` (approved 16 Nov 2026; decisions D1 to D17, recorded in `docs/ARCHITECTURE.md`). Phase 1b follows with plans, limits and loans.
+**Current phase: 1b (Budget core).** Stage 0 (Foundation) and phase 1a (first usable version) are complete; `docs/plans/stage-0-plan.md` and `docs/plans/stage-1a-plan.md` record what exists and why, step by step (1a: decisions D1 to D17 and every later decision in `docs/ARCHITECTURE.md`'s decision log). Phase 1b (ARCHITECTURE 8): plans with carry-over, plan pause, limits, loans without interest, `Adjustment`, manual allocation, summaries. Its plan (`docs/plans/stage-1b-plan.md`) is not written yet: write it, and have it approved, before any 1b code. How to use the app: `docs/GETTING-STARTED.md`.
 
 ## Commands
 
@@ -153,5 +155,6 @@ Local prerequisites: .NET SDK, Azure Functions Core Tools, MongoDB Community 8.0
 - `Contracts` never references `Domain`: it has its own copies of enums (same member names, guarded by a test), mapped explicitly in `Application`; IDs travel as `Guid`. Functions read route and query values with `RequestValues` (no route constraints).
 - UI text: English only for now, but every user-facing string comes from resource files (`IStringLocalizer`); no hard-coded or concatenated strings. Format numbers, dates and money by the user's locale setting: it is the app's `CurrentCulture` (applied in `Program.cs` before the first render), so format with the current culture. Show instants in the owner's time zone (`OwnerDate.LocalTime`), and take "today" from `OwnerDate.Today`.
 - Money in the Web app: show it only through `MoneyFormatter` or the `Amount` component (ISO code, currency precision, real minus sign), and read typed amounts only through `MoneyInput.Parse` (strict, never rounds). Show errors with `ErrorAlert` / `SharedResource.ErrorText(localizer, ErrorInfo, culture)`; a code with parameters may add an `Error.<code>.WithParams` template next to its plain text. Shared pieces (`Amount`, `ErrorAlert`, `EmptyState`, `CardSkeletons`, `TableSkeleton`) live in `src/Web/FinTrack.Web/Shared`.
+- Web app structure: one folder per area (`Buckets`, `Entries`, `Journal`, `Overview`, `Settings`) holding its Api client over `ApiClient` and its plain view and form models, tested in `FinTrack.Web.Tests`; routable pages in `Pages/`. Razor files stay thin: binding, layout and calls into those classes. A form checks the server's rules before sending, with the server's error codes where they exist (`input.*` codes otherwise), and generates one client ID per form so a double submit writes once. A component parameter of type `string` takes an attribute without `@` as literal text, so an expression there needs `@` (found in step 16).
 - Logging: structured, through `ILogger`; never log amounts, balances, keys or personal data.
 - Small commits with conventional messages (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`).

@@ -68,10 +68,8 @@ public sealed class JournalRowTests : IDisposable
     }
 
     [Fact]
-    public void Unallocated_IsNamedWithItsCurrency()
-    {
+    public void Unallocated_IsNamedWithItsCurrency() =>
         Row(Single(JournalEntryType.Deposit, UnallocatedPln, 1m)).Describe(L, Polish).ShouldBe("Unallocated (PLN)");
-    }
 
     [Fact]
     public void Reversal_NamesWhatItCancels_WhenThatEntryIsLoaded()

@@ -42,7 +42,9 @@ var settings = host.Services.GetRequiredService<OwnerSettingsState>();
 await settings.LoadAsync(CancellationToken.None).ConfigureAwait(false);
 if (settings.Settings is { } saved)
 {
-    OwnerCulture.TryApply(saved.Locale);
+    // The server stores only predefined cultures (settings.locale_unknown otherwise), so this succeeds. Should it ever
+    // fail, formatting by the browser's culture is better than not starting; the Settings page still shows the value.
+    _ = OwnerCulture.TryApply(saved.Locale);
 }
 
 await host.RunAsync().ConfigureAwait(false);

@@ -52,9 +52,11 @@ internal static class AssemblyGraph
     {
         var prefixes = forbiddenPrefixes.ToList();
 
-        return ReferencedAssemblyNames(root)
-            .Where(name => prefixes.Exists(prefix => name.StartsWith(prefix, StringComparison.Ordinal)))
-            .Order(StringComparer.Ordinal)
-            .ToList();
+        return
+        [
+            .. ReferencedAssemblyNames(root)
+                .Where(name => prefixes.Exists(prefix => name.StartsWith(prefix, StringComparison.Ordinal)))
+                .Order(StringComparer.Ordinal),
+        ];
     }
 }

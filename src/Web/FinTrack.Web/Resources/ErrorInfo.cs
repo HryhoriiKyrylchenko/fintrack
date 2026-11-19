@@ -36,7 +36,7 @@ public sealed record ErrorInfo(string Code, IReadOnlyDictionary<string, string> 
         var texts = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var (name, value) in parameters)
         {
-            string? text = value.ValueKind switch
+            var text = value.ValueKind switch
             {
                 JsonValueKind.String => value.GetString(),
                 JsonValueKind.Number => value.GetRawText(),

@@ -4,7 +4,7 @@ A personal finance tracker for planning savings and tracking investments. Money 
 
 FinTrack runs entirely on your own machine. The cloud deployment is optional.
 
-> **Status:** early development. The foundation is complete: the app runs locally and shows a status page. Budgeting features start with phase 1a; do not use it for real data yet.
+> **Status:** phase 1a, the first usable version, is complete: buckets in several currencies, opening balances, deposits, spends, transfers (also between currencies), corrections by reversal, an overview with totals in your reporting currency, and the journal. It is meant to be used next to your existing spreadsheet for now; plans, limits and loans follow in phase 1b. See [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md).
 
 ## Principles
 
@@ -47,7 +47,7 @@ pwsh scripts/check-prereqs.ps1   # is this machine ready?
 pwsh scripts/run-local.ps1       # starts Azurite, the Api and the Web app; Ctrl+C stops all
 ```
 
-Open http://localhost:5180. The status page shows whether the Api and the database answer.
+Open http://localhost:5180. The first run asks for your reporting currency, time zone and number format; [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) explains how to start, where the data lives and how to back it up (there is no backup feature yet). **Settings → System status** shows whether the Api and the database answer.
 
 Keep your database and backups outside the repository folder.
 

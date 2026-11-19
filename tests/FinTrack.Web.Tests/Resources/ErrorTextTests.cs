@@ -1,6 +1,8 @@
 using System.Globalization;
+using System.Reflection;
 using System.Text.Json;
 using FinTrack.Shared.Kernel.Monetary;
+using FinTrack.Shared.Kernel.Results;
 using FinTrack.Web.Api;
 using FinTrack.Web.Formatting;
 using FinTrack.Web.Resources;
@@ -66,6 +68,7 @@ public sealed class ErrorTextTests : IDisposable
         "input.rate_required",
         "input.rate_invalid",
         "input.period_invalid",
+        "currency.unknown",
     ];
 
     [Theory]
@@ -77,6 +80,18 @@ public sealed class ErrorTextTests : IDisposable
         text.ShouldNotBe(Localizer["Error.unknown"].Value);
         text.ShouldNotContain(code);
         text.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void EveryKernelErrorCode_HasItsOwnText()
+    {
+        var codes = typeof(ErrorCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(field => field.IsLiteral && field.FieldType == typeof(string))
+            .Select(field => (string)field.GetRawConstantValue()!)
+            .ToList();
+
+        codes.ShouldNotBeEmpty();
+        codes.ShouldAllBe(code => SharedResource.ErrorText(Localizer, code) != Localizer["Error.unknown"].Value);
     }
 
     [Fact]

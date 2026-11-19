@@ -37,7 +37,10 @@ public sealed record ApiResult<T> : ApiResult
     where T : class
 {
     private ApiResult(T? value, string? errorCode, IReadOnlyDictionary<string, JsonElement>? errorParams)
-        : base(errorCode, errorParams) => Value = value;
+        : base(errorCode, errorParams)
+    {
+        Value = value;
+    }
 
     /// <summary>The value; set when <see cref="ApiResult.IsSuccess"/>.</summary>
     public T? Value { get; }
