@@ -1,0 +1,25 @@
+@* An entry's amount: signed for money in or out, both amounts for a transfer, none for a reversal. A reversed
+   entry's amount is struck through; the "Reversed" label next to its type says why. *@
+@using FinTrack.Web.Formatting
+@inject IStringLocalizer<SharedResource> L
+
+<div class="@(Row.IsReversed ? "fintrack-reversed" : null)">
+    @if (Row.SignedAmount is { } amount)
+    {
+        <Amount Value="amount" Sign="MoneySign.Always" />
+    }
+    else if (Row.FromAmount is { } from && Row.ToAmount is { } to)
+    {
+        <Amount Value="from" />
+        @if (from != to)
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" HtmlTag="p"><Amount Value="to" /></MudText>
+        }
+    }
+</div>
+
+@code {
+    /// <summary>The entry.</summary>
+    [Parameter, EditorRequired]
+    public JournalRow Row { get; set; } = default!;
+}

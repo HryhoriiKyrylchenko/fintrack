@@ -411,7 +411,8 @@ public sealed class EntryFormModel
         return parsed.Value;
     }
 
-    private static bool IsValidNote(string note) =>
+    /// <summary>Whether <paramref name="note"/> follows the server's rules for a note (a reversal's too).</summary>
+    public static bool IsValidNote(string note) =>
         note.Length <= MaxNoteLength
         && !char.IsWhiteSpace(note[0])
         && !char.IsWhiteSpace(note[^1])

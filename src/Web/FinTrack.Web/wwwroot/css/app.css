@@ -52,7 +52,9 @@ h1:focus {
 }
 
 /* Row actions in tables: as narrow as their buttons, aligned to the end. */
-.fintrack-actions-column {
+.fintrack-actions-column,
+.mud-simple-table table th.fintrack-actions-column,
+.mud-simple-table table td.fintrack-actions-column {
     width: 1%;
     white-space: nowrap;
     text-align: end;
@@ -120,6 +122,28 @@ h1:focus {
         flex-direction: column-reverse;
         align-items: stretch;
     }
+}
+
+/* Amounts in tables are right-aligned (DESIGN 6); the table's own cell style is more specific than a class alone. */
+.fintrack-amount-column,
+.mud-simple-table table th.fintrack-amount-column,
+.mud-simple-table table td.fintrack-amount-column {
+    text-align: end;
+    white-space: nowrap;
+}
+
+.fintrack-nowrap {
+    white-space: nowrap;
+}
+
+.fintrack-strong {
+    font-weight: 600;
+}
+
+/* A reversed entry's amount no longer counts: struck through, next to the "Reversed" label (never colour alone). */
+.fintrack-reversed .fintrack-amount {
+    text-decoration: line-through;
+    color: var(--mud-palette-text-secondary);
 }
 
 /* An amount never breaks between its sign, digits and currency code (the Amount component). */

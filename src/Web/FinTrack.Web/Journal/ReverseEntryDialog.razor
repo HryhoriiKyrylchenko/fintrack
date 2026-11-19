@@ -1,0 +1,62 @@
+@* Confirms a reversal (DESIGN 9: names the entry and its amount; the title does). Explains what reversing does,
+   takes an optional note, and writes the reversal dated today. A refusal (for example a bucket that would go below
+   zero) stays in the dialog. One ID per dialog, so a double click writes one reversal. Closes with true when written. *@
+@inject JournalClient Journal
+@inject IStringLocalizer<SharedResource> L
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body1">@L["Journal.ReverseText"]</MudText>
+            <MudTextField T="string" @bind-Value="Form.Note" Immediate="true" Label="@L["Journal.ReverseNote"]" Variant="Variant.Outlined"
+                          Lines="2" Sizing="InputSizing.Auto" Counter="EntryFormModel.MaxNoteLength" Disabled="busy"
+                          Error="@(Form.NoteError is not null)"
+                          ErrorText="@(Form.NoteError is { } noteError ? SharedResource.ErrorText(L, noteError, CultureInfo.CurrentCulture) : null)" />
+            @if (error is not null)
+            {
+                <ErrorAlert Error="error" />
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel" Disabled="busy">@L["Common.Cancel"]</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" OnClick="ReverseAsync"
+                   Disabled="@(busy || error is not null || Form.NoteError is not null)">
+            @L["Journal.ReverseConfirm"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private bool busy;
+    private ErrorInfo? error;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>The reversal being confirmed; its ID is fixed for the life of the dialog.</summary>
+    [Parameter, EditorRequired]
+    public ReversalForm Form { get; set; } = default!;
+
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task ReverseAsync()
+    {
+        if (busy)
+        {
+            return;
+        }
+
+        // Set before the first await: a second click finds the button disabled, and it would send the same ID anyway.
+        busy = true;
+        var result = await Journal.ReverseAsync(Form.ToRequest(), CancellationToken.None);
+        if (result.IsSuccess)
+        {
+            Dialog.Close(DialogResult.Ok(true));
+            return;
+        }
+
+        error = ErrorInfo.From(result);
+        busy = false;
+    }
+}
