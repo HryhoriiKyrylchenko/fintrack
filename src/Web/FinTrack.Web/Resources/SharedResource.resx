@@ -241,4 +241,28 @@
   <data name="Error.fx.rate_unavailable" xml:space="preserve">
     <value>No exchange rate is available yet, so the total in your reporting currency cannot be shown. It appears once the app can reach the rate service.</value>
   </data>
+  <data name="Error.bucket.insufficient_funds.WithParams" xml:space="preserve">
+    <value>This would make the bucket's balance negative on {date}. Check the amount and the date, or add the money first.</value>
+  </data>
+  <data name="Error.money.too_many_decimals" xml:space="preserve">
+    <value>This amount has more decimal places than its currency allows.</value>
+  </data>
+  <data name="Error.money.too_many_decimals.WithParams" xml:space="preserve">
+    <value>{currency} amounts have at most {maxDecimalPlaces} decimal places.</value>
+  </data>
+  <data name="Error.input.amount_required" xml:space="preserve">
+    <value>Enter an amount.</value>
+  </data>
+  <data name="Error.input.amount_invalid" xml:space="preserve">
+    <value>Enter the amount as a number, with the decimal separator of your locale.</value>
+  </data>
+  <data name="Error.input.amount_invalid.WithParams" xml:space="preserve">
+    <value>Enter the amount as a number, for example {example}.</value>
+  </data>
+  <data name="Common.Loading" xml:space="preserve">
+    <value>Loading…</value>
+  </data>
+  <data name="Common.Dismiss" xml:space="preserve">
+    <value>Dismiss</value>
+  </data>
 </root>

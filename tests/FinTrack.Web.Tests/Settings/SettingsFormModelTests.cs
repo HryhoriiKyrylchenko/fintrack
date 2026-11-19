@@ -125,18 +125,19 @@ public class SettingsFormModelTests
     }
 
     [Fact]
-    public void Preview_FormatsTheSampleInTheChosenLocale()
+    public void Preview_FormatsTheSampleInTheChosenLocaleAndCurrency()
     {
         var form = SettingsFormModel.ForFirstRun("Europe/Warsaw", "pl-PL", TimeZones, Locales);
 
         var preview = form.Preview().ShouldNotBeNull();
 
-        // Polish: space-like group separator and a decimal comma; day before month.
-        preview.Number.ShouldBe("1 234,56");
+        // Polish: space-like group separator, a decimal comma and the code after the number; day before month.
+        preview.Amount.ShouldBe("1\u00A0234,56\u00A0PLN");
         preview.Date.ShouldBe("15.01.2026");
 
         form.Locale = "en-US";
-        form.Preview().ShouldBe(new LocalePreview("1,234.56", "1/15/2026"));
+        form.ReportingCurrency = Currency.Usd;
+        form.Preview().ShouldBe(new LocalePreview("USD\u00A01,234.56", "1/15/2026"));
     }
 
     [Fact]

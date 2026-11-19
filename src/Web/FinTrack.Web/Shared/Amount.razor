@@ -1,0 +1,21 @@
+@* An amount as DESIGN 6 shows money: currency code, the currency's precision, the owner's locale, the real minus
+   sign, tabular figures (DESIGN 5). The text comes from MoneyFormatter; this component only places it. *@
+@using FinTrack.Web.Formatting
+
+<span class="@CssClass">@MoneyFormatter.Format(Value, CultureInfo.CurrentCulture, Sign)</span>
+
+@code {
+    /// <summary>The amount to show.</summary>
+    [Parameter, EditorRequired]
+    public Money Value { get; set; } = default!;
+
+    /// <summary>Whether a positive amount shows a plus sign too (movements); by default only a negative one is signed.</summary>
+    [Parameter]
+    public MoneySign Sign { get; set; } = MoneySign.NegativeOnly;
+
+    /// <summary>More classes, for example a typography class for a key figure.</summary>
+    [Parameter]
+    public string? Class { get; set; }
+
+    private string CssClass => string.IsNullOrEmpty(Class) ? "fintrack-figures fintrack-amount" : $"fintrack-figures fintrack-amount {Class}";
+}

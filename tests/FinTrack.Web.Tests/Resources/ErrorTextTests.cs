@@ -1,4 +1,8 @@
+using System.Globalization;
+using System.Text.Json;
+using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Web.Api;
+using FinTrack.Web.Formatting;
 using FinTrack.Web.Resources;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
@@ -50,6 +54,9 @@ public sealed class ErrorTextTests : IDisposable
         "settings.time_zone_unknown",
         "settings.locale_unknown",
         "fx.rate_unavailable",
+        "money.too_many_decimals",
+        "input.amount_invalid",
+        "input.amount_required",
     ];
 
     [Theory]
@@ -75,6 +82,63 @@ public sealed class ErrorTextTests : IDisposable
     [Fact]
     public void ApiUnreachable_HasTheExpectedText() =>
         SharedResource.ErrorText(Localizer, ApiClient.ApiUnreachable).ShouldBe("The server cannot be reached. Start it, then check again.");
+
+    [Fact]
+    public void Parameters_FillTheTemplate_AndADateIsFormattedInTheLocale()
+    {
+        var error = new ErrorInfo("bucket.insufficient_funds", new Dictionary<string, string> { ["date"] = "2026-01-15" });
+
+        SharedResource.ErrorText(Localizer, error, CultureInfo.GetCultureInfo("pl-PL"))
+            .ShouldBe("This would make the bucket's balance negative on 15.01.2026. Check the amount and the date, or add the money first.");
+        SharedResource.ErrorText(Localizer, error, CultureInfo.GetCultureInfo("en-US")).ShouldContain("negative on 1/15/2026.");
+    }
+
+    [Fact]
+    public void MissingParameter_GivesThePlainText()
+    {
+        var error = new ErrorInfo("bucket.insufficient_funds", new Dictionary<string, string>());
+
+        SharedResource.ErrorText(Localizer, error, CultureInfo.GetCultureInfo("en-US")).ShouldBe(SharedResource.ErrorText(Localizer, "bucket.insufficient_funds"));
+    }
+
+    [Fact]
+    public void CodeWithoutATemplate_IgnoresItsParameters()
+    {
+        var error = new ErrorInfo("validation.failed", new Dictionary<string, string> { ["field"] = "amount", ["rule"] = "NotNullValidator" });
+
+        SharedResource.ErrorText(Localizer, error, CultureInfo.GetCultureInfo("en-US")).ShouldBe(SharedResource.ErrorText(Localizer, "validation.failed"));
+    }
+
+    [Fact]
+    public void TooManyDecimals_NamesTheCurrencyAndItsPrecision()
+    {
+        var error = ErrorInfo.From(MoneyInput.Parse("1.234", Currency.Pln, CultureInfo.GetCultureInfo("en-US")).Errors[0]);
+
+        SharedResource.ErrorText(Localizer, error, CultureInfo.GetCultureInfo("en-US")).ShouldBe("PLN amounts have at most 2 decimal places.");
+    }
+
+    [Fact]
+    public void InvalidAmount_ShowsAnExampleInTheLocale()
+    {
+        var error = ErrorInfo.From(MoneyInput.Parse("12.50", Currency.Eur, CultureInfo.GetCultureInfo("de-DE")).Errors[0]);
+
+        SharedResource.ErrorText(Localizer, error, CultureInfo.GetCultureInfo("de-DE")).ShouldBe("Enter the amount as a number, for example 1.234,56.");
+    }
+
+    [Fact]
+    public void ApiParameters_AreReadAsText()
+    {
+        using var json = JsonDocument.Parse("""{"date":"2026-01-15","maxDecimalPlaces":2,"strict":true}""");
+        var parameters = json.RootElement.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.Clone());
+
+        var error = ErrorInfo.FromApi("bucket.insufficient_funds", parameters);
+
+        error.Parameters.ShouldBe(new Dictionary<string, string> { ["date"] = "2026-01-15", ["maxDecimalPlaces"] = "2", ["strict"] = "true" }, ignoreOrder: true);
+    }
+
+    [Fact]
+    public void AnErrorThatIsNotAnAppError_IsTheGeneralError() =>
+        ErrorInfo.From(new FluentResults.Error("boom")).Code.ShouldBe("client.unexpected_response");
 
     public void Dispose() => services.Dispose();
 }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using FinTrack.Budget.Contracts.V1.Settings;
 using FinTrack.Shared.Kernel.Monetary;
+using FinTrack.Web.Formatting;
 
 namespace FinTrack.Web.Settings;
 
@@ -17,7 +18,7 @@ public sealed class SettingsFormModel
     public const string FallbackLocale = "en-US";
 
     // Invented sample values for the preview (CLAUDE.md rule 14).
-    private const decimal SampleNumber = 1234.56m;
+    private const decimal SampleAmount = 1234.56m;
     private static readonly DateOnly SampleDate = new(2026, 1, 15);
 
     private SettingsFormModel(Currency reportingCurrency, string timeZone, string locale)
@@ -84,7 +85,7 @@ public sealed class SettingsFormModel
     /// <summary>The Api request for these values.</summary>
     public SaveOwnerSettingsRequest ToRequest() => new(ReportingCurrency, TimeZone, Locale);
 
-    /// <summary>How a number and a date look in the chosen locale; <c>null</c> when the locale is not known here.</summary>
+    /// <summary>How an amount in the chosen currency and a date look in the chosen locale; <c>null</c> when the locale is not known here.</summary>
     public LocalePreview? Preview()
     {
         if (string.IsNullOrEmpty(Locale))
@@ -95,7 +96,7 @@ public sealed class SettingsFormModel
         try
         {
             var culture = CultureInfo.GetCultureInfo(Locale, predefinedOnly: true);
-            return new LocalePreview(SampleNumber.ToString("N2", culture), SampleDate.ToString("d", culture));
+            return new LocalePreview(MoneyFormatter.Format(Money.From(SampleAmount, ReportingCurrency), culture), SampleDate.ToString("d", culture));
         }
         catch (CultureNotFoundException)
         {
@@ -120,7 +121,7 @@ public sealed class SettingsFormModel
     }
 }
 
-/// <summary>A sample number and date, formatted in a locale.</summary>
-/// <param name="Number">An invented amount with two decimals.</param>
+/// <summary>A sample amount and date, formatted in a locale.</summary>
+/// <param name="Amount">An invented amount in the chosen currency, as <see cref="MoneyFormatter"/> shows money.</param>
 /// <param name="Date">An invented date in the short date format.</param>
-public sealed record LocalePreview(string Number, string Date);
+public sealed record LocalePreview(string Amount, string Date);
