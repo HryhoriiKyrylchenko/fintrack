@@ -7,7 +7,8 @@ namespace FinTrack.Budget.Domain.State;
 /// <summary>
 /// Budget's state for one owner, derived only by replaying the journal (ARCHITECTURE 2.3, invariant
 /// 10). The one state builder of the context: handlers and queries read balances from here, so a
-/// stored projection can later replace the replay without touching them. Pure: no clock, no I/O.
+/// stored projection can later replace the replay without touching them. Pure: no clock, no I/O; today is a
+/// parameter (plan 1b B20).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -33,10 +34,20 @@ public sealed class BudgetState
 {
     private readonly IReadOnlyList<BucketBalance> balances;
 
-    private BudgetState(IReadOnlyList<BucketBalance> balances) => this.balances = balances;
+    private BudgetState(IReadOnlyList<BucketBalance> balances, DateOnly today)
+    {
+        this.balances = balances;
+        Today = today;
+    }
 
     /// <summary>One balance per bucket, in the order the buckets were given.</summary>
     public IReadOnlyList<BucketBalance> Balances => balances;
+
+    /// <summary>
+    /// Today in the owner's time zone: the day this state is for (plan 1b B20). It gives the current month that
+    /// plan dues need (from step 9); no balance depends on it.
+    /// </summary>
+    public DateOnly Today { get; }
 
     /// <summary>
     /// The earliest point at which a savings bucket was below zero (the earliest date, then the first
@@ -50,10 +61,13 @@ public sealed class BudgetState
 
     /// <summary>
     /// The state after every entry of <paramref name="journal"/>, applied in replay order (the order
-    /// they are given in does not matter).
+    /// they are given in does not matter), for <paramref name="today"/>.
     /// </summary>
+    /// <param name="buckets">The owner's buckets, archived and system ones included.</param>
+    /// <param name="journal">The owner's journal, in any order.</param>
+    /// <param name="today">Today in the owner's time zone (from the clock and the settings, in Application).</param>
     /// <exception cref="InvalidOperationException">An entry refers to a bucket that is not among <paramref name="buckets"/> (a bug).</exception>
-    public static BudgetState Replay(IEnumerable<Bucket> buckets, IEnumerable<JournalEntry> journal)
+    public static BudgetState Replay(IEnumerable<Bucket> buckets, IEnumerable<JournalEntry> journal, DateOnly today)
     {
         ArgumentNullException.ThrowIfNull(buckets);
         ArgumentNullException.ThrowIfNull(journal);
@@ -62,7 +76,7 @@ public sealed class BudgetState
         var reversed = ReversedEntryIds(entries);
         var effective = entries.Where(entry => entry is not Reversal && !reversed.Contains(entry.Id));
 
-        var state = new BudgetState([.. buckets.Select(BucketBalance.Empty)]);
+        var state = new BudgetState([.. buckets.Select(BucketBalance.Empty)], today);
         return ReplayOrder.Sort(effective).Aggregate(state, (current, entry) => current.Apply(entry));
     }
 
@@ -135,7 +149,7 @@ public sealed class BudgetState
         }
 
         changed[index] = balance;
-        return new BudgetState(changed);
+        return new BudgetState(changed, Today);
     }
 }
 

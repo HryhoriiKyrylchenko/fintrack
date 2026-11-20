@@ -23,6 +23,7 @@ public class ReverseAndArchiveHandlerTests
     private readonly FakeClock clock = new();
     private readonly Bucket cushion;
     private readonly Deposit deposit;
+    private IEntryDependencies dependencies = new JournalEntryDependencies();
 
     public ReverseAndArchiveHandlerTests()
     {
@@ -160,11 +161,107 @@ public class ReverseAndArchiveHandlerTests
         ledger.Commits.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task EntryThatOthersReferTo_IsHasDependents_AndNothingIsWritten()
+    {
+        var lookup = new FakeEntryDependencies(deposit.Id);
+        dependencies = lookup;
+
+        (await Reverse(deposit.Id)).ShouldFailWith(BudgetErrorCodes.EntryHasDependents, ErrorKind.BusinessRule);
+
+        ledger.Commits.ShouldBeEmpty();
+        lookup.Asked.ShouldBe([deposit.Id]);
+    }
+
+    [Fact]
+    public async Task EntryWithoutDependents_IsReversed_AfterTheLookup()
+    {
+        var lookup = new FakeEntryDependencies(Guid.CreateVersion7());
+        dependencies = lookup;
+
+        (await Reverse(deposit.Id)).IsSuccess.ShouldBeTrue();
+
+        ledger.Commits.ShouldHaveSingleItem();
+        lookup.Asked.ShouldBe([deposit.Id]);
+    }
+
+    [Fact]
+    public async Task AlreadyReversed_IsReportedBeforeHasDependents()
+    {
+        await Reverse(deposit.Id);
+        store.Journal.Add(ledger.Commits[0].Appends[0].ShouldBeOfType<Reversal>());
+        dependencies = new FakeEntryDependencies(deposit.Id);
+
+        (await Reverse(deposit.Id)).ShouldFailWith(BudgetErrorCodes.EntryAlreadyReversed, ErrorKind.BusinessRule);
+    }
+
+    [Fact]
+    public async Task HasDependents_IsReportedBeforeArchived()
+    {
+        var archived = StoredBuckets.Of(Guid.CreateVersion7(), "Old", Currency.Pln, 2, FakeClock.DefaultStart, BucketStatus.Archived);
+        store.Buckets.Add(archived);
+        var spend = Spend.Create(JournalEntryId.From(Guid.CreateVersion7()), FakeOwnerContext.Owner, archived.BucketId, Money.From(1m, Currency.Pln),
+            Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value;
+        store.Journal.Add(spend);
+        dependencies = new FakeEntryDependencies(spend.Id);
+
+        (await Reverse(spend.Id)).ShouldFailWith(BudgetErrorCodes.EntryHasDependents, ErrorKind.BusinessRule);
+    }
+
+    // No entry type of phase 1a refers to another entry except a reversal, which is never effective (B5: loans, plans
+    // and pauses add their cases in steps 5, 9 and 10).
+    [Theory]
+    [InlineData("OpeningBalance")]
+    [InlineData("Deposit")]
+    [InlineData("Spend")]
+    [InlineData("Transfer")]
+    [InlineData("Reversal")]
+    public void ThePhase1aLookup_FindsNoDependents(string type)
+    {
+        var id = JournalEntryId.From(Guid.CreateVersion7());
+        var amount = Money.From(1m, Currency.Pln);
+        JournalEntry entry = type switch
+        {
+            "OpeningBalance" => OpeningBalance.Create(id, FakeOwnerContext.Owner, cushion.BucketId, amount, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value,
+            "Deposit" => deposit,
+            "Spend" => Spend.Create(id, FakeOwnerContext.Owner, cushion.BucketId, amount, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value,
+            "Transfer" => Transfer.Create(id, FakeOwnerContext.Owner, cushion.BucketId, BucketId.From(Guid.CreateVersion7()), amount, amount, null, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value,
+            _ => Reversal.Create(id, FakeOwnerContext.Owner, deposit.EntryId, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value,
+        };
+        var snapshot = new BudgetSnapshot(1, store.Settings, [.. store.Buckets], [.. store.Journal, entry]);
+
+        new JournalEntryDependencies().HasDependents(entry, snapshot).ShouldBeFalse();
+        new JournalEntryDependencies().HasDependents(deposit, snapshot).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ArchiveBeforeTheFirstRun_IsSettingsNotFound()
+    {
+        store.Settings = null;
+        var empty = StoredBuckets.Of(Guid.CreateVersion7(), "Holiday", Currency.Pln, 3, FakeClock.DefaultStart, BucketStatus.Active);
+        store.Buckets.Add(empty);
+
+        (await Archive(empty.Id)).ShouldFailWith(BudgetErrorCodes.SettingsNotFound, ErrorKind.NotFound);
+        ledger.Commits.ShouldBeEmpty();
+    }
+
     private Task<FluentResults.Result> Reverse(Guid target) => Send(new ReverseEntry(Guid.CreateVersion7(), target, Today, null, []));
 
     private Task<FluentResults.Result> Send(ReverseEntry command) =>
-        new ReverseEntryHandler(new JournalWriter(new BudgetStateLoader(ledger, store), ledger, new FakeOwnerContext(), clock)).Handle(command, Cancellation).AsTask();
+        new ReverseEntryHandler(new JournalWriter(new BudgetStateLoader(ledger, store), ledger, new FakeOwnerContext(), clock), dependencies).Handle(command, Cancellation).AsTask();
 
     private Task<FluentResults.Result> Archive(Guid bucket) =>
-        new ArchiveBucketHandler(new BudgetStateLoader(ledger, store), ledger).Handle(new ArchiveBucket(bucket), Cancellation).AsTask();
+        new ArchiveBucketHandler(new BudgetStateLoader(ledger, store), ledger, clock).Handle(new ArchiveBucket(bucket), Cancellation).AsTask();
+
+    /// <summary>A dependency lookup that reports the given entries as referred to, and records what it was asked.</summary>
+    private sealed class FakeEntryDependencies(params Guid[] withDependents) : IEntryDependencies
+    {
+        public List<Guid> Asked { get; } = [];
+
+        public bool HasDependents(JournalEntry entry, BudgetSnapshot state)
+        {
+            Asked.Add(entry.Id);
+            return withDependents.Contains(entry.Id);
+        }
+    }
 }

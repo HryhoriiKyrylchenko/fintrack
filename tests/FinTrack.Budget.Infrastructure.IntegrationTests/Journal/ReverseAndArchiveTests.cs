@@ -43,7 +43,7 @@ public sealed class ReverseAndArchiveTests(BudgetFixture fixture)
         (await SendAsync<ReverseEntryHandler, ReverseEntry>(owner, new ReverseEntry(Guid.CreateVersion7(), transfer, Today, "Wrong bucket", []))).IsSuccess.ShouldBeTrue();
 
         var after = await StateAsync(owner);
-        after.State.Balances.ShouldBe(before.State.Balances);
+        after.StateAsOf(Today).Balances.ShouldBe(before.StateAsOf(Today).Balances);
 
         (await SendAsync<ArchiveBucketHandler, ArchiveBucket>(owner, new ArchiveBucket(holiday))).IsSuccess.ShouldBeTrue();
         (await SendAsync<ArchiveBucketHandler, ArchiveBucket>(owner, new ArchiveBucket(cushion))).ShouldFailWith(BudgetErrorCodes.BucketNotEmpty, ErrorKind.BusinessRule);
@@ -86,7 +86,7 @@ public sealed class ReverseAndArchiveTests(BudgetFixture fixture)
         afterUnarchive.Journal.Select(entry => entry.Id).ShouldBe(before.Journal.Select(entry => entry.Id));
         (await SendAsync<ReverseEntryHandler, ReverseEntry>(owner, new ReverseEntry(Guid.CreateVersion7(), spend, Today, "Refunded", []))).IsSuccess.ShouldBeTrue();
         (await SendAsync<AddDepositHandler, AddDeposit>(owner, new AddDeposit(Guid.CreateVersion7(), Pln(20m), Today, holiday, null, null, []))).IsSuccess.ShouldBeTrue();
-        (await StateAsync(owner)).State.BalanceOf(BucketId.From(holiday)).Available.ShouldBe(Pln(70m));
+        (await StateAsync(owner)).StateAsOf(Today).BalanceOf(BucketId.From(holiday)).Available.ShouldBe(Pln(70m));
     }
 
     [Fact]

@@ -14,6 +14,7 @@ namespace FinTrack.Budget.Application.Journal;
 /// Cancels one earlier entry (<c>POST /api/v1/journal/reversals</c>, plan 1a D3): the entry then counts as
 /// if it never happened, at its original date. Fails with <see cref="BudgetErrorCodes.EntryNotFound"/> (404),
 /// <see cref="BudgetErrorCodes.EntryNotReversible"/> (a reversal), <see cref="BudgetErrorCodes.EntryAlreadyReversed"/>,
+/// <see cref="BudgetErrorCodes.EntryHasDependents"/> (effective entries refer to it, plan 1b B5),
 /// <see cref="BudgetErrorCodes.BucketArchived"/> (it touches an archived bucket) or
 /// <see cref="BudgetErrorCodes.BucketInsufficientFunds"/> (the journal without it would be below zero on
 /// some day; 422 each). Repeats as for <see cref="AddDeposit"/>.
@@ -38,8 +39,11 @@ public sealed class ReverseEntryValidator : AbstractValidator<ReverseEntry>
     }
 }
 
-/// <summary>Finds the entry, checks that it may be reversed, and writes the reversal through <see cref="JournalWriter"/>.</summary>
-public sealed class ReverseEntryHandler(JournalWriter writer) : ICommandHandler<ReverseEntry, Result>
+/// <summary>
+/// Finds the entry, checks that it may be reversed (in this order: not a reversal, not reversed yet, no dependents,
+/// no archived bucket), and writes the reversal through <see cref="JournalWriter"/>.
+/// </summary>
+public sealed class ReverseEntryHandler(JournalWriter writer, IEntryDependencies dependencies) : ICommandHandler<ReverseEntry, Result>
 {
     /// <inheritdoc />
     public ValueTask<Result> Handle(ReverseEntry command, CancellationToken cancellationToken)
@@ -65,7 +69,7 @@ public sealed class ReverseEntryHandler(JournalWriter writer) : ICommandHandler<
             cancellationToken);
     }
 
-    private static Result Rules(JournalEntry target, BudgetSnapshot state)
+    private Result Rules(JournalEntry target, BudgetSnapshot state)
     {
         if (target is Reversal)
         {
@@ -75,6 +79,11 @@ public sealed class ReverseEntryHandler(JournalWriter writer) : ICommandHandler<
         if (BudgetState.ReversedEntryIds(state.Journal).Contains(target.Id))
         {
             return Result.Fail(AppError.BusinessRule(BudgetErrorCodes.EntryAlreadyReversed));
+        }
+
+        if (dependencies.HasDependents(target, state))
+        {
+            return Result.Fail(AppError.BusinessRule(BudgetErrorCodes.EntryHasDependents));
         }
 
         // An archived bucket accepts no change to its balance, and a reversal changes it.

@@ -55,8 +55,19 @@ public sealed record BudgetSnapshot(long Version, OwnerSettings? Settings, IRead
 {
     private BudgetState? state;
 
-    /// <summary>The balances, from replaying <see cref="Journal"/> (built on first use).</summary>
-    public BudgetState State => state ??= BudgetState.Replay(Buckets, Journal);
+    /// <summary>
+    /// The state from replaying <see cref="Journal"/> for <paramref name="today"/> (plan 1b B20): today in the owner's
+    /// time zone, which the handler computes from the clock and the settings. Replayed on first use and kept for that day.
+    /// </summary>
+    public BudgetState StateAsOf(DateOnly today)
+    {
+        if (state is not { } replayed || replayed.Today != today)
+        {
+            state = BudgetState.Replay(Buckets, Journal, today);
+        }
+
+        return state;
+    }
 
     /// <summary>The owner's bucket with <paramref name="id"/>, or <c>null</c>.</summary>
     public Bucket? FindBucket(Guid id) => Buckets.FirstOrDefault(bucket => bucket.Id == id);
@@ -67,4 +78,7 @@ public sealed record BudgetSnapshot(long Version, OwnerSettings? Settings, IRead
 
     /// <summary>The owner's entry with <paramref name="id"/>, or <c>null</c>.</summary>
     public JournalEntry? FindEntry(Guid id) => Journal.FirstOrDefault(entry => entry.Id == id);
+
+    /// <summary>The owner's entries with <paramref name="groupId"/> (written by one command, plan 1b B15), possibly none.</summary>
+    public IReadOnlyList<JournalEntry> FindGroup(Guid groupId) => [.. Journal.Where(entry => entry.GroupId == groupId)];
 }

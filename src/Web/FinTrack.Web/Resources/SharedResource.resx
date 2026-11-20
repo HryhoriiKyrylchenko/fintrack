@@ -238,6 +238,9 @@
   <data name="Error.entry.not_reversible" xml:space="preserve">
     <value>A reversal cannot be reversed. Enter a new entry instead.</value>
   </data>
+  <data name="Error.entry.has_dependents" xml:space="preserve">
+    <value>Later entries still refer to this entry. Reverse them first, then reverse this one.</value>
+  </data>
   <data name="Error.fx.rate_unavailable" xml:space="preserve">
     <value>No exchange rate is available yet, so the total in your reporting currency cannot be shown. It appears once the app can reach the rate service.</value>
   </data>

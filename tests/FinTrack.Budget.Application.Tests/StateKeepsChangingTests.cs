@@ -67,13 +67,13 @@ public class StateKeepsChangingTests
             "CreateBucket" => await new CreateBucketHandler(loader, ledger, owner).Handle(
                 new CreateBucket(Guid.CreateVersion7(), "Cushion", Currency.Pln, BucketKind.Savings, null), Cancellation),
             "RenameBucket" => await new RenameBucketHandler(loader, ledger).Handle(new RenameBucket(Guid.CreateVersion7(), "Safety net"), Cancellation),
-            "ArchiveBucket" => await new ArchiveBucketHandler(loader, ledger).Handle(new ArchiveBucket(Guid.CreateVersion7()), Cancellation),
+            "ArchiveBucket" => await new ArchiveBucketHandler(loader, ledger, clock).Handle(new ArchiveBucket(Guid.CreateVersion7()), Cancellation),
             "UnarchiveBucket" => await new UnarchiveBucketHandler(loader, ledger).Handle(new UnarchiveBucket(Guid.CreateVersion7()), Cancellation),
             "SaveOwnerSettings" => await new SaveOwnerSettingsHandler(loader, ledger, owner, clock).Handle(
                 new SaveOwnerSettings(Currency.Eur, "Europe/Warsaw", "pl-PL"), Cancellation),
             "AddDeposit" => await new AddDepositHandler(new BucketEntryWriter(loader, ledger, owner, clock)).Handle(
                 new AddDeposit(Guid.CreateVersion7(), Money.From(10m, Currency.Pln), today, null, Currency.Pln, null, []), Cancellation),
-            _ => await new ReverseEntryHandler(new JournalWriter(loader, ledger, owner, clock)).Handle(
+            _ => await new ReverseEntryHandler(new JournalWriter(loader, ledger, owner, clock), new JournalEntryDependencies()).Handle(
                 new ReverseEntry(Guid.CreateVersion7(), Guid.CreateVersion7(), today, null, []), Cancellation),
         };
     }

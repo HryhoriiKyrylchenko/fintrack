@@ -125,7 +125,7 @@ public class ReversalTests
                 return withReversal.Balances.SequenceEqual(without.Balances);
             });
 
-    private BudgetState Replay(params JournalEntry[] journal) => BudgetState.Replay([cushion, holiday], journal);
+    private BudgetState Replay(params JournalEntry[] journal) => BudgetState.Replay([cushion, holiday], journal, Today);
 
     private Reversal Reverse(JournalEntry entry) =>
         Reversal.Create(NewId(), Owner, entry.EntryId, Today, Today, EntryInfo.None, NextRecordedAt()).Value;

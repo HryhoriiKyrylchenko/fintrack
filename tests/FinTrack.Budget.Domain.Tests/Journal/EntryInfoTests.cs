@@ -16,6 +16,20 @@ public class EntryInfoTests
         EntryInfo.None.Source.ShouldBe(EntrySource.Manual);
     }
 
+    [Fact]
+    public void GroupId_IsNoneByDefault_AndKeptWhenSet()
+    {
+        var group = Guid.CreateVersion7();
+
+        EntryInfo.None.GroupId.ShouldBeNull();
+        new EntryInfo(null, [], EntrySource.Manual).GroupId.ShouldBeNull();
+        new EntryInfo(null, [], EntrySource.Manual, group).GroupId.ShouldBe(group);
+    }
+
+    [Fact]
+    public void EmptyGroupId_Throws() =>
+        Should.Throw<ArgumentException>(() => new EntryInfo(null, [], EntrySource.Manual, Guid.Empty)).ParamName.ShouldBe("groupId");
+
     [Theory]
     [InlineData("Salary")]
     [InlineData("Two lines\nof note")]

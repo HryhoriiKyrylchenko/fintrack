@@ -2,6 +2,7 @@ using FinTrack.Budget.Application.Buckets;
 using FinTrack.Budget.Contracts.V1.Overview;
 using FinTrack.Budget.Domain;
 using FinTrack.Budget.Domain.Buckets;
+using FinTrack.Budget.Domain.State;
 using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Shared.Kernel.Results;
 using FinTrack.Shared.Kernel.Time;
@@ -47,6 +48,9 @@ public sealed class GetBudgetOverviewHandler(BudgetStateLoader loader, IFxRatePr
             return Result.Fail<BudgetOverviewDto>(AppError.NotFound(BudgetErrorCodes.SettingsNotFound));
         }
 
+        // One reading of the clock: the state and the overview's date are for the same day.
+        var today = settings.Today(clock.UtcNow);
+        var state = snapshot.StateAsOf(today);
         var reporting = settings.ReportingCurrency;
         var active = snapshot.Buckets
             .Where(bucket => bucket.Status == BucketStatus.Active)
@@ -54,7 +58,7 @@ public sealed class GetBudgetOverviewHandler(BudgetStateLoader loader, IFxRatePr
             .ThenBy(bucket => bucket.Id)
             .ToList();
 
-        IReadOnlyList<BucketSummaryDto> summaries = [.. active.Select(bucket => Summary(bucket, snapshot))];
+        IReadOnlyList<BucketSummaryDto> summaries = [.. active.Select(bucket => Summary(bucket, state))];
 
         var subtotals = summaries
             .GroupBy(summary => summary.Currency)
@@ -95,12 +99,12 @@ public sealed class GetBudgetOverviewHandler(BudgetStateLoader loader, IFxRatePr
             ? new ReportingTotalDto(reportingAmount, oldestRateDate, UnavailableReason: null)
             : new ReportingTotalDto(Amount: null, RateDate: null, unavailableReason);
 
-        return Result.Ok(new BudgetOverviewDto(reporting, settings.Today(clock.UtcNow), totals, reportingTotal, summaries));
+        return Result.Ok(new BudgetOverviewDto(reporting, today, totals, reportingTotal, summaries));
     }
 
-    private static BucketSummaryDto Summary(Bucket bucket, BudgetSnapshot snapshot)
+    private static BucketSummaryDto Summary(Bucket bucket, BudgetState state)
     {
-        var balance = snapshot.State.BalanceOf(bucket.BucketId);
+        var balance = state.BalanceOf(bucket.BucketId);
         return new BucketSummaryDto(
             bucket.Id,
             bucket.Name,

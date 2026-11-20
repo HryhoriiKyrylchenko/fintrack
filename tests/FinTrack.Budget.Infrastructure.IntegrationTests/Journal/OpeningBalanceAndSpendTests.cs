@@ -33,7 +33,7 @@ public sealed class OpeningBalanceAndSpendTests(BudgetFixture fixture)
         (await SendAsync(owner, new AddSpend(Guid.CreateVersion7(), Money.From(250.75m, Currency.Pln), Today.AddDays(-50), bucket, null, "Car repair", ["car"]))).IsSuccess.ShouldBeTrue();
         (await SendAsync(owner, new AddSpend(Guid.CreateVersion7(), Money.From(749.25m, Currency.Pln), Today, bucket, null, null, []))).IsSuccess.ShouldBeTrue();
 
-        var balance = (await StateAsync(owner)).State.BalanceOf(BucketId.From(bucket));
+        var balance = (await StateAsync(owner)).StateAsOf(Today).BalanceOf(BucketId.From(bucket));
         balance.Available.ShouldBe(Money.Zero(Currency.Pln));
         balance.Deposited.ShouldBe(Money.Zero(Currency.Pln));
     }

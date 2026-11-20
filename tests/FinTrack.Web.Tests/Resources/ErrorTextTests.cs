@@ -53,6 +53,7 @@ public sealed class ErrorTextTests : IDisposable
         "entry.not_found",
         "entry.already_reversed",
         "entry.not_reversible",
+        "entry.has_dependents",
         "settings.time_zone_unknown",
         "settings.locale_unknown",
         "fx.rate_unavailable",

@@ -164,7 +164,7 @@ public class BudgetModelTests
         {
             var bucketList = budget.Buckets.ToList();
             var journal = budget.Journal.ToList();
-            var state = BudgetState.Replay(bucketList, journal);
+            var state = BudgetState.Replay(bucketList, journal, Today);
 
             var reversed = BudgetState.ReversedEntryIds(journal);
             var effective = journal.Where(entry => entry is not Reversal && !reversed.Contains(entry.Id)).ToList();
@@ -187,9 +187,9 @@ public class BudgetModelTests
             state.FirstOverdraft.ShouldBeNull();
 
             // Invariant 10: the replay equals the step-by-step build and does not depend on the stored order.
-            var stepByStep = ReplayOrder.Sort(effective).Aggregate(BudgetState.Replay(bucketList, []), (current, entry) => current.Apply(entry));
+            var stepByStep = ReplayOrder.Sort(effective).Aggregate(BudgetState.Replay(bucketList, [], Today), (current, entry) => current.Apply(entry));
             state.Balances.ShouldBe(stepByStep.Balances);
-            BudgetState.Replay(bucketList, Enumerable.Reverse(journal)).Balances.ShouldBe(state.Balances);
+            BudgetState.Replay(bucketList, Enumerable.Reverse(journal), Today).Balances.ShouldBe(state.Balances);
 
             // Invariant 11: per-currency totals equal the independent sums; no currency is added to another.
             foreach (var bucket in bucketList)
@@ -374,13 +374,13 @@ public class BudgetModelTests
                 SaveOwnerSettings save => new SaveOwnerSettingsHandler(loader, budget, owner, clock).Handle(save, cancellation),
                 CreateBucket create => new CreateBucketHandler(loader, budget, owner).Handle(create, cancellation),
                 RenameBucket rename => new RenameBucketHandler(loader, budget).Handle(rename, cancellation),
-                ArchiveBucket archive => new ArchiveBucketHandler(loader, budget).Handle(archive, cancellation),
+                ArchiveBucket archive => new ArchiveBucketHandler(loader, budget, clock).Handle(archive, cancellation),
                 UnarchiveBucket unarchive => new UnarchiveBucketHandler(loader, budget).Handle(unarchive, cancellation),
                 AddOpeningBalance opening => new AddOpeningBalanceHandler(entries).Handle(opening, cancellation),
                 AddDeposit deposit => new AddDepositHandler(entries).Handle(deposit, cancellation),
                 AddSpend spend => new AddSpendHandler(entries).Handle(spend, cancellation),
                 AddTransfer transfer => new AddTransferHandler(writer).Handle(transfer, cancellation),
-                ReverseEntry reverse => new ReverseEntryHandler(writer).Handle(reverse, cancellation),
+                ReverseEntry reverse => new ReverseEntryHandler(writer, new JournalEntryDependencies()).Handle(reverse, cancellation),
                 _ => throw new InvalidOperationException($"Unknown command {command.GetType().Name}."),
             }).AsTask().GetAwaiter().GetResult();
         }

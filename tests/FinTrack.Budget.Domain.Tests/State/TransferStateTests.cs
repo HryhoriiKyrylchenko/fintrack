@@ -27,7 +27,7 @@ public class TransferStateTests
         var transfer = Transfer.Create(NewId(), Owner, pln.BucketId, eur.BucketId, Money.From(400m, Currency.Pln), Money.From(93m, Currency.Eur), Money.From(4m, Currency.Pln),
             Today.AddDays(-1), Today, EntryInfo.None, FakeClock.DefaultStart).Value;
 
-        var state = BudgetState.Replay([pln, eur], [deposit, transfer]);
+        var state = BudgetState.Replay([pln, eur], [deposit, transfer], Today);
 
         state.BalanceOf(pln.BucketId).Available.ShouldBe(Money.From(600m, Currency.Pln));
         state.BalanceOf(eur.BucketId).Available.ShouldBe(Money.From(93m, Currency.Eur));
@@ -44,7 +44,7 @@ public class TransferStateTests
         var transfer = Transfer.Create(NewId(), Owner, from.BucketId, to.BucketId, Money.From(10m, Currency.Pln), Money.From(10m, Currency.Pln), null,
             Today.AddDays(-1), Today, EntryInfo.None, FakeClock.DefaultStart.AddSeconds(1)).Value;
 
-        BudgetState.Replay([from, to], [deposit, transfer]).FirstOverdraft.ShouldBe(new Overdraft(from.BucketId, Today.AddDays(-1)));
+        BudgetState.Replay([from, to], [deposit, transfer], Today).FirstOverdraft.ShouldBe(new Overdraft(from.BucketId, Today.AddDays(-1)));
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class TransferStateTests
         var transfer = Transfer.Create(NewId(), Owner, stocks.BucketId, cushion.BucketId, Money.From(50m, Currency.Pln), Money.From(50m, Currency.Pln), null,
             Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value;
 
-        var state = BudgetState.Replay([stocks, cushion], [transfer]);
+        var state = BudgetState.Replay([stocks, cushion], [transfer], Today);
 
         state.BalanceOf(stocks.BucketId).Available.ShouldBe(-Money.From(50m, Currency.Pln));
         state.FirstOverdraft.ShouldBeNull();
@@ -96,7 +96,7 @@ public class TransferStateTests
     public void TotalsPerCurrency_EqualAnIndependentSum_NeverMixingCurrencies() =>
         Histories.Sample(history =>
         {
-            var state = BudgetState.Replay(history.Buckets, history.Journal);
+            var state = BudgetState.Replay(history.Buckets, history.Journal, Today);
 
             return Currencies.All(currency =>
             {
@@ -125,7 +125,7 @@ public class TransferStateTests
                 return true;
             }
 
-            var before = BudgetState.Replay(history.Buckets, history.Journal);
+            var before = BudgetState.Replay(history.Buckets, history.Journal, Today);
             var transfer = Transfer.Create(NewId(), Owner, plnBuckets[0].BucketId, plnBuckets[1].BucketId, Money.From(1m, Currency.Pln), Money.From(1m, Currency.Pln), null,
                 Today, Today, EntryInfo.None, FakeClock.DefaultStart.AddDays(1)).Value;
             var after = before.Apply(transfer);

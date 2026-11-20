@@ -79,12 +79,12 @@ public sealed class BucketEntryWriter(BudgetStateLoader loader, ILedger ledger, 
     /// <summary>Writes the entry that <paramref name="create"/> makes, after every check.</summary>
     /// <param name="command">The command.</param>
     /// <param name="create">The entry type's factory.</param>
-    /// <param name="typeRule">The entry type's own rule about the target bucket in the current state (for example "no spend from an investment bucket"); ok when it allows the entry.</param>
+    /// <param name="typeRule">The entry type's own rule about the target bucket in the state the write is checked against (for example "no spend from an investment bucket"); ok when it allows the entry.</param>
     /// <param name="cancellationToken">Cancels the read and the commit.</param>
     public ValueTask<Result> WriteAsync(
         IBucketEntryCommand command,
         Func<EntryArguments, Result<JournalEntry>> create,
-        Func<Bucket, BudgetSnapshot, Result> typeRule,
+        Func<Bucket, JournalWriteContext, Result> typeRule,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -95,7 +95,7 @@ public sealed class BucketEntryWriter(BudgetStateLoader loader, ILedger ledger, 
             command.Id,
             context => context.ResolveTarget(command.BucketId, command.Unallocated).Map(bucket => new JournalDraft(
                 create(new EntryArguments(context.EntryId, context.Owner, bucket.BucketId, context.Today, new EntryInfo(command.Note, command.Tags, EntrySource.Manual), context.Now)),
-                JournalWriteContext.CheckBucket(bucket, command.Amount).Bind(() => typeRule(bucket, context.State)))),
+                JournalWriteContext.CheckBucket(bucket, command.Amount).Bind(() => typeRule(bucket, context)))),
             cancellationToken);
     }
 }
