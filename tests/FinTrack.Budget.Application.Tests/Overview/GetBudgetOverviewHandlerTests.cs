@@ -3,6 +3,8 @@ using FinTrack.Budget.Contracts.V1.Overview;
 using FinTrack.Budget.Domain;
 using FinTrack.Budget.Domain.Buckets;
 using FinTrack.Budget.Domain.Journal;
+using System.Text.Json;
+using FinTrack.Shared.Kernel.Json;
 using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Shared.Kernel.Results;
 using FinTrack.Tests.Common;
@@ -228,6 +230,23 @@ public class GetBudgetOverviewHandlerTests
             new BucketSummaryDto(unallocated.Id, null, Currency.Pln, Contract.BucketKind.Savings, null, Contract.BucketSystemRole.Unallocated, Pln(0m), Pln(0m), Pln(0m)),
             new BucketSummaryDto(crypto.Id, "Alpha", Currency.Pln, Contract.BucketKind.Investment, Contract.InvestmentProfile.Crypto, Contract.BucketSystemRole.None, Pln(2.50m), Pln(2.50m), Pln(0m)),
         ]);
+    }
+
+    // The real path, not a hand-built DTO: an empty bucket and the loan figure (no loans yet) are zeros at the
+    // currency's scale, so the contract has one spelling of zero (ARCHITECTURE 2.7).
+    [Fact]
+    public async Task Zeros_AreWrittenAtTheCurrencysScale()
+    {
+        Savings("Travel", Currency.Pln);
+
+        var json = JsonSerializer.Serialize((await Overview()).Value, FinTrackJson.Options);
+
+        json.ShouldContain("""
+            "available":{"amount":"0.00","currency":"PLN"},"netContributed":{"amount":"0.00","currency":"PLN"},"outstandingPrincipal":{"amount":"0.00","currency":"PLN"}
+            """);
+        json.ShouldContain("""
+            "reportingTotal":{"amount":{"amount":"0.00","currency":"PLN"}
+            """);
     }
 
     [Fact]

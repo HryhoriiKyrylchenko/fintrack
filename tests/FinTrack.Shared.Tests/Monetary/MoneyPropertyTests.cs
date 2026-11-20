@@ -44,6 +44,13 @@ public class MoneyPropertyTests
             .All(part => FitsPrecision(part.Amount, part.Currency)));
 
     [Fact]
+    public void EveryResult_HasExactlyTheCurrencysScale() =>
+        Currencies.SelectMany(currency => Gen.Select(AmountsIn(currency), AmountsIn(currency), Gen.Decimal[0.0001m, 1_000m].Array[1, 12]))
+            .Sample((a, b, weights) =>
+                new[] { a, b, a + b, a - b, -a, Money.Round(a.Amount / 7m, a.Currency) }.Concat(a.Split(weights))
+                    .All(money => money.Amount.Scale == money.Currency.DecimalPlaces));
+
+    [Fact]
     public void AddThenSubtract_ReturnsTheOriginal() =>
         Currencies.SelectMany(currency => Gen.Select(AmountsIn(currency), AmountsIn(currency)))
             .Sample((a, b) => a + b - b == a);

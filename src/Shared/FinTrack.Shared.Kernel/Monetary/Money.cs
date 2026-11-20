@@ -20,13 +20,17 @@ namespace FinTrack.Shared.Kernel.Monetary;
 /// </remarks>
 public sealed record Money
 {
+    // Every value passes here, so every amount has its currency's scale (see AtScale).
     private Money(decimal amount, Currency currency)
     {
-        Amount = amount;
+        Amount = AtScale(amount, currency.DecimalPlaces);
         Currency = currency;
     }
 
-    /// <summary>The amount, at most <see cref="Currency.DecimalPlaces"/> decimal places.</summary>
+    /// <summary>
+    /// The amount, with exactly <see cref="Currency.DecimalPlaces"/> decimal places: <c>50</c> PLN is
+    /// <c>50.00</c>, so every amount has one spelling in JSON and in storage (ARCHITECTURE 2.7). Zero has no sign.
+    /// </summary>
     public decimal Amount { get; }
 
     /// <summary>The currency of the amount.</summary>
@@ -176,6 +180,23 @@ public sealed record Money
         {
             throw new CurrencyMismatchException(left.Currency, right.Currency);
         }
+    }
+
+    // The same value with exactly `places` decimals: only trailing zeros are added or removed, never a digit
+    // (every caller has checked the precision or rounded first; a value that does not fit is a bug). A decimal
+    // holds 28 to 29 significant digits, so a value too large for its scale keeps fewer decimals.
+    private static decimal AtScale(decimal amount, int places)
+    {
+        var zero = new decimal(0, 0, 0, false, (byte)places);
+        if (amount == 0m)
+        {
+            return zero;
+        }
+
+        var trimmed = decimal.Round(amount, places);
+        return trimmed == amount
+            ? trimmed + zero
+            : throw new InvalidOperationException("An amount with more decimal places than its currency allows reached Money (a bug).");
     }
 
     private static bool FitsPrecision(decimal amount, Currency currency) =>

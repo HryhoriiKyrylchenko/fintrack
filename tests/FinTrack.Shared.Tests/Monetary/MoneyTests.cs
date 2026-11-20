@@ -11,6 +11,8 @@ public class MoneyTests
 
     private static Money Eur(decimal amount) => Money.From(amount, Currency.Eur);
 
+    private static string Text(Money money) => money.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
     // --- Creation ---
 
     [Theory]
@@ -57,6 +59,54 @@ public class MoneyTests
 
         zero.Amount.ShouldBe(0m);
         zero.Currency.ShouldBe(Currency.Eur);
+    }
+
+    // --- Scale: an amount always has exactly its currency's decimal places, so it has one spelling ---
+
+    [Theory]
+    [InlineData("50", "50.00")]
+    [InlineData("1.1", "1.10")]
+    [InlineData("1.100", "1.10")] // trailing zeros beyond the precision are dropped
+    [InlineData("-3.2", "-3.20")]
+    [InlineData("0", "0.00")]
+    [InlineData("-0.000", "0.00")] // zero has no sign
+    public void FromAndCreate_HaveTheCurrencysScale(string amount, string expected)
+    {
+        var value = decimal.Parse(amount, System.Globalization.CultureInfo.InvariantCulture);
+
+        Text(Money.From(value, Currency.Pln)).ShouldBe(expected);
+        Text(Money.Create(value, Currency.Pln).Value).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Zero_HasTheCurrencysScale()
+    {
+        Text(Money.Zero(Currency.Pln)).ShouldBe("0.00");
+        Text(Money.Zero(Currency.Define("WHL", 0))).ShouldBe("0");
+        Text(Money.Zero(Currency.Define("Q18", 18))).ShouldBe("0.000000000000000000");
+    }
+
+    [Fact]
+    public void ZeroDecimalCurrency_HasNoDecimals() => Text(Money.From(2.0m, Currency.Define("WHL", 0))).ShouldBe("2");
+
+    [Fact]
+    public void Results_HaveTheCurrencysScale()
+    {
+        Text(Pln(1.5m) + Pln(2m)).ShouldBe("3.50");
+        Text(Pln(2m) - Pln(2m)).ShouldBe("0.00");
+        Text(-Pln(1m)).ShouldBe("-1.00");
+        Text(Money.Round(7m, Currency.Pln)).ShouldBe("7.00");
+        Text(Eur(100m).Convert(2m, Currency.Pln)).ShouldBe("200.00");
+        Pln(100m).Split([1m, 4m]).Select(Text).ShouldBe(["20.00", "80.00"]);
+    }
+
+    [Fact]
+    public void NegatedZero_IsPositiveZero()
+    {
+        var zero = -Money.Zero(Currency.Pln);
+
+        Text(zero).ShouldBe("0.00");
+        (decimal.GetBits(zero.Amount)[3] & int.MinValue).ShouldBe(0);
     }
 
     // --- Arithmetic ---
@@ -127,7 +177,7 @@ public class MoneyTests
     }
 
     [Fact]
-    public void ToString_ShowsAmountAndCode() => Pln(-1234.5m).ToString().ShouldBe("-1234.5 PLN");
+    public void ToString_ShowsAmountAndCode() => Pln(-1234.5m).ToString().ShouldBe("-1234.50 PLN");
 
     // --- Rounding: banker's rounding at the currency's precision ---
 

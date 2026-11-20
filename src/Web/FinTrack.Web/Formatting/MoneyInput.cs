@@ -16,8 +16,8 @@ namespace FinTrack.Web.Formatting;
 /// allowed is the form's rule); ASCII digits; the locale's decimal separator at most once, with digits on both
 /// sides; group separators only between digits and exactly where the locale's grouping puts them (any of the
 /// usual spaces counts when the locale groups with a space, because a keyboard types a plain one). The result
-/// has the currency's scale (<c>12.5</c> becomes <c>12.50</c>; trailing zeros are not decimals, as in the kernel),
-/// so the Api receives one spelling.
+/// has the currency's scale (<c>12.5</c> becomes <c>12.50</c>), as every kernel <see cref="Money"/> has, so the Api
+/// receives one spelling; trailing zeros are not decimals, as in the kernel.
 /// </remarks>
 public static class MoneyInput
 {
@@ -65,13 +65,8 @@ public static class MoneyInput
             return InvalidIn(currency, culture);
         }
 
-        var amount = Money.Create(negative ? -value : value, currency);
-        return amount.IsFailed ? amount : Result.Ok(Money.From(WithScale(amount.Value.Amount, currency.DecimalPlaces), currency));
+        return Money.Create(negative ? -value : value, currency);
     }
-
-    // The same value with exactly `places` decimals: only trailing zeros are added or removed.
-    private static decimal WithScale(decimal value, int places) =>
-        decimal.Round(value, places) + new decimal(0, 0, 0, false, (byte)places);
 
     private static Result<Money> InvalidIn(Currency currency, CultureInfo culture)
     {
