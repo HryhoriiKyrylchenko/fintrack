@@ -131,6 +131,18 @@ public class FinTrackJsonTests
         Deserialize<Money>("""{"currency":"EUR","amount":"-0.10"}""").ShouldBe(Money.From(-0.10m, Currency.Eur));
     }
 
+    // One spelling per amount: fewer decimals than the currency's are accepted and written at its scale.
+    [Theory]
+    [InlineData("""{"amount":"1.1","currency":"PLN"}""", """{"amount":"1.10","currency":"PLN"}""")]
+    [InlineData("""{"amount":"50","currency":"EUR"}""", """{"amount":"50.00","currency":"EUR"}""")]
+    [InlineData("""{"amount":"0","currency":"USD"}""", """{"amount":"0.00","currency":"USD"}""")]
+    public void Money_IsWrittenAtItsCurrencysScale(string json, string written) =>
+        Serialize(Deserialize<Money>(json)).ShouldBe(written);
+
+    [Fact]
+    public void Money_Zero_IsWrittenAtItsCurrencysScale() =>
+        Serialize(Money.Zero(Currency.Eur)).ShouldBe("""{"amount":"0.00","currency":"EUR"}""");
+
     [Theory]
     [InlineData("""{"amount":1.10,"currency":"PLN"}""")]
     [InlineData("""{"amount":"1.10"}""")]

@@ -1,3 +1,5 @@
+using System.Globalization;
+using FinTrack.Shared.Kernel.Monetary;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
@@ -79,6 +81,33 @@ public sealed class StorageFormatTests(MongoDatabaseFixture fixture)
         stored["optionalRate"].ShouldBe(BsonNull.Value);
         stored["parentId"].ShouldBe(BsonNull.Value);
         read.ShouldBe(document);
+    }
+
+    [Fact]
+    public async Task Money_IsStoredAtItsCurrencysScale()
+    {
+        var (typed, raw) = fixture.NewCollection<SampleDocument>();
+
+        await typed.InsertManyAsync(
+            [SampleDocument.Create() with { Balance = Money.From(50m, Currency.Pln) }, SampleDocument.Create() with { Id = Guid.CreateVersion7(), Balance = Money.Zero(Currency.Pln) }],
+            cancellationToken: Cancellation);
+        var stored = await raw.Find(FilterDefinition<BsonDocument>.Empty).ToListAsync(Cancellation);
+
+        stored.Select(document => document["balance"]["amount"].AsDecimal128.ToString()).Order(StringComparer.Ordinal).ShouldBe(["0.00", "50.00"]);
+    }
+
+    // Documents written before amounts were kept at their currency's scale may hold fewer decimals.
+    [Fact]
+    public async Task Money_StoredWithFewerDecimals_IsReadAtItsCurrencysScale()
+    {
+        var (typed, raw) = fixture.NewCollection<SampleDocument>();
+        var document = SampleDocument.Create().ToBsonDocument();
+        document["balance"]["amount"] = new BsonDecimal128(10m);
+
+        await raw.InsertOneAsync(document, cancellationToken: Cancellation);
+        var read = await typed.Find(FilterDefinition<SampleDocument>.Empty).SingleAsync(Cancellation);
+
+        read.Balance.Amount.ToString(CultureInfo.InvariantCulture).ShouldBe("10.00");
     }
 
     [Fact]
