@@ -93,7 +93,7 @@ public class NeverNegativeTests
     {
         var holiday = Bucket.Create(BucketId.From(Guid.CreateVersion7()), Owner, "Holiday", Currency.Pln, BucketKind.Savings, null, []).Value;
 
-        var state = BudgetState.Replay([cushion, holiday], [Spend(cushion, 1m, -2), Spend(holiday, 1m, -7)]);
+        var state = BudgetState.Replay([cushion, holiday], [Spend(cushion, 1m, -2), Spend(holiday, 1m, -7)], Today);
 
         state.FirstOverdraft.ShouldBe(new Overdraft(holiday.BucketId, Today.AddDays(-7)));
     }
@@ -102,7 +102,7 @@ public class NeverNegativeTests
     public void WithoutAnOpeningBalance_HasOpeningBalanceIsFalse() =>
         Replay(Deposit(cushion, 1m, 0)).BalanceOf(cushion.BucketId).HasOpeningBalance.ShouldBeFalse();
 
-    private BudgetState Replay(params JournalEntry[] journal) => BudgetState.Replay([cushion, crypto], journal);
+    private BudgetState Replay(params JournalEntry[] journal) => BudgetState.Replay([cushion, crypto], journal, Today);
 
     private JournalEntry Opening(Bucket bucket, decimal amount, int day) =>
         OpeningBalance.Create(NewId(), Owner, bucket.BucketId, Money.From(amount, bucket.Currency), Today.AddDays(day), Today, EntryInfo.None, NextRecordedAt()).Value;

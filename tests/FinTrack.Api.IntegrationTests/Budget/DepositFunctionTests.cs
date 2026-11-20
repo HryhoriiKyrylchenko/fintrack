@@ -38,7 +38,7 @@ public sealed class DepositFunctionTests(ApiFixture fixture)
 
         var state = await StateAsync();
         var unallocated = state.Buckets.ShouldHaveSingleItem();
-        state.State.BalanceOf(unallocated.BucketId).Available.ShouldBe(Money.From(12.30m, Currency.Pln));
+        state.StateAsOf(DateOnly.FromDateTime(DateTime.UtcNow)).BalanceOf(unallocated.BucketId).Available.ShouldBe(Money.From(12.30m, Currency.Pln));
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class DepositFunctionTests(ApiFixture fixture)
         var unallocated = state.Buckets.ShouldHaveSingleItem();
         unallocated.SystemRole.ShouldBe(BucketSystemRole.Unallocated);
         state.Journal.Count.ShouldBe(3);
-        state.State.BalanceOf(unallocated.BucketId).Available.ShouldBe(Money.From(6m, Currency.Eur));
+        state.StateAsOf(DateOnly.FromDateTime(DateTime.UtcNow)).BalanceOf(unallocated.BucketId).Available.ShouldBe(Money.From(6m, Currency.Eur));
     }
 
     [Fact]
@@ -120,7 +120,7 @@ public sealed class DepositFunctionTests(ApiFixture fixture)
             .ShouldBe("bucket.opening_balance_exists");
 
         var state = await StateAsync();
-        state.State.BalanceOf(state.Buckets.ShouldHaveSingleItem().BucketId).Available.ShouldBe(Money.From(60m, Currency.Pln));
+        state.StateAsOf(DateOnly.FromDateTime(DateTime.UtcNow)).BalanceOf(state.Buckets.ShouldHaveSingleItem().BucketId).Available.ShouldBe(Money.From(60m, Currency.Pln));
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public sealed class DepositFunctionTests(ApiFixture fixture)
         var state = await StateAsync();
         var transfer = state.Journal.OfType<FinTrack.Budget.Domain.Journal.Transfer>().ShouldHaveSingleItem();
         transfer.Rate.ShouldBe(0.235294117647m);
-        state.State.BalanceOf(transfer.ToBucketId).Available.ShouldBe(Money.From(100m, Currency.Eur));
+        state.StateAsOf(DateOnly.FromDateTime(DateTime.UtcNow)).BalanceOf(transfer.ToBucketId).Available.ShouldBe(Money.From(100m, Currency.Eur));
 
         Code(await TransferAsync($$"""{"id":"{{Guid.CreateVersion7()}}","fromAmount":{"amount":"1.00","currency":"PLN"},"toAmount":{"amount":"0.99","currency":"PLN"},"occurredOn":"{{Today}}","fromUnallocated":"PLN","toUnallocated":"PLN"}"""), 400)
             .ShouldBe("transfer.same_bucket");

@@ -159,6 +159,33 @@ public sealed class JournalStorageTests(BudgetFixture fixture)
         stored["amount"]["amount"].AsDecimal128.ToString().ShouldBe("1.10");
     }
 
+    // Plan 1b B15: an entry written with others carries the command's group, after the tags; absent when written alone.
+    [Fact]
+    public async Task GroupedEntry_StoresItsGroup_AsAStandardUuid_AfterTheTags()
+    {
+        var owner = BudgetFixture.NewOwner();
+        var bucket = BucketId.From(Guid.CreateVersion7());
+        var group = Guid.CreateVersion7();
+        var deposit = NewDeposit(owner, bucket, 250.00m, Day, new EntryInfo(null, [], EntrySource.Manual, group));
+        await AppendAsync(owner, deposit);
+
+        (await RawAsync(deposit.Id)).ShouldBe(new BsonDocument
+        {
+            { "_id", Uuid(deposit.Id) },
+            { "type", "Deposit" },
+            { "ownerId", Uuid(owner.Value) },
+            { "schemaVersion", 1 },
+            { "recordedAt", new BsonDateTime(FakeClock.DefaultStart.UtcDateTime) },
+            { "occurredOn", "2026-01-15" },
+            { "tags", new BsonArray() },
+            { "groupId", Uuid(group) },
+            { "source", "Manual" },
+            { "bucketId", Uuid(bucket.Value) },
+            { "amount", new BsonDocument { { "amount", new BsonDecimal128(250.00m) }, { "currency", "PLN" } } },
+        });
+        (await ReadAsync(owner)).ShouldHaveSingleItem().HasSameContent(deposit).ShouldBeTrue();
+    }
+
     [Fact]
     public async Task StoredDeposit_ReadsBackWithTheSameContent()
     {

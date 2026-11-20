@@ -35,7 +35,7 @@ public sealed class AddDepositTests(BudgetFixture fixture)
         var state = await StateAsync(owner);
         state.Journal.Count.ShouldBe(2);
         state.Journal[0].OccurredOn.ShouldBe(Today.AddDays(-30));
-        var balance = state.State.BalanceOf(BucketId.From(bucket));
+        var balance = state.StateAsOf(Today).BalanceOf(BucketId.From(bucket));
         balance.Available.ShouldBe(Money.From(120.50m, Currency.Pln));
         balance.Deposited.ShouldBe(Money.From(120.50m, Currency.Pln));
     }
@@ -52,7 +52,7 @@ public sealed class AddDepositTests(BudgetFixture fixture)
         var unallocated = state.Buckets.ShouldHaveSingleItem();
         unallocated.SystemRole.ShouldBe(BucketSystemRole.Unallocated);
         UuidV7.IsValid(unallocated.Id).ShouldBeTrue();
-        state.State.BalanceOf(unallocated.BucketId).Available.ShouldBe(Money.From(15m, Currency.Eur));
+        state.StateAsOf(Today).BalanceOf(unallocated.BucketId).Available.ShouldBe(Money.From(15m, Currency.Eur));
         state.Version.ShouldBe(3);
     }
 

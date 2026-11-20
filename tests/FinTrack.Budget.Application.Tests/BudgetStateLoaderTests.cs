@@ -60,7 +60,7 @@ public class BudgetStateLoaderTests
 
         snapshot.Version.ShouldBe(5);
         snapshot.Buckets.ShouldContain(bucket);
-        snapshot.State.BalanceOf(bucket.BucketId).Available.ShouldBe(Money.From(2m, Currency.Pln));
+        snapshot.StateAsOf(new DateOnly(2026, 1, 15)).BalanceOf(bucket.BucketId).Available.ShouldBe(Money.From(2m, Currency.Pln));
         log.Calls.Count(call => call == "journal").ShouldBe(2);
     }
 
@@ -73,5 +73,19 @@ public class BudgetStateLoaderTests
 
         result.ShouldFailWith(ErrorCodes.ConcurrencyConflict, ErrorKind.Conflict);
         log.Calls.Count(call => call == "journal").ShouldBe(BudgetStateLoader.MaxAttempts);
+    }
+
+    // B20: the state is for a day; it is replayed once per day asked for, not once per question.
+    [Fact]
+    public async Task StateAsOf_IsForThatDay_AndReplayedOncePerDay()
+    {
+        var monday = new DateOnly(2026, 1, 12);
+        var snapshot = (await new BudgetStateLoader(ledger, store).LoadAsync(Cancellation)).Value;
+
+        var state = snapshot.StateAsOf(monday);
+
+        state.Today.ShouldBe(monday);
+        snapshot.StateAsOf(monday).ShouldBeSameAs(state);
+        snapshot.StateAsOf(monday.AddDays(1)).Today.ShouldBe(monday.AddDays(1));
     }
 }

@@ -45,16 +45,16 @@ public class BudgetStatePropertyTests
     [Fact]
     public void Available_IsNetContributedMinusOutstandingPrincipal() =>
         Histories.Sample(history =>
-            BudgetState.Replay(history.Buckets, history.Journal).Balances
+            BudgetState.Replay(history.Buckets, history.Journal, Today).Balances
                 .All(balance => balance.Available == balance.NetContributed - balance.OutstandingPrincipal));
 
     [Fact]
     public void Replay_EqualsApplyingEntryByEntryInReplayOrder() =>
         Histories.Sample(history =>
         {
-            var replayed = BudgetState.Replay(history.Buckets, history.Journal);
+            var replayed = BudgetState.Replay(history.Buckets, history.Journal, Today);
             var stepByStep = ReplayOrder.Sort(history.Journal)
-                .Aggregate(BudgetState.Replay(history.Buckets, []), (state, entry) => state.Apply(entry));
+                .Aggregate(BudgetState.Replay(history.Buckets, [], Today), (state, entry) => state.Apply(entry));
 
             return replayed.Balances.SequenceEqual(stepByStep.Balances);
         });
@@ -65,15 +65,27 @@ public class BudgetStatePropertyTests
         {
             var shuffled = history.Journal.OrderBy(_ => new Random(seed).Next()).ToArray();
 
-            return BudgetState.Replay(history.Buckets, history.Journal).Balances
-                .SequenceEqual(BudgetState.Replay(history.Buckets, shuffled).Balances);
+            return BudgetState.Replay(history.Buckets, history.Journal, Today).Balances
+                .SequenceEqual(BudgetState.Replay(history.Buckets, shuffled, Today).Balances);
+        });
+
+    // B20: the state builder takes today for the dues of later steps; no figure of phase 1a depends on it.
+    [Fact]
+    public void Balances_DoNotDependOnToday() =>
+        Gen.Select(Histories, Gen.Int[0, 3650]).Sample((history, days) =>
+        {
+            var later = Today.AddDays(days);
+            var state = BudgetState.Replay(history.Buckets, history.Journal, later);
+
+            return state.Today == later
+                && state.Balances.SequenceEqual(BudgetState.Replay(history.Buckets, history.Journal, Today).Balances);
         });
 
     [Fact]
     public void Deposited_IsTheSumOfDeposits_PerBucket() =>
         Histories.Sample(history =>
         {
-            var state = BudgetState.Replay(history.Buckets, history.Journal);
+            var state = BudgetState.Replay(history.Buckets, history.Journal, Today);
             return history.Buckets.All(bucket => state.BalanceOf(bucket.BucketId).Deposited.Amount
                 == history.Journal.Where(deposit => deposit.BucketId == bucket.BucketId).Sum(deposit => deposit.Amount.Amount));
         });

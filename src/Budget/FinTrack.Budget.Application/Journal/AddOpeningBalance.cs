@@ -41,7 +41,7 @@ public sealed class AddOpeningBalanceHandler(BucketEntryWriter writer) : IComman
             command,
             arguments => OpeningBalance.Create(arguments.Id, arguments.OwnerId, arguments.BucketId, command.Amount, command.OccurredOn, arguments.Today, arguments.Info, arguments.RecordedAt)
                 .Map(entry => (JournalEntry)entry),
-            (bucket, state) => state.Buckets.Contains(bucket) && state.State.BalanceOf(bucket.BucketId).HasOpeningBalance
+            (bucket, context) => context.State.Buckets.Contains(bucket) && context.Balances.BalanceOf(bucket.BucketId).HasOpeningBalance
                 ? Result.Fail(AppError.BusinessRule(BudgetErrorCodes.BucketOpeningBalanceExists))
                 : Result.Ok(),
             cancellationToken);

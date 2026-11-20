@@ -3,7 +3,7 @@ using System.Text;
 namespace FinTrack.Budget.Domain.Journal;
 
 /// <summary>
-/// The descriptive fields every entry carries (ARCHITECTURE 4.2): a note, tags and the source. A
+/// The descriptive fields every entry carries (ARCHITECTURE 4.2): a note, tags, the source and the group. A
 /// parameter object for the entry factories; the entry stores the fields themselves.
 /// </summary>
 /// <remarks>
@@ -25,7 +25,11 @@ public sealed record EntryInfo
     public const int MaxTagLength = 30;
 
     /// <summary>Creates the fields; throws <see cref="ArgumentException"/> for values that break the rules (bugs).</summary>
-    public EntryInfo(string? note, IReadOnlyList<string> tags, EntrySource source)
+    /// <param name="note">The note, or <c>null</c>.</param>
+    /// <param name="tags">The tags, possibly none.</param>
+    /// <param name="source">Where the entry came from.</param>
+    /// <param name="groupId">The group of a command that writes several entries (plan 1b B15), or <c>null</c>; never empty.</param>
+    public EntryInfo(string? note, IReadOnlyList<string> tags, EntrySource source, Guid? groupId = null)
     {
         ArgumentNullException.ThrowIfNull(tags);
 
@@ -44,9 +48,15 @@ public sealed record EntryInfo
             throw new ArgumentException("The source is missing.", nameof(source));
         }
 
+        if (groupId == Guid.Empty)
+        {
+            throw new ArgumentException("A group ID is never empty.", nameof(groupId));
+        }
+
         Note = note;
         Tags = [.. tags];
         Source = source;
+        GroupId = groupId;
     }
 
     /// <summary>No note, no tags, entered by the user.</summary>
@@ -60,6 +70,9 @@ public sealed record EntryInfo
 
     /// <summary>Where the entry came from.</summary>
     public EntrySource Source { get; }
+
+    /// <summary>The group of the command that writes this entry with others (plan 1b B15), or <c>null</c> for a single entry.</summary>
+    public Guid? GroupId { get; }
 
     /// <summary>Whether <paramref name="note"/> may be a note.</summary>
     public static bool IsValidNote(string? note) =>

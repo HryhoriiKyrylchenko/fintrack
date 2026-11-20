@@ -57,11 +57,11 @@ public class NeverNegativePropertyTests
         Histories.Sample(history =>
         {
             var journal = Accept(history.Buckets, history.Attempts);
-            var replayed = BudgetState.Replay(history.Buckets, journal);
+            var replayed = BudgetState.Replay(history.Buckets, journal, Today);
             // Step by step over the effective journal: what is left after reversals (D3).
             var reversed = BudgetState.ReversedEntryIds(journal);
             var effective = journal.Where(entry => entry is not Reversal && !reversed.Contains(entry.Id));
-            var stepByStep = ReplayOrder.Sort(effective).Aggregate(BudgetState.Replay(history.Buckets, []), (state, entry) => state.Apply(entry));
+            var stepByStep = ReplayOrder.Sort(effective).Aggregate(BudgetState.Replay(history.Buckets, [], Today), (state, entry) => state.Apply(entry));
 
             return replayed.Balances.SequenceEqual(stepByStep.Balances)
                 && replayed.Balances.All(balance => balance.Available == balance.NetContributed - balance.OutstandingPrincipal)
@@ -76,7 +76,7 @@ public class NeverNegativePropertyTests
         {
             var (kind, bucketIndex, units, daysBack, id) = attempts[index];
             var bucket = buckets[bucketIndex];
-            var state = BudgetState.Replay(buckets, journal);
+            var state = BudgetState.Replay(buckets, journal, Today);
 
             if (kind == Kind.Reversal)
             {
@@ -87,7 +87,7 @@ public class NeverNegativePropertyTests
                 {
                     var target = candidates[(int)(units % candidates.Count)];
                     var reversal = Reversal.Create(JournalEntryId.From(id), Owner, target.EntryId, Today, Today, EntryInfo.None, FakeClock.DefaultStart.AddSeconds(index)).Value;
-                    if (BudgetState.Replay(buckets, [.. journal, reversal]).FirstOverdraft is null)
+                    if (BudgetState.Replay(buckets, [.. journal, reversal], Today).FirstOverdraft is null)
                     {
                         journal.Add(reversal);
                     }
@@ -117,7 +117,7 @@ public class NeverNegativePropertyTests
                 _ => Transfer.Create(entryId, Owner, bucket.BucketId, next.BucketId, amount, fee is null ? amount : amount - fee, fee, occurredOn, Today, EntryInfo.None, recordedAt).Value,
             };
 
-            if (BudgetState.Replay(buckets, [.. journal, entry]).FirstOverdraft is null)
+            if (BudgetState.Replay(buckets, [.. journal, entry], Today).FirstOverdraft is null)
             {
                 journal.Add(entry);
             }

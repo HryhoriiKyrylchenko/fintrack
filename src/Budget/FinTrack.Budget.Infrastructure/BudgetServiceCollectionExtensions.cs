@@ -43,6 +43,7 @@ public static class BudgetServiceCollectionExtensions
         services.TryAddScoped<BudgetStateLoader>();
         services.TryAddScoped<JournalWriter>();
         services.TryAddScoped<BucketEntryWriter>();
+        services.TryAddSingleton<IEntryDependencies, JournalEntryDependencies>();
 
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<SaveOwnerSettings>, SaveOwnerSettingsValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<CreateBucket>, CreateBucketValidator>());

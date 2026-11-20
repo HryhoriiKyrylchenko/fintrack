@@ -56,6 +56,6 @@ public sealed class Spend : SingleBucketEntry
         var check = Check(amount, occurredOn, today, info);
         return check.IsFailed
             ? check.ToResult<Spend>()
-            : Result.Ok(new Spend(id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, groupId: null, info.Source, externalId: null, bucketId, amount));
+            : Result.Ok(new Spend(id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, info.GroupId, info.Source, externalId: null, bucketId, amount));
     }
 }

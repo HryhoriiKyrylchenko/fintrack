@@ -58,6 +58,6 @@ public sealed class OpeningBalance : SingleBucketEntry
         var check = Check(amount, occurredOn, today, info);
         return check.IsFailed
             ? check.ToResult<OpeningBalance>()
-            : Result.Ok(new OpeningBalance(id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, groupId: null, info.Source, externalId: null, bucketId, amount));
+            : Result.Ok(new OpeningBalance(id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, info.GroupId, info.Source, externalId: null, bucketId, amount));
     }
 }

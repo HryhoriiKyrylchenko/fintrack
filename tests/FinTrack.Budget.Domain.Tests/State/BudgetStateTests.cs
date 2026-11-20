@@ -21,7 +21,7 @@ public class BudgetStateTests
     {
         var bucket = Savings("Cushion", Currency.Pln);
 
-        var balance = BudgetState.Replay([bucket], []).BalanceOf(bucket.BucketId);
+        var balance = BudgetState.Replay([bucket], [], Today).BalanceOf(bucket.BucketId);
 
         balance.NetContributed.ShouldBe(Money.Zero(Currency.Pln));
         balance.OutstandingPrincipal.ShouldBe(Money.Zero(Currency.Pln));
@@ -37,7 +37,7 @@ public class BudgetStateTests
 
         var state = BudgetState.Replay(
             [cushion, holiday],
-            [Deposit(cushion, 100.50m, Currency.Pln), Deposit(cushion, 20m, Currency.Pln), Deposit(holiday, 5m, Currency.Eur)]);
+            [Deposit(cushion, 100.50m, Currency.Pln), Deposit(cushion, 20m, Currency.Pln), Deposit(holiday, 5m, Currency.Eur)], Today);
 
         state.BalanceOf(cushion.BucketId).NetContributed.ShouldBe(Money.From(120.50m, Currency.Pln));
         state.BalanceOf(cushion.BucketId).Available.ShouldBe(Money.From(120.50m, Currency.Pln));
@@ -50,7 +50,7 @@ public class BudgetStateTests
     {
         var bucket = Savings("Cushion", Currency.Pln);
 
-        Should.Throw<CurrencyMismatchException>(() => BudgetState.Replay([bucket], [Deposit(bucket, 1m, Currency.Eur)]));
+        Should.Throw<CurrencyMismatchException>(() => BudgetState.Replay([bucket], [Deposit(bucket, 1m, Currency.Eur)], Today));
     }
 
     [Fact]
@@ -59,14 +59,14 @@ public class BudgetStateTests
         var known = Savings("Cushion", Currency.Pln);
         var unknown = Savings("Elsewhere", Currency.Pln);
 
-        Should.Throw<InvalidOperationException>(() => BudgetState.Replay([known], [Deposit(unknown, 1m, Currency.Pln)]));
+        Should.Throw<InvalidOperationException>(() => BudgetState.Replay([known], [Deposit(unknown, 1m, Currency.Pln)], Today));
     }
 
     [Fact]
     public void Apply_GivesANewState_AndLeavesTheOldOneUnchanged()
     {
         var bucket = Savings("Cushion", Currency.Pln);
-        var empty = BudgetState.Replay([bucket], []);
+        var empty = BudgetState.Replay([bucket], [], Today);
 
         var after = empty.Apply(Deposit(bucket, 7m, Currency.Pln));
 
@@ -75,11 +75,23 @@ public class BudgetStateTests
     }
 
     [Fact]
+    public void TheState_KnowsTheDayItIsFor_AndApplyKeepsIt()
+    {
+        var bucket = Savings("Cushion", Currency.Pln);
+        var day = new DateOnly(2026, 3, 31);
+
+        var state = BudgetState.Replay([bucket], [Deposit(bucket, 1m, Currency.Pln)], day);
+
+        state.Today.ShouldBe(day);
+        state.Apply(Deposit(bucket, 2m, Currency.Pln)).Today.ShouldBe(day);
+    }
+
+    [Fact]
     public void Balances_CoverEveryBucket_IncludingArchivedAndSystemOnes()
     {
         var unallocated = Bucket.Unallocated(BucketId.From(Guid.CreateVersion7()), Owner, Currency.Usd);
 
-        var state = BudgetState.Replay([unallocated], [Deposit(unallocated, 3m, Currency.Usd)]);
+        var state = BudgetState.Replay([unallocated], [Deposit(unallocated, 3m, Currency.Usd)], Today);
 
         state.Balances.ShouldHaveSingleItem().Available.ShouldBe(Money.From(3m, Currency.Usd));
     }

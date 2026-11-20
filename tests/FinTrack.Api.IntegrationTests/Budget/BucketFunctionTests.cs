@@ -128,6 +128,7 @@ public sealed class BucketFunctionTests(ApiFixture fixture)
     [Fact]
     public async Task Unarchive_Is204_AndTheBucketIsActiveAgain_AndRepeatingIt_Is204()
     {
+        await SaveSettingsAsync();
         var id = Guid.CreateVersion7();
         await CreateAsync(Body(id, "Holiday"));
         (await ArchiveAsync(id.ToString())).ShouldBeOfType<NoContentResult>();
@@ -142,12 +143,24 @@ public sealed class BucketFunctionTests(ApiFixture fixture)
     [Fact]
     public async Task Unarchive_WhileTheNameIsTaken_Is422NameTaken()
     {
+        await SaveSettingsAsync();
         var id = Guid.CreateVersion7();
         await CreateAsync(Body(id, "Holiday"));
         await ArchiveAsync(id.ToString());
         await CreateAsync(Body(Guid.CreateVersion7(), "HOLIDAY"));
 
         Code(await UnarchiveAsync(id.ToString()), 422).ShouldBe("bucket.name_taken");
+    }
+
+    // Plan 1b B20: archiving checks the balance as of today in the owner's time zone, which needs the settings.
+    [Fact]
+    public async Task Archive_BeforeTheFirstRun_Is404SettingsNotFound()
+    {
+        var id = Guid.CreateVersion7();
+        await CreateAsync(Body(id, "Holiday"));
+
+        Code(await ArchiveAsync(id.ToString()), 404).ShouldBe("settings.not_found");
+        Buckets(await ListAsync()).ShouldHaveSingleItem().Status.ShouldBe(BucketStatus.Active);
     }
 
     [Fact]
@@ -178,6 +191,13 @@ public sealed class BucketFunctionTests(ApiFixture fixture)
     {
         await using var scope = await ScopeAsync();
         return await ActivatorUtilities.CreateInstance<RenameBucketFunction>(scope.ServiceProvider).Run(JsonRequest(json), id, Cancellation);
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        await using var scope = await ScopeAsync();
+        var request = JsonRequest("""{"reportingCurrency":"PLN","timeZone":"Europe/Warsaw","locale":"pl-PL"}""");
+        (await ActivatorUtilities.CreateInstance<SaveOwnerSettingsFunction>(scope.ServiceProvider).Run(request, Cancellation)).ShouldBeOfType<NoContentResult>();
     }
 
     private async Task<IActionResult> ArchiveAsync(string id)

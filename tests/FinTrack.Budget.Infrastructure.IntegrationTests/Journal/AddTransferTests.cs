@@ -35,10 +35,10 @@ public sealed class AddTransferTests(BudgetFixture fixture)
         (await TransferAsync(owner, new AddTransfer(Guid.CreateVersion7(), Pln(430m), Money.From(100m, Currency.Eur), null, Today, cushion, null, travel, null, "To euro", []))).IsSuccess.ShouldBeTrue();
 
         var state = await StateAsync(owner);
-        state.State.BalanceOf(BucketId.From(cushion)).Available.ShouldBe(Pln(270m));
-        state.State.BalanceOf(BucketId.From(holiday)).Available.ShouldBe(Pln(299m));
-        state.State.BalanceOf(BucketId.From(travel)).Available.ShouldBe(Money.From(100m, Currency.Eur));
-        state.State.BalanceOf(BucketId.From(travel)).Deposited.ShouldBe(Money.Zero(Currency.Eur));
+        state.StateAsOf(Today).BalanceOf(BucketId.From(cushion)).Available.ShouldBe(Pln(270m));
+        state.StateAsOf(Today).BalanceOf(BucketId.From(holiday)).Available.ShouldBe(Pln(299m));
+        state.StateAsOf(Today).BalanceOf(BucketId.From(travel)).Available.ShouldBe(Money.From(100m, Currency.Eur));
+        state.StateAsOf(Today).BalanceOf(BucketId.From(travel)).Deposited.ShouldBe(Money.Zero(Currency.Eur));
     }
 
     [Fact]

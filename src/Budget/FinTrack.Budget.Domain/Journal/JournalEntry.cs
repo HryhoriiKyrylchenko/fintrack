@@ -63,7 +63,10 @@ public abstract class JournalEntry : IAppendOnlyDocument
     /// <summary>Tags, possibly none.</summary>
     public IReadOnlyList<string> Tags { get; }
 
-    /// <summary>Links the entries of one user action (phase 1b); <c>null</c> for a single entry.</summary>
+    /// <summary>
+    /// Links the entries one command writes together (plan 1b B15), client-generated; <c>null</c> for an
+    /// entry written alone. Part of the content a repeat must match.
+    /// </summary>
     public Guid? GroupId { get; }
 
     /// <summary>Where the entry came from.</summary>

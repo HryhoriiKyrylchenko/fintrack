@@ -153,7 +153,7 @@ public sealed class Transfer : JournalEntry
         var rate = decimal.Round(toAmount.Amount / sent.Amount, RateDecimalPlaces, MidpointRounding.ToEven);
 
         return Result.Ok(new Transfer(
-            id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, groupId: null, info.Source, externalId: null,
+            id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, info.GroupId, info.Source, externalId: null,
             fromBucketId, toBucketId, fromAmount, toAmount, fee, rate));
     }
 

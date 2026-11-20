@@ -54,6 +54,12 @@ public static class BudgetErrorCodes
     /// <summary>The entry is a reversal, which cannot be reversed (D3): enter a new entry instead. No parameters.</summary>
     public const string EntryNotReversible = "entry.not_reversible";
 
+    /// <summary>
+    /// Effective entries still refer to the entry, so it cannot be reversed (plan 1b B5: a borrow with repayments, a plan
+    /// with changes or contributions, a pause with changes); reverse those first. No parameters.
+    /// </summary>
+    public const string EntryHasDependents = "entry.has_dependents";
+
     /// <summary>An amount is not in the bucket's currency. No parameters.</summary>
     public const string BucketCurrencyMismatch = "bucket.currency_mismatch";
 
@@ -66,7 +72,10 @@ public static class BudgetErrorCodes
     /// <summary>In one currency, what arrives is not exactly what leaves minus the fee (D6). No parameters.</summary>
     public const string TransferAmountsInconsistent = "transfer.amounts_inconsistent";
 
-    /// <summary>An entry with this ID exists with different content (repeated command, invariant 13). No parameters.</summary>
+    /// <summary>
+    /// An entry with this ID exists with different content (repeated command, invariant 13); for a command that writes
+    /// several entries, the stored group differs from the command's entries in any way (plan 1b B15). No parameters.
+    /// </summary>
     public const string EntryIdReused = "entry.id_reused";
 
     /// <summary>An entry is dated after today in the owner's time zone (plan 1a D12). No parameters.</summary>

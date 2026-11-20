@@ -59,7 +59,7 @@ public sealed class Reversal : JournalEntry
 
         return occurredOn > today
             ? Result.Fail<Reversal>(AppError.BusinessRule(BudgetErrorCodes.EntryDateInFuture))
-            : Result.Ok(new Reversal(id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, groupId: null, info.Source, externalId: null, reversedEntryId));
+            : Result.Ok(new Reversal(id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, info.GroupId, info.Source, externalId: null, reversedEntryId));
     }
 
     /// <inheritdoc />

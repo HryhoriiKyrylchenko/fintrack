@@ -61,6 +61,6 @@ public sealed class Deposit : SingleBucketEntry
         var check = Check(amount, occurredOn, today, info);
         return check.IsFailed
             ? check.ToResult<Deposit>()
-            : Result.Ok(new Deposit(id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, groupId: null, info.Source, externalId: null, bucketId, amount));
+            : Result.Ok(new Deposit(id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, info.GroupId, info.Source, externalId: null, bucketId, amount));
     }
 }
