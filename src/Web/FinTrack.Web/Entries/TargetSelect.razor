@@ -1,9 +1,14 @@
-@* A bucket to choose for an entry: the owner's buckets with their currency, then Unallocated of each currency. *@
+@* A bucket to choose for an entry: the owner's buckets with their currency, then Unallocated of each currency; for a
+   borrow's destination and a repayment's source also "Outside the app" (plan 1b step 7). *@
 @using FinTrack.Web.Buckets
 @inject IStringLocalizer<SharedResource> L
 
 <MudSelect T="string" Label="@Label" Value="Key" ValueChanged="KeyChanged" ToStringFunc="Display" Variant="Variant.Outlined"
-           Error="@(Error is not null)" ErrorText="@Error">
+           HelperText="@HelperText" Error="@(Error is not null)" ErrorText="@Error">
+    @if (AllowOutside)
+    {
+        <MudSelectItem T="string" Value="EntryFormModel.OutsideKey">@Display(EntryFormModel.OutsideKey)</MudSelectItem>
+    }
     @foreach (var target in Targets)
     {
         <MudSelectItem T="string" Value="target.Key">@Display(target.Key)</MudSelectItem>
@@ -19,6 +24,10 @@
     [Parameter, EditorRequired]
     public IReadOnlyList<EntryTarget> Targets { get; set; } = default!;
 
+    /// <summary>Whether "Outside the app" is offered first (<see cref="EntryFormModel.OutsideKey"/>).</summary>
+    [Parameter]
+    public bool AllowOutside { get; set; }
+
     /// <summary>The chosen target's key.</summary>
     [Parameter]
     public string? Key { get; set; }
@@ -27,14 +36,26 @@
     [Parameter]
     public EventCallback<string?> KeyChanged { get; set; }
 
+    /// <summary>A hint under the field, or <c>null</c>.</summary>
+    [Parameter]
+    public string? HelperText { get; set; }
+
     /// <summary>The message under the field, or <c>null</c>.</summary>
     [Parameter]
     public string? Error { get; set; }
 
-    private string Display(string? key) => Targets.FirstOrDefault(target => target.Key == key) switch
+    private string Display(string? key)
     {
-        null => string.Empty,
-        { IsUnallocated: true } target => BucketNames.Display(null, target.Currency, L),
-        var target => L["Entries.TargetOption", target.Name!, target.Currency.Code],
-    };
+        if (AllowOutside && key == EntryFormModel.OutsideKey)
+        {
+            return L["Loans.Outside"];
+        }
+
+        return Targets.FirstOrDefault(target => target.Key == key) switch
+        {
+            null => string.Empty,
+            { IsUnallocated: true } target => BucketNames.Display(null, target.Currency, L),
+            var target => L["Entries.TargetOption", target.Name!, target.Currency.Code],
+        };
+    }
 }

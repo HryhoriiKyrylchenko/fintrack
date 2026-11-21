@@ -76,6 +76,8 @@ public sealed class ErrorTextTests : IDisposable
         "input.rate_required",
         "input.rate_invalid",
         "input.period_invalid",
+        "input.loan_required",
+        "input.reason_required",
         "currency.unknown",
     ];
 

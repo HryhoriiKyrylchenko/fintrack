@@ -1,0 +1,69 @@
+@* A loan's history (plan 1b step 7): its borrow, its repayments and their reversals, newest first, read from the
+   journal's loanId filter. Read only: entries are reversed from the Journal. *@
+@using FinTrack.Budget.Contracts.V1.Buckets
+@inject LoansClient Loans
+@inject IStringLocalizer<SharedResource> L
+
+<MudDialog>
+    <DialogContent>
+        @if (error is not null)
+        {
+            <ErrorAlert Error="error" />
+        }
+        else if (rows is null)
+        {
+            <TableSkeleton Rows="3" />
+        }
+        else
+        {
+            <MudStack Spacing="0">
+                @foreach (var row in rows)
+                {
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Spacing="3" Class="py-3 fintrack-history-row">
+                        <div>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" HtmlTag="p">@row.Entry.OccurredOn.ToString("d", CultureInfo.CurrentCulture)</MudText>
+                            <JournalEntryText Row="row" />
+                        </div>
+                        <div class="fintrack-figures fintrack-nowrap">
+                            <JournalAmount Row="row" />
+                        </div>
+                    </MudStack>
+                }
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Close">@L["Common.Close"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private IReadOnlyList<JournalRow>? rows;
+    private ErrorInfo? error;
+
+    [CascadingParameter]
+    private IMudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>The loan whose history is shown.</summary>
+    [Parameter, EditorRequired]
+    public Guid LoanId { get; set; }
+
+    /// <summary>Every bucket of the owner by ID, archived ones included, to name them.</summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyDictionary<Guid, BucketDto> Buckets { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Loans.HistoryAsync(LoanId, CancellationToken.None);
+        if (result.Value is not { } entries)
+        {
+            error = ErrorInfo.From(result);
+            return;
+        }
+
+        var loaded = entries.ToDictionary(entry => entry.Id);
+        rows = [.. entries.Select(entry => new JournalRow(entry, Buckets, loaded))];
+    }
+
+    private void Close() => Dialog.Close();
+}

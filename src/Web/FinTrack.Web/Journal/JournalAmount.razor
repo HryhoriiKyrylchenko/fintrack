@@ -1,4 +1,5 @@
-@* An entry's amount: signed for money in or out, both amounts for a transfer, none for a reversal. A reversed
+@* An entry's amount: signed for money in or out (an adjustment by its direction), unsigned for a borrow or a repayment
+   (money moved between two sides), both amounts for a transfer, none for a reversal. A reversed
    entry's amount is struck through; the "Reversed" label next to its type says why. *@
 @using FinTrack.Web.Formatting
 @inject IStringLocalizer<SharedResource> L
@@ -7,6 +8,10 @@
     @if (Row.SignedAmount is { } amount)
     {
         <Amount Value="amount" Sign="MoneySign.Always" />
+    }
+    else if (Row.MovedAmount is { } moved)
+    {
+        <Amount Value="moved" />
     }
     else if (Row.FromAmount is { } from && Row.ToAmount is { } to)
     {

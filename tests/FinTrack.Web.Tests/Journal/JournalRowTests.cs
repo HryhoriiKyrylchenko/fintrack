@@ -68,6 +68,53 @@ public sealed class JournalRowTests : IDisposable
         MoneyFormatter.Format(row.SignedAmount, Polish, MoneySign.Always).ShouldStartWith(signedStart);
     }
 
+    [Theory]
+    [InlineData(AdjustmentDirection.Increase, "+12,50")]
+    [InlineData(AdjustmentDirection.Decrease, "\u221212,50")]
+    public void Adjustment_ReadsAsItsBucket_SignedByItsDirection(AdjustmentDirection direction, string signedStart)
+    {
+        var row = Row(Single(JournalEntryType.Adjustment, Cushion, 12.50m) with { Direction = direction });
+
+        L[row.TypeKey].Value.ShouldBe("Adjustment");
+        row.Describe(L, Polish).ShouldBe("Cushion");
+        MoneyFormatter.Format(row.SignedAmount!, Polish, MoneySign.Always).ShouldStartWith(signedStart);
+        row.MovedAmount.ShouldBeNull();
+    }
+
+    [Fact]
+    public void BorrowAndRepayment_ReadFromAndTo_WithOutsideTheAppForAMissingSide_AndTheirAmount()
+    {
+        var loan = Guid.CreateVersion7();
+        var intoBucket = Row(Loan(JournalEntryType.Borrow, loan, Cushion.Id, UnallocatedPln.Id, 300m));
+        var toOutside = Row(Loan(JournalEntryType.Borrow, loan, Cushion.Id, null, 50m));
+        var fromOutside = Row(Loan(JournalEntryType.Repayment, loan, null, Cushion.Id, 20m));
+
+        L[intoBucket.TypeKey].Value.ShouldBe("Borrow");
+        L[fromOutside.TypeKey].Value.ShouldBe("Repayment");
+        intoBucket.Describe(L, Polish).ShouldBe("Cushion \u2192 Unallocated (PLN)");
+        toOutside.Describe(L, Polish).ShouldBe("Cushion \u2192 Outside the app");
+        fromOutside.Describe(L, Polish).ShouldBe("Outside the app \u2192 Cushion");
+        intoBucket.SignedAmount.ShouldBeNull();
+        intoBucket.MovedAmount.ShouldBe(Money.From(300m, Currency.Pln));
+        fromOutside.MovedAmount.ShouldBe(Money.From(20m, Currency.Pln));
+    }
+
+    [Fact]
+    public void BorrowAndRepayment_AreReversibleUnlessABucketIsArchived_AndTheirReversalTitleNamesBothSides()
+    {
+        var loan = Guid.CreateVersion7();
+        var repayment = Loan(JournalEntryType.Repayment, loan, null, Cushion.Id, 20m) with { OccurredOn = new DateOnly(2026, 1, 14) };
+
+        Row(repayment).CanReverse.ShouldBeTrue();
+        Row(Loan(JournalEntryType.Borrow, loan, Cushion.Id, Old.Id, 1m)).CanReverse.ShouldBeFalse();
+        Row(repayment).ReversalTitle(L, Polish).ShouldBe("Reverse the repayment of 20,00\u00A0PLN from Outside the app to Cushion on 14.01.2026?");
+    }
+
+    [Fact]
+    public void ALoansHistoryPage_AsksForTheLoan() =>
+        JournalClient.PagePath(JournalFilter.None with { LoanId = Guid.Parse("0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b") }, null)
+            .ShouldBe("v1/journal?loanId=0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b&limit=25");
+
     [Fact]
     public void Transfer_ReadsFromAndTo_WithBothAmounts()
     {
@@ -199,6 +246,11 @@ public sealed class JournalRowTests : IDisposable
     private static JournalEntryDto Transfer(BucketDto from, BucketDto to, decimal sent, decimal received) =>
         new(Guid.CreateVersion7(), JournalEntryType.Transfer, Today, Recorded, null, [], null, "Manual", null,
             null, null, from.Id, to.Id, Money.From(sent, from.Currency), Money.From(received, to.Currency), null, 1m, null, null);
+
+    // A borrow (from = lender, to = destination) or a repayment (from = source, to = lender), as the Api maps them (B18).
+    private static JournalEntryDto Loan(JournalEntryType type, Guid loan, Guid? from, Guid? to, decimal amount) =>
+        new(Guid.CreateVersion7(), type, Today, Recorded, null, [], null, "Manual", null,
+            null, Money.From(amount, Currency.Pln), from, to, null, null, null, null, null, null, LoanId: loan);
 
     private static JournalEntryDto Reversal(JournalEntryDto reversed) =>
         new(Guid.CreateVersion7(), JournalEntryType.Reversal, Today, Recorded, null, [], null, "Manual", null,
