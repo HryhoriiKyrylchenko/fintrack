@@ -9,7 +9,7 @@ using Microsoft.Azure.Functions.Worker;
 namespace FinTrack.Api.Budget;
 
 /// <summary>
-/// <c>GET /api/v1/journal?bucketId=&amp;from=&amp;to=&amp;limit=&amp;cursor=</c>: 200 with one page of the journal, newest
+/// <c>GET /api/v1/journal?bucketId=&amp;loanId=&amp;from=&amp;to=&amp;limit=&amp;cursor=</c>: 200 with one page of the journal, newest
 /// first. Every parameter is optional; one that cannot be read is 400 <c>validation.failed</c> (rule
 /// <c>QueryFormat</c>), and the query's own rules follow (<see cref="GetJournal"/>).
 /// </summary>
@@ -25,18 +25,19 @@ public sealed class GetJournalFunction(ISender sender)
         CancellationToken cancellationToken)
     {
         var bucketId = RequestValues.QueryGuid(request, "bucketId");
+        var loanId = RequestValues.QueryGuid(request, "loanId");
         var from = RequestValues.QueryDate(request, "from");
         var to = RequestValues.QueryDate(request, "to");
         var limit = RequestValues.QueryInt(request, "limit");
         var cursor = RequestValues.QueryText(request, "cursor");
 
-        var read = Result.Merge(bucketId.ToResult(), from.ToResult(), to.ToResult(), limit.ToResult(), cursor.ToResult());
+        var read = Result.Merge(bucketId.ToResult(), loanId.ToResult(), from.ToResult(), to.ToResult(), limit.ToResult(), cursor.ToResult());
         if (read.IsFailed)
         {
             return ProblemDetailsMapper.ToActionResult(read);
         }
 
-        var query = new GetJournal(bucketId.Value, from.Value, to.Value, limit.Value ?? GetJournal.DefaultLimit, cursor.Value);
+        var query = new GetJournal(bucketId.Value, from.Value, to.Value, limit.Value ?? GetJournal.DefaultLimit, cursor.Value, loanId.Value);
         return ProblemDetailsMapper.ToActionResult(await sender.Send(query, cancellationToken).ConfigureAwait(false));
     }
 }

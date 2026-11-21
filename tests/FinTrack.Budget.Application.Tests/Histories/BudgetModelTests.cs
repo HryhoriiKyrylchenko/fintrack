@@ -1,6 +1,7 @@
 using CsCheck;
 using FinTrack.Budget.Application.Buckets;
 using FinTrack.Budget.Application.Journal;
+using FinTrack.Budget.Application.Loans;
 using FinTrack.Budget.Application.Overview;
 using FinTrack.Budget.Application.Settings;
 using FinTrack.Budget.Domain.Buckets;
@@ -13,6 +14,7 @@ using FluentResults;
 using Contract = FinTrack.Budget.Contracts.V1.Buckets;
 using GetBudgetOverview = FinTrack.Budget.Contracts.V1.Overview.GetBudgetOverview;
 using GetJournal = FinTrack.Budget.Contracts.V1.Journal.GetJournal;
+using GetLoans = FinTrack.Budget.Contracts.V1.Loans.GetLoans;
 
 namespace FinTrack.Budget.Application.Tests.Histories;
 
@@ -238,6 +240,7 @@ public class BudgetModelTests
                 .ShouldAllBe(bucket => sums[bucket.BucketId] == 0m);
 
             CheckOverview(state, bucketList);
+            CheckLoans(state, journal);
             CheckJournalPages(journal);
         }
 
@@ -260,6 +263,7 @@ public class BudgetModelTests
                 summary.Available.ShouldBe(balance.Available);
                 summary.NetContributed.ShouldBe(balance.NetContributed);
                 summary.OutstandingPrincipal.ShouldBe(balance.OutstandingPrincipal);
+                summary.OpenLoans.ShouldBe(state.Loans.Count(loan => loan.LenderBucketId == balance.BucketId && loan.Status == LoanStatus.Open));
             }
 
             var expected = Currencies
@@ -276,6 +280,37 @@ public class BudgetModelTests
             overview.ReportingTotal.Amount.ShouldBe(Money.From(converted, Currency.Pln));
             overview.ReportingTotal.RateDate.ShouldBe(used.Count > 0 ? used.Min() : null);
             overview.ReportingTotal.UnavailableReason.ShouldBeNull();
+        }
+
+        // The loan list is the state's loans, field by field, open ones alone by default; and each loan's journal filter is
+        // its borrow, its repayments and their reversals.
+        private void CheckLoans(BudgetState state, List<JournalEntry> journal)
+        {
+            var handler = new GetLoansHandler(new BudgetStateLoader(budget, budget), clock);
+            var all = handler.Handle(new GetLoans(IncludeClosed: true), TestContext.Current.CancellationToken).AsTask().GetAwaiter().GetResult().Value;
+            var open = handler.Handle(new GetLoans(), TestContext.Current.CancellationToken).AsTask().GetAwaiter().GetResult().Value;
+
+            all.Select(loan => loan.Id).ShouldBe(state.Loans.Select(loan => loan.LoanId.Value));
+            open.Select(loan => loan.Id).ShouldBe(state.Loans.Where(loan => loan.Status == LoanStatus.Open).Select(loan => loan.LoanId.Value));
+            foreach (var (dto, loan) in all.Zip(state.Loans))
+            {
+                dto.LenderBucketId.ShouldBe(loan.LenderBucketId.Value);
+                dto.ToBucketId.ShouldBe(loan.ToBucketId?.Value);
+                dto.Principal.ShouldBe(loan.Principal);
+                dto.BorrowedOn.ShouldBe(loan.BorrowedOn);
+                dto.Repaid.ShouldBe(loan.Repaid);
+                dto.Outstanding.ShouldBe(loan.Outstanding);
+                dto.Status.ToString().ShouldBe(loan.Status.ToString());
+                dto.ClosedOn.ShouldBe(loan.ClosedOn);
+
+                var history = new GetJournalHandler(new BudgetStateLoader(budget, budget))
+                    .Handle(new GetJournal(Limit: GetJournal.MaxLimit, LoanId: loan.LoanId.Value), TestContext.Current.CancellationToken).AsTask().GetAwaiter().GetResult().Value;
+                var expected = journal.Where(entry => entry.Id == loan.LoanId.Value
+                    || (entry is Repayment repayment && repayment.LoanId == loan.LoanId)
+                    || (entry is Reversal reversal && journal.Any(target => target.Id == reversal.ReversedEntryId.Value
+                        && (target.Id == loan.LoanId.Value || (target is Repayment repaid && repaid.LoanId == loan.LoanId)))));
+                history.Entries.Select(entry => entry.Id).ShouldBe(ReplayOrder.Sort(expected).Reverse().Select(entry => entry.Id));
+            }
         }
 
         // Read page by page, the journal is every entry exactly once, newest first, and each reversed entry

@@ -72,8 +72,12 @@ public sealed record ReportingTotalDto(Money? Amount, DateOnly? RateDate, string
 /// zero for a savings bucket (invariant 1). For an investment bucket this is the net invested amount ("Invested"),
 /// which may be below zero; market value arrives with the Investments context (phase 3).
 /// </param>
-/// <param name="NetContributed">Opening balance + deposits + transfers in − spends − transfers out; reversed entries do not count.</param>
-/// <param name="OutstandingPrincipal">Borrowed and not yet repaid principal; always zero until loans exist (phase 1b).</param>
+/// <param name="NetContributed">
+/// Opening balance + deposits + transfers in − spends − transfers out + adjustments up − adjustments down + borrowed into the
+/// bucket − repayments paid from it; reversed entries do not count.
+/// </param>
+/// <param name="OutstandingPrincipal">Principal lent from this bucket and not repaid yet: the sum of its open loans' <c>outstanding</c>.</param>
+/// <param name="OpenLoans">How many loans from this bucket are open (plan 1b B19); <c>GET /api/v1/loans</c> lists them.</param>
 public sealed record BucketSummaryDto(
     Guid Id,
     string? Name,
@@ -83,4 +87,5 @@ public sealed record BucketSummaryDto(
     BucketSystemRole SystemRole,
     Money Available,
     Money NetContributed,
-    Money OutstandingPrincipal);
+    Money OutstandingPrincipal,
+    int OpenLoans = 0);

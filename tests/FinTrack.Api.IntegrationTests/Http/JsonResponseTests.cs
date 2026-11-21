@@ -154,7 +154,7 @@ public sealed class JsonResponseTests : IDisposable
             + "{\"currency\":\"EUR\",\"available\":{\"amount\":\"2.00\",\"currency\":\"EUR\"},\"conversion\":{\"amount\":{\"amount\":\"8.55\",\"currency\":\"PLN\"},\"rate\":\"4.2735\",\"rateDate\":\"2026-01-14\"}}],"
             + "\"reportingTotal\":{\"amount\":{\"amount\":\"19.05\",\"currency\":\"PLN\"},\"rateDate\":\"2026-01-14\",\"unavailableReason\":null},"
             + "\"buckets\":[{\"id\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b\",\"name\":null,\"currency\":\"PLN\",\"kind\":\"Savings\",\"profile\":null,\"systemRole\":\"Unallocated\","
-            + "\"available\":{\"amount\":\"10.50\",\"currency\":\"PLN\"},\"netContributed\":{\"amount\":\"10.50\",\"currency\":\"PLN\"},\"outstandingPrincipal\":{\"amount\":\"0.00\",\"currency\":\"PLN\"}}]}");
+            + "\"available\":{\"amount\":\"10.50\",\"currency\":\"PLN\"},\"netContributed\":{\"amount\":\"10.50\",\"currency\":\"PLN\"},\"outstandingPrincipal\":{\"amount\":\"0.00\",\"currency\":\"PLN\"},\"openLoans\":0}]}");
     }
 
     [Fact]
