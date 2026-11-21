@@ -17,8 +17,8 @@ public interface IEntryDependencies
 }
 
 /// <summary>
-/// The dependency rule of the entry types that exist. No type of phase 1a is referred to by another entry except
-/// through a reversal (which is not effective), so none has dependents; the types that do get their case in the
+/// The dependency rule of the entry types that exist. No type of phase 1a, and no <c>Adjustment</c> (plan 1b step 4), is
+/// referred to by another entry except through a reversal (which is not effective), so none has dependents; the types that do get their case in the
 /// step that adds them (loans step 5, plans step 9, pauses step 10). An unknown type is a bug: every new type must
 /// decide here.
 /// </summary>
@@ -33,7 +33,7 @@ public sealed class JournalEntryDependencies : IEntryDependencies
 
         return entry switch
         {
-            OpeningBalance or Deposit or Spend or Transfer or Reversal => false,
+            OpeningBalance or Deposit or Spend or Transfer or Reversal or Adjustment => false,
             _ => throw new InvalidOperationException($"The dependency rule does not know the entry type {entry.GetType().Name}."),
         };
     }

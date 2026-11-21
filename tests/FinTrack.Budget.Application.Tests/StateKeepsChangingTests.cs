@@ -37,7 +37,7 @@ public class StateKeepsChangingTests
     public static TheoryData<string> Handlers =>
     [
         "GetBuckets", "GetOwnerSettings", "GetBudgetOverview", "GetJournal",
-        "CreateBucket", "RenameBucket", "ArchiveBucket", "UnarchiveBucket", "SaveOwnerSettings", "AddDeposit", "ReverseEntry",
+        "CreateBucket", "RenameBucket", "ArchiveBucket", "UnarchiveBucket", "SaveOwnerSettings", "AddDeposit", "AddAdjustment", "ReverseEntry",
     ];
 
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -73,6 +73,8 @@ public class StateKeepsChangingTests
                 new SaveOwnerSettings(Currency.Eur, "Europe/Warsaw", "pl-PL"), Cancellation),
             "AddDeposit" => await new AddDepositHandler(new BucketEntryWriter(loader, ledger, owner, clock)).Handle(
                 new AddDeposit(Guid.CreateVersion7(), Money.From(10m, Currency.Pln), today, null, Currency.Pln, null, []), Cancellation),
+            "AddAdjustment" => await new AddAdjustmentHandler(new BucketEntryWriter(loader, ledger, owner, clock)).Handle(
+                new AddAdjustment(Guid.CreateVersion7(), Money.From(10m, Currency.Pln), Contracts.V1.Journal.AdjustmentDirection.Increase, today, null, Currency.Pln, "Recount", []), Cancellation),
             _ => await new ReverseEntryHandler(new JournalWriter(loader, ledger, owner, clock), new JournalEntryDependencies()).Handle(
                 new ReverseEntry(Guid.CreateVersion7(), Guid.CreateVersion7(), today, null, []), Cancellation),
         };

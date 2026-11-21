@@ -202,6 +202,84 @@ public sealed class JournalStorageTests(BudgetFixture fixture)
     }
 
     [Fact]
+    public async Task Adjustment_HasThePinnedShape_WithItsDirectionByName()
+    {
+        var owner = BudgetFixture.NewOwner();
+        var bucket = BucketId.From(Guid.CreateVersion7());
+        var adjustment = Adjustment.Create(JournalEntryId.From(Guid.CreateVersion7()), owner, bucket, Money.From(7.5m, Currency.Pln), AdjustmentDirection.Decrease,
+            Day, Day, new EntryInfo("Counted the cash box", [], EntrySource.Manual), FakeClock.DefaultStart).Value;
+        await AppendAsync(owner, adjustment);
+
+        (await RawAsync(adjustment.Id)).ShouldBe(new BsonDocument
+        {
+            { "_id", Uuid(adjustment.Id) },
+            { "type", "Adjustment" },
+            { "ownerId", Uuid(owner.Value) },
+            { "schemaVersion", 1 },
+            { "recordedAt", new BsonDateTime(FakeClock.DefaultStart.UtcDateTime) },
+            { "occurredOn", "2026-01-15" },
+            { "note", "Counted the cash box" },
+            { "tags", new BsonArray() },
+            { "source", "Manual" },
+            { "bucketId", Uuid(bucket.Value) },
+            { "amount", new BsonDocument { { "amount", new BsonDecimal128(7.50m) }, { "currency", "PLN" } } },
+            { "direction", "Decrease" },
+        });
+    }
+
+    [Theory]
+    [InlineData(AdjustmentDirection.Increase)]
+    [InlineData(AdjustmentDirection.Decrease)]
+    public async Task StoredAdjustment_ReadsBackWithTheSameContent(AdjustmentDirection direction)
+    {
+        var owner = BudgetFixture.NewOwner();
+        var adjustment = Adjustment.Create(JournalEntryId.From(Guid.CreateVersion7()), owner, BucketId.From(Guid.CreateVersion7()), Money.From(1.25m, Currency.Eur),
+            direction, Day, Day, new EntryInfo("Recount", ["cash"], EntrySource.Manual), FakeClock.DefaultStart).Value;
+        await AppendAsync(owner, adjustment);
+
+        var read = (await ReadAsync(owner)).ShouldHaveSingleItem().ShouldBeOfType<Adjustment>();
+
+        read.HasSameContent(adjustment).ShouldBeTrue();
+        read.Direction.ShouldBe(direction);
+        (await RawAsync(adjustment.Id))["direction"].ShouldBe(new BsonString(direction.ToString()));
+    }
+
+    [Theory]
+    [InlineData("a direction in another case", "increase")]
+    [InlineData("an unknown direction", "Up")]
+    public async Task StoredAdjustment_WithADirectionThatIsNotAName_FailsToRead(string reason, string direction)
+    {
+        var owner = BudgetFixture.NewOwner();
+        await fixture.Raw(BudgetCollections.Journal).InsertOneAsync(AdjustmentDocument(owner, new BsonString(direction)), cancellationToken: Cancellation);
+
+        await Should.ThrowAsync<Exception>(() => ReadAsync(owner), reason);
+    }
+
+    [Fact]
+    public async Task StoredAdjustment_WithADirectionAsANumber_OrWithoutOne_FailsToRead()
+    {
+        var numbered = BudgetFixture.NewOwner();
+        await fixture.Raw(BudgetCollections.Journal).InsertOneAsync(AdjustmentDocument(numbered, new BsonInt32(1)), cancellationToken: Cancellation);
+        await Should.ThrowAsync<Exception>(() => ReadAsync(numbered));
+
+        var missing = BudgetFixture.NewOwner();
+        var document = AdjustmentDocument(missing, new BsonString("Increase"));
+        document.Remove("direction");
+        await fixture.Raw(BudgetCollections.Journal).InsertOneAsync(document, cancellationToken: Cancellation);
+        await Should.ThrowAsync<Exception>(() => ReadAsync(missing));
+    }
+
+    [Fact]
+    public async Task StoredAdjustment_WrittenByHand_IsRead()
+    {
+        // The control for the failures above: the same document with a valid direction reads.
+        var owner = BudgetFixture.NewOwner();
+        await fixture.Raw(BudgetCollections.Journal).InsertOneAsync(AdjustmentDocument(owner, new BsonString("Increase")), cancellationToken: Cancellation);
+
+        (await ReadAsync(owner)).ShouldHaveSingleItem().ShouldBeOfType<Adjustment>().Direction.ShouldBe(AdjustmentDirection.Increase);
+    }
+
+    [Fact]
     public void EveryEntryType_HasAnExplicitStableName()
     {
         BudgetMongoMapping.Register();
@@ -346,6 +424,15 @@ public sealed class JournalStorageTests(BudgetFixture fixture)
         await fixture.Raw(BudgetCollections.Journal).Find(new BsonDocument("_id", Uuid(id))).SingleAsync(Cancellation);
 
     private static BsonBinaryData Uuid(Guid value) => new(value, GuidRepresentation.Standard);
+
+    private static BsonDocument AdjustmentDocument(OwnerId owner, BsonValue direction)
+    {
+        var document = ValidDocument(owner);
+        document["type"] = "Adjustment";
+        document.InsertAt(document.IndexOfName("tags"), new BsonElement("note", "Recount"));
+        document.Add("direction", direction);
+        return document;
+    }
 
     private static BsonDocument ValidDocument(OwnerId owner) => new()
     {

@@ -16,6 +16,7 @@ namespace FinTrack.Budget.Application.Tests.Journal;
 public class ReverseAndArchiveHandlerTests
 {
     private static readonly DateOnly Today = new(2026, 1, 15);
+    private static readonly EntryInfo Reason = new("Counted the cash box", [], EntrySource.Manual);
 
     private readonly CallLog log = new();
     private readonly FakeLedger ledger;
@@ -96,6 +97,39 @@ public class ReverseAndArchiveHandlerTests
         store.Journal.Add(spend);
 
         (await Reverse(spend.Id)).ShouldFailWith(BudgetErrorCodes.BucketArchived, ErrorKind.BusinessRule);
+    }
+
+    [Theory]
+    [InlineData(AdjustmentDirection.Increase)]
+    [InlineData(AdjustmentDirection.Decrease)]
+    public async Task ReversingAnAdjustmentOfAnArchivedBucket_IsRejected(AdjustmentDirection direction)
+    {
+        var archived = StoredBuckets.Of(Guid.CreateVersion7(), "Old", Currency.Pln, 2, FakeClock.DefaultStart, BucketStatus.Archived);
+        store.Buckets.Add(archived);
+        var adjustment = Adjustment.Create(JournalEntryId.From(Guid.CreateVersion7()), FakeOwnerContext.Owner, archived.BucketId, Money.From(1m, Currency.Pln),
+            direction, Today, Today, Reason, FakeClock.DefaultStart).Value;
+        store.Journal.Add(adjustment);
+
+        (await Reverse(adjustment.Id)).ShouldFailWith(BudgetErrorCodes.BucketArchived, ErrorKind.BusinessRule);
+        ledger.Commits.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ReversingAnAdjustment_RestoresTheBalance_UnlessItFundedALaterSpend()
+    {
+        // The deposit of 100 on day -10, then a decrease of 30 on day -5, an increase of 50 on day -4 and a spend of 120 on day -3.
+        var decrease = Adjustment.Create(JournalEntryId.From(Guid.CreateVersion7()), FakeOwnerContext.Owner, cushion.BucketId, Money.From(30m, Currency.Pln),
+            AdjustmentDirection.Decrease, Today.AddDays(-5), Today, Reason, FakeClock.DefaultStart).Value;
+        var increase = Adjustment.Create(JournalEntryId.From(Guid.CreateVersion7()), FakeOwnerContext.Owner, cushion.BucketId, Money.From(50m, Currency.Pln),
+            AdjustmentDirection.Increase, Today.AddDays(-4), Today, Reason, FakeClock.DefaultStart).Value;
+        var spend = Spend.Create(JournalEntryId.From(Guid.CreateVersion7()), FakeOwnerContext.Owner, cushion.BucketId, Money.From(120m, Currency.Pln),
+            Today.AddDays(-3), Today, EntryInfo.None, FakeClock.DefaultStart).Value;
+        store.Journal.AddRange([decrease, increase, spend]);
+
+        (await Reverse(increase.Id)).ShouldFailWith(BudgetErrorCodes.BucketInsufficientFunds, ErrorKind.BusinessRule)
+            .Parameters["date"].ShouldBe("2026-01-12");
+        (await Reverse(decrease.Id)).IsSuccess.ShouldBeTrue();
+        ledger.Commits.ShouldHaveSingleItem().Appends.ShouldHaveSingleItem().ShouldBeOfType<Reversal>().ReversedEntryId.ShouldBe(decrease.EntryId);
     }
 
     [Fact]
@@ -216,6 +250,7 @@ public class ReverseAndArchiveHandlerTests
     [InlineData("Spend")]
     [InlineData("Transfer")]
     [InlineData("Reversal")]
+    [InlineData("Adjustment")]
     public void ThePhase1aLookup_FindsNoDependents(string type)
     {
         var id = JournalEntryId.From(Guid.CreateVersion7());
@@ -226,6 +261,7 @@ public class ReverseAndArchiveHandlerTests
             "Deposit" => deposit,
             "Spend" => Spend.Create(id, FakeOwnerContext.Owner, cushion.BucketId, amount, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value,
             "Transfer" => Transfer.Create(id, FakeOwnerContext.Owner, cushion.BucketId, BucketId.From(Guid.CreateVersion7()), amount, amount, null, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value,
+            "Adjustment" => Adjustment.Create(id, FakeOwnerContext.Owner, cushion.BucketId, amount, AdjustmentDirection.Increase, Today, Today, Reason, FakeClock.DefaultStart).Value,
             _ => Reversal.Create(id, FakeOwnerContext.Owner, deposit.EntryId, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value,
         };
         var snapshot = new BudgetSnapshot(1, store.Settings, [.. store.Buckets], [.. store.Journal, entry]);

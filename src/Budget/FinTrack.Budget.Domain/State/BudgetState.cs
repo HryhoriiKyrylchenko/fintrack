@@ -13,7 +13,7 @@ namespace FinTrack.Budget.Domain.State;
 /// <remarks>
 /// <para>
 /// Balances follow 4.3: <c>NetContributed</c> = opening balance + deposits + transfers in − spends −
-/// transfers out; <c>OutstandingPrincipal</c> is 0 until loans exist
+/// transfers out + adjustments up − adjustments down; <c>OutstandingPrincipal</c> is 0 until loans exist
 /// (phase 1b); <c>Available</c> = <c>NetContributed</c> − <c>OutstandingPrincipal</c>. Every amount stays in
 /// its bucket's currency; currencies are never added together (invariant 11).
 /// </para>
@@ -105,6 +105,16 @@ public sealed class BudgetState
         {
             NetContributed = balance.NetContributed - spend.Amount,
         }),
+        Adjustment { Direction: AdjustmentDirection.Increase } increase => With(increase.BucketId, increase.OccurredOn, balance => balance with
+        {
+            NetContributed = balance.NetContributed + increase.Amount,
+            AdjustedIn = balance.AdjustedIn + increase.Amount,
+        }),
+        Adjustment { Direction: AdjustmentDirection.Decrease } decrease => With(decrease.BucketId, decrease.OccurredOn, balance => balance with
+        {
+            NetContributed = balance.NetContributed - decrease.Amount,
+            AdjustedOut = balance.AdjustedOut + decrease.Amount,
+        }),
         Transfer transfer => With(transfer.FromBucketId, transfer.OccurredOn, balance => balance with
             {
                 NetContributed = balance.NetContributed - transfer.FromAmount,
@@ -156,9 +166,11 @@ public sealed class BudgetState
 /// <summary>One bucket's balances (ARCHITECTURE 4.3), all in the bucket's currency.</summary>
 /// <param name="BucketId">The bucket.</param>
 /// <param name="Kind">Savings or investment (only savings buckets must never go below zero).</param>
-/// <param name="NetContributed">Opening balance + deposits + transfers in − spends − transfers out.</param>
+/// <param name="NetContributed">Opening balance + deposits + transfers in − spends − transfers out + adjustments up − adjustments down.</param>
 /// <param name="OutstandingPrincipal">Borrowed − repaid principal; 0 until loans exist (phase 1b).</param>
 /// <param name="Deposited">The sum of deposits: the only income (invariant 5).</param>
+/// <param name="AdjustedIn">The sum of adjustments up (plan 1b B14): never income, kept apart for the reports.</param>
+/// <param name="AdjustedOut">The sum of adjustments down, above zero.</param>
 /// <param name="HasOpeningBalance">Whether the bucket has an opening balance (D13: at most one).</param>
 /// <param name="FirstNegativeOn">The first date in replay order on which <see cref="Available"/> was below zero, or <c>null</c>.</param>
 public sealed record BucketBalance(
@@ -167,6 +179,8 @@ public sealed record BucketBalance(
     Money NetContributed,
     Money OutstandingPrincipal,
     Money Deposited,
+    Money AdjustedIn,
+    Money AdjustedOut,
     bool HasOpeningBalance,
     DateOnly? FirstNegativeOn)
 {
@@ -178,7 +192,7 @@ public sealed record BucketBalance(
     {
         ArgumentNullException.ThrowIfNull(bucket);
         var zero = Money.Zero(bucket.Currency);
-        return new BucketBalance(bucket.BucketId, bucket.Kind, zero, zero, zero, HasOpeningBalance: false, FirstNegativeOn: null);
+        return new BucketBalance(bucket.BucketId, bucket.Kind, zero, zero, zero, zero, zero, HasOpeningBalance: false, FirstNegativeOn: null);
     }
 }
 

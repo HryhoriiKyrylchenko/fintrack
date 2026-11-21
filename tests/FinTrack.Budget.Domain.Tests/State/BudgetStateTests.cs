@@ -137,7 +137,7 @@ public class BudgetStateTests
         // exist (phase 1b) no replay produces a principal, so the formula (invariant 2) is pinned here directly.
         var balance = new BucketBalance(
             BucketId.From(Guid.CreateVersion7()), BucketKind.Savings, Money.From(1_000_000m, Currency.Pln), Money.From(100_000m, Currency.Pln),
-            Money.Zero(Currency.Pln), HasOpeningBalance: false, FirstNegativeOn: null);
+            Money.Zero(Currency.Pln), Money.Zero(Currency.Pln), Money.Zero(Currency.Pln), HasOpeningBalance: false, FirstNegativeOn: null);
 
         balance.Available.ShouldBe(Money.From(900_000m, Currency.Pln));
     }

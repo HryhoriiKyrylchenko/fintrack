@@ -706,6 +706,9 @@
   <data name="Journal.Type.Reversal" xml:space="preserve">
     <value>Reversal</value>
   </data>
+  <data name="Journal.Type.Adjustment" xml:space="preserve">
+    <value>Adjustment</value>
+  </data>
   <data name="Journal.TheType.OpeningBalance" xml:space="preserve">
     <value>the opening balance</value>
   </data>
@@ -720,6 +723,9 @@
   </data>
   <data name="Journal.TheType.Reversal" xml:space="preserve">
     <value>the reversal</value>
+  </data>
+  <data name="Journal.TheType.Adjustment" xml:space="preserve">
+    <value>the adjustment</value>
   </data>
   <data name="Journal.TransferLine" xml:space="preserve">
     <value>{0} → {1}</value>

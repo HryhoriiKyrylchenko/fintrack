@@ -19,7 +19,7 @@ public class GroupIdTests
     private static readonly JournalEntryId EntryId = JournalEntryId.From(Guid.Parse("01900000-0000-7000-8000-0000000000aa"));
     private static readonly JournalEntryId ReversedId = JournalEntryId.From(Guid.Parse("01900000-0000-7000-8000-0000000000bb"));
 
-    public static TheoryData<string> Types => ["OpeningBalance", "Deposit", "Spend", "Transfer", "Reversal"];
+    public static TheoryData<string> Types => ["OpeningBalance", "Deposit", "Spend", "Transfer", "Reversal", "Adjustment"];
 
     [Theory]
     [MemberData(nameof(Types))]
@@ -56,6 +56,7 @@ public class GroupIdTests
             "Deposit" => Deposit.Create(EntryId, Owner, Cushion, amount, Today, Today, info, at).Value,
             "Spend" => Spend.Create(EntryId, Owner, Cushion, amount, Today, Today, info, at).Value,
             "Transfer" => Transfer.Create(EntryId, Owner, Cushion, Holiday, amount, amount, null, Today, Today, info, at).Value,
+            "Adjustment" => Adjustment.Create(EntryId, Owner, Cushion, amount, AdjustmentDirection.Decrease, Today, Today, new EntryInfo("Recount", info.Tags, info.Source, info.GroupId), at).Value,
             _ => Reversal.Create(EntryId, Owner, ReversedId, Today, Today, info, at).Value,
         };
     }
