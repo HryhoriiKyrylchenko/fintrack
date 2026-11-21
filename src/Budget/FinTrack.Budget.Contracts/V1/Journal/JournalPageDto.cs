@@ -22,9 +22,18 @@ public sealed record JournalPageDto(IReadOnlyList<JournalEntryDto> Entries, stri
 /// <param name="Source">Where the entry came from: <c>Manual</c>, <c>Import:&lt;connector&gt;</c> or <c>Agent:&lt;name&gt;</c>.</param>
 /// <param name="ExternalId">The source's own ID of an imported entry, or <c>null</c> (always in phase 1a).</param>
 /// <param name="BucketId">The bucket of an <c>OpeningBalance</c>, <c>Deposit</c>, <c>Spend</c> or <c>Adjustment</c>; <c>null</c> for other types.</param>
-/// <param name="Amount">The amount of an <c>OpeningBalance</c>, <c>Deposit</c>, <c>Spend</c> or <c>Adjustment</c>, in its bucket's currency; <c>null</c> for other types.</param>
-/// <param name="FromBucketId">The source of a <c>Transfer</c>; <c>null</c> for other types.</param>
-/// <param name="ToBucketId">The destination of a <c>Transfer</c>; <c>null</c> for other types.</param>
+/// <param name="Amount">
+/// The amount of an <c>OpeningBalance</c>, <c>Deposit</c>, <c>Spend</c> or <c>Adjustment</c>, in its bucket's currency; the principal of a
+/// <c>Borrow</c> and the amount of a <c>Repayment</c>, in the lender's currency; <c>null</c> for other types.
+/// </param>
+/// <param name="FromBucketId">
+/// The source of a <c>Transfer</c>; the lender of a <c>Borrow</c>; the source of a <c>Repayment</c>, or <c>null</c> when it was paid with
+/// new money from outside; <c>null</c> for other types.
+/// </param>
+/// <param name="ToBucketId">
+/// The destination of a <c>Transfer</c>; the destination of a <c>Borrow</c>, or <c>null</c> when the money left the app; the lender of a
+/// <c>Repayment</c>; <c>null</c> for other types.
+/// </param>
 /// <param name="FromAmount">Everything that left the source of a <c>Transfer</c>, fee included, in the source's currency; <c>null</c> for other types.</param>
 /// <param name="ToAmount">What arrived at the destination of a <c>Transfer</c>, in its currency; <c>null</c> for other types.</param>
 /// <param name="Fee">The fee of a <c>Transfer</c> (part of <paramref name="FromAmount"/>, in the source's currency); <c>null</c> when there was none and for other types.</param>
@@ -38,6 +47,7 @@ public sealed record JournalPageDto(IReadOnlyList<JournalEntryDto> Entries, stri
 /// as if it never happened, at its original date.
 /// </param>
 /// <param name="Direction">Whether an <c>Adjustment</c> raised or lowered its bucket; <c>null</c> for other types (plan 1b B18).</param>
+/// <param name="LoanId">The loan of a <c>Borrow</c> (its own ID) or a <c>Repayment</c>; <c>null</c> for other types (plan 1b B18).</param>
 public sealed record JournalEntryDto(
     Guid Id,
     JournalEntryType Type,
@@ -58,7 +68,8 @@ public sealed record JournalEntryDto(
     decimal? Rate,
     Guid? ReversedEntryId,
     Guid? ReversedBy,
-    AdjustmentDirection? Direction = null);
+    AdjustmentDirection? Direction = null,
+    Guid? LoanId = null);
 
 /// <summary>The type of a journal entry (ARCHITECTURE 4.2). JSON: the member's name, which is also the stored type name.</summary>
 public enum JournalEntryType
@@ -80,4 +91,10 @@ public enum JournalEntryType
 
     /// <summary>A manual correction of one bucket, up or down, with a reason (the note); never income.</summary>
     Adjustment,
+
+    /// <summary>Money borrowed from a savings bucket with the obligation to return it; opens a loan with this entry's ID.</summary>
+    Borrow,
+
+    /// <summary>Loan principal paid back to its lender; never income.</summary>
+    Repayment,
 }

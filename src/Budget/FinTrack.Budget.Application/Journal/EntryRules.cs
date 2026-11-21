@@ -20,6 +20,9 @@ public static class EntryRules
     /// <summary>The rule code for two tags that differ only in case.</summary>
     public const string DistinctTags = "DistinctTags";
 
+    /// <summary>The rule code for an optional side (a borrow's destination, a repayment's source) named both by bucket and as <c>Unallocated</c>.</summary>
+    public const string AtMostOneTarget = "AtMostOneTarget";
+
     /// <summary>The note rules: optional, but when present 1 to 500 characters; line breaks allowed.</summary>
     public static IRuleBuilderOptions<T, string?> EntryNote<T>(this IRuleBuilder<T, string?> rule) =>
         rule.Must(note => note is null || note.Length > 0).WithErrorCode("NotEmptyValidator")

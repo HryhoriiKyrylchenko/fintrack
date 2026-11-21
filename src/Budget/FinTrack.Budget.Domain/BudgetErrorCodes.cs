@@ -42,8 +42,36 @@ public static class BudgetErrorCodes
     /// <summary>The bucket already has an opening balance that is not reversed (D13). No parameters.</summary>
     public const string BucketOpeningBalanceExists = "bucket.opening_balance_exists";
 
-    /// <summary>The bucket still holds money (phase 1a: <c>Available</c> is not zero) and cannot be archived. No parameters.</summary>
+    /// <summary>
+    /// The bucket's <c>NetContributed</c> is not zero, so it cannot be archived (plan 1b B17: <c>Available</c> alone would
+    /// miss a lender whose money is all lent out). No parameters.
+    /// </summary>
     public const string BucketNotEmpty = "bucket.not_empty";
+
+    /// <summary>The bucket is the lender of an open loan and cannot be archived (plan 1b B17); checked before <see cref="BucketNotEmpty"/>. No parameters.</summary>
+    public const string BucketHasOpenLoan = "bucket.has_open_loan";
+
+    /// <summary>Money can be borrowed from a savings bucket only, never from an investment bucket (ARCHITECTURE 4.9, plan 1b B2). No parameters.</summary>
+    public const string BucketBorrowNotAllowed = "bucket.borrow_not_allowed";
+
+    /// <summary>A borrow's destination is its lender (plan 1b B2). No parameters.</summary>
+    public const string BorrowSameBucket = "borrow.same_bucket";
+
+    /// <summary>No loan with this ID exists for the owner: no effective borrow has it (plan 1b B2). No parameters.</summary>
+    public const string LoanNotFound = "loan.not_found";
+
+    /// <summary>The loan is fully repaid; nothing is outstanding (plan 1b B2). No parameters.</summary>
+    public const string LoanClosed = "loan.closed";
+
+    /// <summary>
+    /// A repayment would take a loan's outstanding principal below zero at some point of the replay order (invariant 4,
+    /// plan 1b B3, B4), also when it is dated before its borrow. Parameter <c>date</c>: the first such day
+    /// (<c>yyyy-MM-dd</c>); never an amount.
+    /// </summary>
+    public const string LoanRepaymentExceedsOutstanding = "loan.repayment_exceeds_outstanding";
+
+    /// <summary>A repayment is paid from its own lender (plan 1b B2). No parameters.</summary>
+    public const string RepaymentFromLender = "repayment.from_lender";
 
     /// <summary>No entry with this ID exists for the owner. No parameters.</summary>
     public const string EntryNotFound = "entry.not_found";

@@ -49,6 +49,8 @@ public static class BudgetMongoMapping
         [typeof(Spend)] = "Spend",
         [typeof(Transfer)] = "Transfer",
         [typeof(Adjustment)] = "Adjustment",
+        [typeof(Borrow)] = "Borrow",
+        [typeof(Repayment)] = "Repayment",
         [typeof(Reversal)] = "Reversal",
     };
 
@@ -75,6 +77,8 @@ public static class BudgetMongoMapping
             BsonClassMap.RegisterClassMap<Spend>(MapEntryType);
             BsonClassMap.RegisterClassMap<Adjustment>(MapAdjustment);
             BsonClassMap.RegisterClassMap<Transfer>(MapTransfer);
+            BsonClassMap.RegisterClassMap<Borrow>(MapBorrow);
+            BsonClassMap.RegisterClassMap<Repayment>(MapRepayment);
             BsonClassMap.RegisterClassMap<Reversal>(MapReversal);
 
             registered = true;
@@ -147,6 +151,24 @@ public static class BudgetMongoMapping
         Map(map, transfer => transfer.ToAmount, "toAmount");
         MapOptional(map, transfer => transfer.Fee, "fee");
         Map(map, transfer => transfer.Rate, "rate");
+        MapEntryType(map);
+    }
+
+    // The lender, the principal, and the destination only when the money stayed in the app (plan 1b B2).
+    private static void MapBorrow(BsonClassMap<Borrow> map)
+    {
+        Map(map, borrow => borrow.LenderBucketId, "lenderBucketId");
+        Map(map, borrow => borrow.Principal, "principal");
+        MapOptional(map, borrow => borrow.ToBucketId, "toBucketId");
+        MapEntryType(map);
+    }
+
+    // The loan, the amount, and the source only when the money came from a bucket (plan 1b B2).
+    private static void MapRepayment(BsonClassMap<Repayment> map)
+    {
+        Map(map, repayment => repayment.LoanId, "loanId");
+        Map(map, repayment => repayment.Amount, "amount");
+        MapOptional(map, repayment => repayment.FromBucketId, "fromBucketId");
         MapEntryType(map);
     }
 

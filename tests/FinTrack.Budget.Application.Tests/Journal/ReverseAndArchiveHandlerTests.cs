@@ -251,6 +251,8 @@ public class ReverseAndArchiveHandlerTests
     [InlineData("Transfer")]
     [InlineData("Reversal")]
     [InlineData("Adjustment")]
+    [InlineData("Repayment")]
+    [InlineData("Borrow")]
     public void ThePhase1aLookup_FindsNoDependents(string type)
     {
         var id = JournalEntryId.From(Guid.CreateVersion7());
@@ -262,12 +264,32 @@ public class ReverseAndArchiveHandlerTests
             "Spend" => Spend.Create(id, FakeOwnerContext.Owner, cushion.BucketId, amount, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value,
             "Transfer" => Transfer.Create(id, FakeOwnerContext.Owner, cushion.BucketId, BucketId.From(Guid.CreateVersion7()), amount, amount, null, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value,
             "Adjustment" => Adjustment.Create(id, FakeOwnerContext.Owner, cushion.BucketId, amount, AdjustmentDirection.Increase, Today, Today, Reason, FakeClock.DefaultStart).Value,
+            "Repayment" => Repayment.Create(id, FakeOwnerContext.Owner, Domain.Loans.LoanId.From(Guid.CreateVersion7()), amount, null, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value,
+            "Borrow" => Borrow.Create(id, FakeOwnerContext.Owner, cushion.BucketId, amount, null, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value,
             _ => Reversal.Create(id, FakeOwnerContext.Owner, deposit.EntryId, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value,
         };
         var snapshot = new BudgetSnapshot(1, store.Settings, [.. store.Buckets], [.. store.Journal, entry]);
 
         new JournalEntryDependencies().HasDependents(entry, snapshot).ShouldBeFalse();
         new JournalEntryDependencies().HasDependents(deposit, snapshot).ShouldBeFalse();
+    }
+
+    // A borrow has dependents only while an effective repayment refers to it: a reversed repayment or another loan's does not count.
+    [Fact]
+    public void ABorrow_HasDependents_OnlyWhileAnEffectiveRepaymentOfItsLoanExists()
+    {
+        var amount = Money.From(1m, Currency.Pln);
+        var borrow = Borrow.Create(JournalEntryId.From(Guid.CreateVersion7()), FakeOwnerContext.Owner, cushion.BucketId, amount, null, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value;
+        var other = Borrow.Create(JournalEntryId.From(Guid.CreateVersion7()), FakeOwnerContext.Owner, cushion.BucketId, amount, null, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value;
+        var repayment = Repayment.Create(JournalEntryId.From(Guid.CreateVersion7()), FakeOwnerContext.Owner, borrow.LoanId, amount, null, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value;
+        var ofOther = Repayment.Create(JournalEntryId.From(Guid.CreateVersion7()), FakeOwnerContext.Owner, other.LoanId, amount, null, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value;
+        var reversal = Reversal.Create(JournalEntryId.From(Guid.CreateVersion7()), FakeOwnerContext.Owner, repayment.EntryId, Today, Today, EntryInfo.None, FakeClock.DefaultStart).Value;
+        var lookup = new JournalEntryDependencies();
+
+        lookup.HasDependents(borrow, Snapshot(borrow, other, ofOther)).ShouldBeFalse();
+        lookup.HasDependents(borrow, Snapshot(borrow, other, ofOther, repayment)).ShouldBeTrue();
+        lookup.HasDependents(borrow, Snapshot(borrow, other, ofOther, repayment, reversal)).ShouldBeFalse();
+        lookup.HasDependents(other, Snapshot(borrow, other, ofOther)).ShouldBeTrue();
     }
 
     [Fact]
@@ -280,6 +302,8 @@ public class ReverseAndArchiveHandlerTests
         (await Archive(empty.Id)).ShouldFailWith(BudgetErrorCodes.SettingsNotFound, ErrorKind.NotFound);
         ledger.Commits.ShouldBeEmpty();
     }
+
+    private BudgetSnapshot Snapshot(params JournalEntry[] entries) => new(1, store.Settings, [.. store.Buckets], [.. store.Journal, .. entries]);
 
     private Task<FluentResults.Result> Reverse(Guid target) => Send(new ReverseEntry(Guid.CreateVersion7(), target, Today, null, []));
 

@@ -37,7 +37,7 @@ public class StateKeepsChangingTests
     public static TheoryData<string> Handlers =>
     [
         "GetBuckets", "GetOwnerSettings", "GetBudgetOverview", "GetJournal",
-        "CreateBucket", "RenameBucket", "ArchiveBucket", "UnarchiveBucket", "SaveOwnerSettings", "AddDeposit", "AddAdjustment", "ReverseEntry",
+        "CreateBucket", "RenameBucket", "ArchiveBucket", "UnarchiveBucket", "SaveOwnerSettings", "AddDeposit", "AddAdjustment", "AddBorrow", "AddRepayment", "ReverseEntry",
     ];
 
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -75,6 +75,10 @@ public class StateKeepsChangingTests
                 new AddDeposit(Guid.CreateVersion7(), Money.From(10m, Currency.Pln), today, null, Currency.Pln, null, []), Cancellation),
             "AddAdjustment" => await new AddAdjustmentHandler(new BucketEntryWriter(loader, ledger, owner, clock)).Handle(
                 new AddAdjustment(Guid.CreateVersion7(), Money.From(10m, Currency.Pln), Contracts.V1.Journal.AdjustmentDirection.Increase, today, null, Currency.Pln, "Recount", []), Cancellation),
+            "AddBorrow" => await new AddBorrowHandler(new JournalWriter(loader, ledger, owner, clock)).Handle(
+                new AddBorrow(Guid.CreateVersion7(), Guid.CreateVersion7(), Money.From(10m, Currency.Pln), today, null, null, null, []), Cancellation),
+            "AddRepayment" => await new AddRepaymentHandler(new JournalWriter(loader, ledger, owner, clock)).Handle(
+                new AddRepayment(Guid.CreateVersion7(), Guid.CreateVersion7(), Money.From(10m, Currency.Pln), today, null, null, null, []), Cancellation),
             _ => await new ReverseEntryHandler(new JournalWriter(loader, ledger, owner, clock), new JournalEntryDependencies()).Handle(
                 new ReverseEntry(Guid.CreateVersion7(), Guid.CreateVersion7(), today, null, []), Cancellation),
         };

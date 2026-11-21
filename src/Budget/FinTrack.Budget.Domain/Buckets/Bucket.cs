@@ -176,14 +176,17 @@ public sealed class Bucket : IMutableDocument
     }
 
     /// <summary>
-    /// The same bucket, archived (ARCHITECTURE 4.1): it frees its name and accepts no new entries.
-    /// Fails with <see cref="BudgetErrorCodes.BucketSystemBucket"/> for a system bucket and with
-    /// <see cref="BudgetErrorCodes.BucketNotEmpty"/> while its <c>Available</c> is not zero (phase 1a has no
-    /// loans or plans, the other things that keep a bucket open). Identity and version are kept.
+    /// The same bucket, archived (ARCHITECTURE 4.1, invariant 8, plan 1b B17): it frees its name and accepts no new
+    /// entries. Fails, in this order, with <see cref="BudgetErrorCodes.BucketSystemBucket"/> for a system bucket, with
+    /// <see cref="BudgetErrorCodes.BucketHasOpenLoan"/> while it lends to an open loan, and with
+    /// <see cref="BudgetErrorCodes.BucketNotEmpty"/> while its <c>NetContributed</c> is not zero (<c>Available</c> alone
+    /// would miss a lender whose money is all lent out). An active plan (<c>bucket.has_active_plan</c>) joins in step 9.
+    /// Identity and version are kept.
     /// </summary>
     /// <param name="balance">This bucket's balance, from the state builder.</param>
+    /// <param name="lendsToAnOpenLoan">Whether the bucket is the lender of a loan that is open today, from the state builder.</param>
     /// <exception cref="ArgumentException">The balance is another bucket's (a bug).</exception>
-    public Result<Bucket> Archive(BucketBalance balance)
+    public Result<Bucket> Archive(BucketBalance balance, bool lendsToAnOpenLoan)
     {
         ArgumentNullException.ThrowIfNull(balance);
         if (balance.BucketId != BucketId)
@@ -196,7 +199,12 @@ public sealed class Bucket : IMutableDocument
             return Result.Fail<Bucket>(AppError.BusinessRule(BudgetErrorCodes.BucketSystemBucket));
         }
 
-        return balance.Available.Amount != 0m
+        if (lendsToAnOpenLoan)
+        {
+            return Result.Fail<Bucket>(AppError.BusinessRule(BudgetErrorCodes.BucketHasOpenLoan));
+        }
+
+        return balance.NetContributed.Amount != 0m
             ? Result.Fail<Bucket>(AppError.BusinessRule(BudgetErrorCodes.BucketNotEmpty))
             : Result.Ok(new Bucket(Id, OwnerId, SchemaVersion, Version, CreatedAt, UpdatedAt, Name, Currency, Kind, Profile, BucketStatus.Archived, SystemRole));
     }

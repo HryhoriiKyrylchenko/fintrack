@@ -87,15 +87,20 @@ public sealed class ReverseEntryHandler(JournalWriter writer, IEntryDependencies
         }
 
         // An archived bucket accepts no change to its balance, and a reversal changes it.
-        return BucketsOf(target).Any(bucketId => state.FindBucket(bucketId.Value) is { Status: BucketStatus.Archived })
+        return BucketsOf(target, state).Any(bucketId => state.FindBucket(bucketId.Value) is { Status: BucketStatus.Archived })
             ? Result.Fail(AppError.BusinessRule(BudgetErrorCodes.BucketArchived))
             : Result.Ok();
     }
 
-    private static IEnumerable<BucketId> BucketsOf(JournalEntry entry) => entry switch
+    // The buckets whose balances the entry changes: for a repayment also its loan's lender (found by its borrow).
+    private static IEnumerable<BucketId> BucketsOf(JournalEntry entry, BudgetSnapshot state) => entry switch
     {
         SingleBucketEntry single => [single.BucketId],
         Transfer transfer => [transfer.FromBucketId, transfer.ToBucketId],
-        _ => [],
+        Borrow borrow => [borrow.LenderBucketId, .. Optional(borrow.ToBucketId)],
+        Repayment repayment => [.. Optional(repayment.FromBucketId), .. Optional((state.FindEntry(repayment.LoanId.Value) as Borrow)?.LenderBucketId)],
+        _ => throw new InvalidOperationException($"The reversal does not know the buckets of entry type {entry.GetType().Name}."),
     };
+
+    private static IEnumerable<BucketId> Optional(BucketId? bucketId) => bucketId is { } id ? [id] : [];
 }

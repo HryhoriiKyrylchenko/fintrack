@@ -84,7 +84,7 @@ public sealed class GetJournalHandler(BudgetStateLoader loader) : IQueryHandler<
         }
 
         IReadOnlyList<JournalEntryDto> entries =
-            [.. page.Select(entry => JournalContractMapping.ToDto(entry, reversedBy.TryGetValue(entry.Id, out var reversal) ? reversal : null))];
+            [.. page.Select(entry => JournalContractMapping.ToDto(entry, reversedBy.TryGetValue(entry.Id, out var reversal) ? reversal : null, byId))];
 
         return Result.Ok(new JournalPageDto(entries, hasMore ? JournalCursor.Encode(ReplayPosition.Of(page[^1])) : null));
     }
@@ -94,6 +94,8 @@ public sealed class GetJournalHandler(BudgetStateLoader loader) : IQueryHandler<
     {
         SingleBucketEntry single => single.BucketId == bucketId,
         Transfer transfer => transfer.FromBucketId == bucketId || transfer.ToBucketId == bucketId,
+        Borrow borrow => borrow.LenderBucketId == bucketId || borrow.ToBucketId == bucketId,
+        Repayment repayment => repayment.FromBucketId == bucketId || JournalContractMapping.LenderOf(repayment, byId) == bucketId,
         Reversal reversal => byId.TryGetValue(reversal.ReversedEntryId.Value, out var reversed) && Touches(reversed, bucketId, byId),
         _ => throw new ArgumentOutOfRangeException(nameof(entry), entry?.GetType().Name, "Unknown journal entry type."),
     };
