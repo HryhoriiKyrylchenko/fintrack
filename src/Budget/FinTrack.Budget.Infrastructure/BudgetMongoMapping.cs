@@ -48,6 +48,7 @@ public static class BudgetMongoMapping
         [typeof(Deposit)] = "Deposit",
         [typeof(Spend)] = "Spend",
         [typeof(Transfer)] = "Transfer",
+        [typeof(Adjustment)] = "Adjustment",
         [typeof(Reversal)] = "Reversal",
     };
 
@@ -72,6 +73,7 @@ public static class BudgetMongoMapping
             BsonClassMap.RegisterClassMap<OpeningBalance>(MapEntryType);
             BsonClassMap.RegisterClassMap<Deposit>(MapEntryType);
             BsonClassMap.RegisterClassMap<Spend>(MapEntryType);
+            BsonClassMap.RegisterClassMap<Adjustment>(MapAdjustment);
             BsonClassMap.RegisterClassMap<Transfer>(MapTransfer);
             BsonClassMap.RegisterClassMap<Reversal>(MapReversal);
 
@@ -145,6 +147,13 @@ public static class BudgetMongoMapping
         Map(map, transfer => transfer.ToAmount, "toAmount");
         MapOptional(map, transfer => transfer.Fee, "fee");
         Map(map, transfer => transfer.Rate, "rate");
+        MapEntryType(map);
+    }
+
+    // The single-bucket fields, then the direction by name (plan 1b B14).
+    private static void MapAdjustment(BsonClassMap<Adjustment> map)
+    {
+        Map(map, adjustment => adjustment.Direction, "direction");
         MapEntryType(map);
     }
 

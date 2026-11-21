@@ -8,7 +8,8 @@ namespace FinTrack.Budget.Domain.Journal;
 
 /// <summary>
 /// An entry that moves one strictly positive amount into or out of one bucket: <see cref="OpeningBalance"/>,
-/// <see cref="Deposit"/> and <see cref="Spend"/>. The type decides the direction (ARCHITECTURE 4.2).
+/// <see cref="Deposit"/>, <see cref="Spend"/> and <see cref="Adjustment"/>. The type decides the direction
+/// (ARCHITECTURE 4.2), except for an adjustment, whose <see cref="Adjustment.Direction"/> does (plan 1b B14).
 /// </summary>
 public abstract class SingleBucketEntry : JournalEntry
 {

@@ -1,5 +1,7 @@
 using FinTrack.Budget.Contracts.V1.Journal;
 using FinTrack.Budget.Domain.Journal;
+using AdjustmentDirection = FinTrack.Budget.Contracts.V1.Journal.AdjustmentDirection;
+using Model = FinTrack.Budget.Domain.Journal;
 
 namespace FinTrack.Budget.Application.Journal;
 
@@ -15,6 +17,10 @@ internal static class JournalContractMapping
         OpeningBalance opening => Single(opening, JournalEntryType.OpeningBalance, reversedBy),
         Deposit deposit => Single(deposit, JournalEntryType.Deposit, reversedBy),
         Spend spend => Single(spend, JournalEntryType.Spend, reversedBy),
+        Adjustment adjustment => Single(adjustment, JournalEntryType.Adjustment, reversedBy) with
+        {
+            Direction = ToContract(adjustment.Direction),
+        },
         Transfer transfer => Common(transfer, JournalEntryType.Transfer, reversedBy) with
         {
             FromBucketId = transfer.FromBucketId.Value,
@@ -29,6 +35,22 @@ internal static class JournalContractMapping
             ReversedEntryId = reversal.ReversedEntryId.Value,
         },
         _ => throw new ArgumentOutOfRangeException(nameof(entry), entry?.GetType().Name, "Unknown journal entry type."),
+    };
+
+    /// <summary>The contract's copy of <paramref name="direction"/>.</summary>
+    public static AdjustmentDirection ToContract(Model.AdjustmentDirection direction) => direction switch
+    {
+        Model.AdjustmentDirection.Increase => AdjustmentDirection.Increase,
+        Model.AdjustmentDirection.Decrease => AdjustmentDirection.Decrease,
+        _ => throw new ArgumentOutOfRangeException(nameof(direction), direction, "Unknown adjustment direction."),
+    };
+
+    /// <summary>The domain's copy of <paramref name="direction"/>.</summary>
+    public static Model.AdjustmentDirection ToDomain(AdjustmentDirection direction) => direction switch
+    {
+        AdjustmentDirection.Increase => Model.AdjustmentDirection.Increase,
+        AdjustmentDirection.Decrease => Model.AdjustmentDirection.Decrease,
+        _ => throw new ArgumentOutOfRangeException(nameof(direction), direction, "Unknown adjustment direction."),
     };
 
     private static JournalEntryDto Single(SingleBucketEntry entry, JournalEntryType type, Guid? reversedBy) =>

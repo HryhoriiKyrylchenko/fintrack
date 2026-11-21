@@ -190,12 +190,12 @@ public sealed class JsonResponseTests : IDisposable
             "{\"entries\":["
             + "{\"id\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2c\",\"type\":\"Reversal\",\"occurredOn\":\"2026-01-15\",\"recordedAt\":\"2026-01-15T09:30:00.123Z\",\"note\":\"Typo\",\"tags\":[],"
             + "\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,\"bucketId\":null,\"amount\":null,\"fromBucketId\":null,\"toBucketId\":null,\"fromAmount\":null,\"toAmount\":null,"
-            + "\"fee\":null,\"rate\":null,\"reversedEntryId\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b\",\"reversedBy\":null},"
+            + "\"fee\":null,\"rate\":null,\"reversedEntryId\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b\",\"reversedBy\":null,\"direction\":null},"
             + "{\"id\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2b\",\"type\":\"Transfer\",\"occurredOn\":\"2026-01-14\",\"recordedAt\":\"2026-01-15T09:30:00.123Z\",\"note\":null,\"tags\":[\"move\"],"
             + "\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,\"bucketId\":null,\"amount\":null,"
             + "\"fromBucketId\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2d\",\"toBucketId\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2e\","
             + "\"fromAmount\":{\"amount\":\"43.50\",\"currency\":\"PLN\"},\"toAmount\":{\"amount\":\"10.00\",\"currency\":\"EUR\"},\"fee\":{\"amount\":\"0.50\",\"currency\":\"PLN\"},"
-            + "\"rate\":\"0.232558139535\",\"reversedEntryId\":null,\"reversedBy\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2c\"}],"
+            + "\"rate\":\"0.232558139535\",\"reversedEntryId\":null,\"reversedBy\":\"0190a1b2-c3d4-7e5f-8a6b-7c8d9e0f1a2c\",\"direction\":null}],"
             + "\"nextCursor\":\"AQGQ\"}");
     }
 

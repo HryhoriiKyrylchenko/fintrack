@@ -17,9 +17,9 @@ namespace FinTrack.Budget.Application.Tests.Histories;
 
 /// <summary>
 /// The model test of plan 1a step 10: random sequences of every Budget command (buckets in three
-/// currencies, opening balances, deposits, spends, transfers with and without fee and across
+/// currencies, opening balances, deposits, spends, adjustments up and down (plan 1b step 4), transfers with and without fee and across
 /// currencies, reversals, archiving, unarchiving (plan 1b step 2), renaming, backdating, and repeats of earlier commands) run through
-/// the real handlers. After every command and at the end, invariants 1, 2, 10, 11 and 13 must hold. At the
+/// the real handlers. After every command and at the end, invariants 1, 2, 5, 10, 11 and 13 must hold. At the
 /// end, the read queries (step 12) must agree with the state: the overview's balances and totals, and the
 /// journal read page by page.
 /// </summary>
@@ -36,6 +36,7 @@ public class BudgetModelTests
         OpeningBalance,
         Deposit,
         Spend,
+        Adjust,
         Transfer,
         Reverse,
         Archive,
@@ -182,6 +183,18 @@ public class BudgetModelTests
                     .ShouldAllBe(bucket => sums[bucket.BucketId] >= 0m, "a savings bucket went below zero");
             }
 
+            // Invariant 5, checked independently: income is the effective deposits only (adjustments, opening balances and
+            // transfers never count), and adjustments are tracked apart by direction.
+            foreach (var bucket in bucketList)
+            {
+                var balance = state.BalanceOf(bucket.BucketId);
+                balance.Deposited.Amount.ShouldBe(effective.OfType<Deposit>().Where(deposit => deposit.BucketId == bucket.BucketId).Sum(deposit => deposit.Amount.Amount));
+                balance.AdjustedIn.Amount.ShouldBe(effective.OfType<Adjustment>()
+                    .Where(adjustment => adjustment.BucketId == bucket.BucketId && adjustment.Direction == AdjustmentDirection.Increase).Sum(adjustment => adjustment.Amount.Amount));
+                balance.AdjustedOut.Amount.ShouldBe(effective.OfType<Adjustment>()
+                    .Where(adjustment => adjustment.BucketId == bucket.BucketId && adjustment.Direction == AdjustmentDirection.Decrease).Sum(adjustment => adjustment.Amount.Amount));
+            }
+
             // Invariant 2.
             state.Balances.ShouldAllBe(balance => balance.Available == balance.NetContributed - balance.OutstandingPrincipal);
             state.FirstOverdraft.ShouldBeNull();
@@ -267,6 +280,7 @@ public class BudgetModelTests
         private static IEnumerable<(BucketId Bucket, decimal Change)> Changes(JournalEntry entry) => entry switch
         {
             Spend spend => [(spend.BucketId, -spend.Amount.Amount)],
+            Adjustment { Direction: AdjustmentDirection.Decrease } decrease => [(decrease.BucketId, -decrease.Amount.Amount)],
             SingleBucketEntry single => [(single.BucketId, single.Amount.Amount)],
             Transfer transfer => [(transfer.FromBucketId, -transfer.FromAmount.Amount), (transfer.ToBucketId, transfer.ToAmount.Amount)],
             _ => [],
@@ -296,6 +310,14 @@ public class BudgetModelTests
                         Kind.Deposit => new AddDeposit(id, amount, occurredOn, bucketId, unallocated, null, []),
                         _ => new AddSpend(id, amount, occurredOn, bucketId, unallocated, null, []),
                     };
+
+                case Kind.Adjust:
+                    // Up or down on any active bucket or Unallocated, always with its reason (the handlers run without the
+                    // validator, which rejects a missing note before the domain sees it).
+                    var adjusted = Target(operation.Unallocated, operation.A, active, all);
+                    return new AddAdjustment(id, Money.From(operation.Units / 100m, adjusted.Currency),
+                        operation.B % 2 == 0 ? Contracts.V1.Journal.AdjustmentDirection.Increase : Contracts.V1.Journal.AdjustmentDirection.Decrease,
+                        occurredOn, adjusted.BucketId, adjusted.Unallocated, "Recount", []);
 
                 case Kind.Transfer:
                     var from = Target(operation.Unallocated && operation.A % 2 == 0, operation.A, active, all);
@@ -379,6 +401,7 @@ public class BudgetModelTests
                 AddOpeningBalance opening => new AddOpeningBalanceHandler(entries).Handle(opening, cancellation),
                 AddDeposit deposit => new AddDepositHandler(entries).Handle(deposit, cancellation),
                 AddSpend spend => new AddSpendHandler(entries).Handle(spend, cancellation),
+                AddAdjustment adjustment => new AddAdjustmentHandler(entries).Handle(adjustment, cancellation),
                 AddTransfer transfer => new AddTransferHandler(writer).Handle(transfer, cancellation),
                 ReverseEntry reverse => new ReverseEntryHandler(writer, new JournalEntryDependencies()).Handle(reverse, cancellation),
                 _ => throw new InvalidOperationException($"Unknown command {command.GetType().Name}."),

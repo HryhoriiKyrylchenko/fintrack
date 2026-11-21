@@ -9,7 +9,8 @@ public sealed record JournalPageDto(IReadOnlyList<JournalEntryDto> Entries, stri
 
 /// <summary>
 /// One journal entry (ARCHITECTURE 4.2) as stored, version 1 of the contract. One shape for every type: the
-/// fields of other types are <c>null</c>. Amounts are always above zero; <see cref="Type"/> gives the direction.
+/// fields of other types are <c>null</c>. Amounts are always above zero; <see cref="Type"/> gives the direction, and for an
+/// <c>Adjustment</c> <see cref="Direction"/> does. Within V1 the shape grows only by new properties at the end (plan 1b B18).
 /// </summary>
 /// <param name="Id">The entry's ID (a GUID string in JSON).</param>
 /// <param name="Type">What the entry does; decides which of the fields below are set.</param>
@@ -20,8 +21,8 @@ public sealed record JournalPageDto(IReadOnlyList<JournalEntryDto> Entries, stri
 /// <param name="GroupId">The entries created by one user action share it; <c>null</c> for an entry on its own (always in phase 1a).</param>
 /// <param name="Source">Where the entry came from: <c>Manual</c>, <c>Import:&lt;connector&gt;</c> or <c>Agent:&lt;name&gt;</c>.</param>
 /// <param name="ExternalId">The source's own ID of an imported entry, or <c>null</c> (always in phase 1a).</param>
-/// <param name="BucketId">The bucket of an <c>OpeningBalance</c>, <c>Deposit</c> or <c>Spend</c>; <c>null</c> for other types.</param>
-/// <param name="Amount">The amount of an <c>OpeningBalance</c>, <c>Deposit</c> or <c>Spend</c>, in its bucket's currency; <c>null</c> for other types.</param>
+/// <param name="BucketId">The bucket of an <c>OpeningBalance</c>, <c>Deposit</c>, <c>Spend</c> or <c>Adjustment</c>; <c>null</c> for other types.</param>
+/// <param name="Amount">The amount of an <c>OpeningBalance</c>, <c>Deposit</c>, <c>Spend</c> or <c>Adjustment</c>, in its bucket's currency; <c>null</c> for other types.</param>
 /// <param name="FromBucketId">The source of a <c>Transfer</c>; <c>null</c> for other types.</param>
 /// <param name="ToBucketId">The destination of a <c>Transfer</c>; <c>null</c> for other types.</param>
 /// <param name="FromAmount">Everything that left the source of a <c>Transfer</c>, fee included, in the source's currency; <c>null</c> for other types.</param>
@@ -36,6 +37,7 @@ public sealed record JournalPageDto(IReadOnlyList<JournalEntryDto> Entries, stri
 /// The ID of the <c>Reversal</c> that cancels this entry, or <c>null</c> while it counts. A reversed entry counts
 /// as if it never happened, at its original date.
 /// </param>
+/// <param name="Direction">Whether an <c>Adjustment</c> raised or lowered its bucket; <c>null</c> for other types (plan 1b B18).</param>
 public sealed record JournalEntryDto(
     Guid Id,
     JournalEntryType Type,
@@ -55,7 +57,8 @@ public sealed record JournalEntryDto(
     Money? Fee,
     decimal? Rate,
     Guid? ReversedEntryId,
-    Guid? ReversedBy);
+    Guid? ReversedBy,
+    AdjustmentDirection? Direction = null);
 
 /// <summary>The type of a journal entry (ARCHITECTURE 4.2). JSON: the member's name, which is also the stored type name.</summary>
 public enum JournalEntryType
@@ -74,4 +77,7 @@ public enum JournalEntryType
 
     /// <summary>Cancels one earlier entry; moves no money itself.</summary>
     Reversal,
+
+    /// <summary>A manual correction of one bucket, up or down, with a reason (the note); never income.</summary>
+    Adjustment,
 }

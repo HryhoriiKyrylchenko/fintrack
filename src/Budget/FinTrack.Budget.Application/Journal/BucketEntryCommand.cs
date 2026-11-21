@@ -12,7 +12,7 @@ namespace FinTrack.Budget.Application.Journal;
 
 /// <summary>
 /// A command that writes one single-bucket entry (<c>AddOpeningBalance</c>, <c>AddDeposit</c>,
-/// <c>AddSpend</c>). The target is a bucket by ID or the <c>Unallocated</c> bucket of a currency.
+/// <c>AddSpend</c>, <c>AddAdjustment</c>). The target is a bucket by ID or the <c>Unallocated</c> bucket of a currency.
 /// </summary>
 public interface IBucketEntryCommand
 {
@@ -31,7 +31,7 @@ public interface IBucketEntryCommand
     /// <summary>The currency of the target <c>Unallocated</c> bucket, or <c>null</c>.</summary>
     Currency? Unallocated { get; }
 
-    /// <summary>An optional note.</summary>
+    /// <summary>A note: optional, except for an adjustment (its reason).</summary>
     string? Note { get; }
 
     /// <summary>Tags, possibly none.</summary>

@@ -42,6 +42,18 @@ public sealed class JournalRowTests : IDisposable
 
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
 
+    public static TheoryData<JournalEntryType> EntryTypes => [.. Enum.GetValues<JournalEntryType>()];
+
+    // Every type the Api can send has a name and a name in a sentence, so the Journal never shows a resource key
+    // (Adjustment from plan 1b step 4; its row, with the signed amount, comes with the forms in step 7).
+    [Theory]
+    [MemberData(nameof(EntryTypes))]
+    public void EveryEntryType_HasItsTexts(JournalEntryType type)
+    {
+        L[JournalRow.TypeKeyOf(type)].ResourceNotFound.ShouldBeFalse();
+        L["Journal.TheType." + type].ResourceNotFound.ShouldBeFalse();
+    }
+
     [Theory]
     [InlineData(JournalEntryType.OpeningBalance, "Opening balance", "+5,00")]
     [InlineData(JournalEntryType.Deposit, "Deposit", "+5,00")]

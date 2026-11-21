@@ -83,6 +83,26 @@ public class GetJournalHandlerTests
     }
 
     [Fact]
+    public async Task Adjustments_CarryTheirBucketAmountAndDirection_AndTheBucketFilterKeepsThem()
+    {
+        var reason = new EntryInfo("Counted the cash box", [], EntrySource.Manual);
+        var increase = Add(Adjustment.Create(NewId(), FakeOwnerContext.Owner, cushion.BucketId, Pln(7.50m), Domain.Journal.AdjustmentDirection.Increase, Today.AddDays(-3), Today, reason, NextRecordedAt()).Value);
+        var decrease = Add(Adjustment.Create(NewId(), FakeOwnerContext.Owner, cushion.BucketId, Pln(2.25m), Domain.Journal.AdjustmentDirection.Decrease, Today.AddDays(-2), Today, reason, NextRecordedAt()).Value);
+        var deposit = Deposit(holiday, 1m, Today.AddDays(-1));
+
+        var entries = (await Journal(new GetJournal())).Value.Entries;
+
+        entries.Select(Untagged).ShouldBe(
+        [
+            Single(deposit, JournalEntryType.Deposit, null, Pln(1m)),
+            Single(decrease, JournalEntryType.Adjustment, "Counted the cash box", Pln(2.25m)) with { Direction = Contracts.V1.Journal.AdjustmentDirection.Decrease },
+            Single(increase, JournalEntryType.Adjustment, "Counted the cash box", Pln(7.50m)) with { Direction = Contracts.V1.Journal.AdjustmentDirection.Increase },
+        ]);
+        entries[0].Direction.ShouldBeNull();
+        (await Ids(new GetJournal(BucketId: cushion.Id))).ShouldBe([decrease.Id, increase.Id]);
+    }
+
+    [Fact]
     public async Task Transfer_CarriesBothSides_TheFeeAndTheRate()
     {
         Deposit(cushion, 100m, Today.AddDays(-9));

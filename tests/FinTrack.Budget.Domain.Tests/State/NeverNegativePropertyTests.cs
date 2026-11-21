@@ -18,6 +18,7 @@ public class NeverNegativePropertyTests
 {
     private static readonly OwnerId Owner = OwnerId.From(Guid.Parse("aaaaaaaa-0000-4000-8000-000000000001"));
     private static readonly DateOnly Today = new(2026, 1, 15);
+    private static readonly EntryInfo Reason = new("Counted again", [], EntrySource.Manual);
 
     private enum Kind
     {
@@ -26,6 +27,8 @@ public class NeverNegativePropertyTests
         Spend,
         Transfer,
         Reversal,
+        AdjustUp,
+        AdjustDown,
     }
 
     // Two savings buckets and one investment bucket, all in PLN.
@@ -114,6 +117,8 @@ public class NeverNegativePropertyTests
                 Kind.Opening => OpeningBalance.Create(entryId, Owner, bucket.BucketId, amount, occurredOn, Today, EntryInfo.None, recordedAt).Value,
                 Kind.Deposit => Deposit.Create(entryId, Owner, bucket.BucketId, amount, occurredOn, Today, EntryInfo.None, recordedAt).Value,
                 Kind.Spend => Spend.Create(entryId, Owner, bucket.BucketId, amount, occurredOn, Today, EntryInfo.None, recordedAt).Value,
+                Kind.AdjustUp => Adjustment.Create(entryId, Owner, bucket.BucketId, amount, AdjustmentDirection.Increase, occurredOn, Today, Reason, recordedAt).Value,
+                Kind.AdjustDown => Adjustment.Create(entryId, Owner, bucket.BucketId, amount, AdjustmentDirection.Decrease, occurredOn, Today, Reason, recordedAt).Value,
                 _ => Transfer.Create(entryId, Owner, bucket.BucketId, next.BucketId, amount, fee is null ? amount : amount - fee, fee, occurredOn, Today, EntryInfo.None, recordedAt).Value,
             };
 
@@ -147,6 +152,9 @@ public class NeverNegativePropertyTests
                     break;
                 case Spend spend:
                     sums[spend.BucketId] -= spend.Amount.Amount;
+                    break;
+                case Adjustment { Direction: AdjustmentDirection.Decrease } decrease:
+                    sums[decrease.BucketId] -= decrease.Amount.Amount;
                     break;
                 case SingleBucketEntry raise:
                     sums[raise.BucketId] += raise.Amount.Amount;
