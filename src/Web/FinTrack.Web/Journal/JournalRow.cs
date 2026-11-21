@@ -34,15 +34,20 @@ public sealed class JournalRow(JournalEntryDto entry, IReadOnlyDictionary<Guid, 
     public bool IsReversal => Entry.Type == JournalEntryType.Reversal;
 
     /// <summary>
-    /// The amount of an opening balance, deposit or spend with its direction: money in is positive, a spend is
-    /// negative. <c>null</c> for a transfer (two amounts) and a reversal (none).
+    /// The amount of an opening balance, deposit, spend or adjustment with its direction: money in is positive, a spend
+    /// and an adjustment down are negative. <c>null</c> for a transfer (two amounts), a borrow and a repayment (money
+    /// moved, see <see cref="MovedAmount"/>) and a reversal (none).
     /// </summary>
     public Money? SignedAmount => Entry switch
     {
         { Type: JournalEntryType.Spend, Amount: { } amount } => -amount,
-        { Type: JournalEntryType.OpeningBalance or JournalEntryType.Deposit, Amount: { } amount } => amount,
+        { Type: JournalEntryType.Adjustment, Direction: AdjustmentDirection.Decrease, Amount: { } amount } => -amount,
+        { Type: JournalEntryType.OpeningBalance or JournalEntryType.Deposit or JournalEntryType.Adjustment, Amount: { } amount } => amount,
         _ => null,
     };
+
+    /// <summary>The amount a borrow or a repayment moved from one side to the other, without a sign; <c>null</c> for other types.</summary>
+    public Money? MovedAmount => Entry.Type is JournalEntryType.Borrow or JournalEntryType.Repayment ? Entry.Amount : null;
 
     /// <summary>What left the source of a transfer, fee included.</summary>
     public Money? FromAmount => Entry.FromAmount;
@@ -67,6 +72,7 @@ public sealed class JournalRow(JournalEntryDto entry, IReadOnlyDictionary<Guid, 
         return Entry.Type switch
         {
             JournalEntryType.Transfer => localizer["Journal.TransferLine", Name(Entry.FromBucketId, localizer), Name(Entry.ToBucketId, localizer)],
+            JournalEntryType.Borrow or JournalEntryType.Repayment => localizer["Journal.TransferLine", Side(Entry.FromBucketId, localizer), Side(Entry.ToBucketId, localizer)],
             JournalEntryType.Reversal => Entry.ReversedEntryId is { } cancelled && loaded.TryGetValue(cancelled, out var reversed)
                 ? localizer["Journal.Cancels", localizer[ArticleKeyOf(reversed.Type)], reversed.OccurredOn.ToString("d", culture), new JournalRow(reversed, buckets, loaded).Place(localizer)]
                 : localizer["Journal.CancelsEarlier"],
@@ -92,13 +98,19 @@ public sealed class JournalRow(JournalEntryDto entry, IReadOnlyDictionary<Guid, 
     // The type in a sentence ("the deposit").
     private static string ArticleKeyOf(JournalEntryType type) => "Journal.TheType." + type;
 
-    // "in Cushion" for money in, "from Cushion" for a spend, "from Cushion to Holiday" for a transfer.
+    // "in Cushion" for money in and an adjustment, "from Cushion" for a spend, "from Cushion to Holiday" for a transfer, a borrow
+    // and a repayment ("Outside the app" for a missing side).
     private string Place(IStringLocalizer<SharedResource> localizer) => Entry.Type switch
     {
         JournalEntryType.Spend => localizer["Journal.FromBucket", Name(Entry.BucketId, localizer)],
         JournalEntryType.Transfer => localizer["Journal.FromTo", Name(Entry.FromBucketId, localizer), Name(Entry.ToBucketId, localizer)],
+        JournalEntryType.Borrow or JournalEntryType.Repayment => localizer["Journal.FromTo", Side(Entry.FromBucketId, localizer), Side(Entry.ToBucketId, localizer)],
         _ => localizer["Journal.InBucket", Name(Entry.BucketId, localizer)],
     };
+
+    // A side of a borrow or a repayment: a bucket, or outside the app when the Api names none (plan 1b B18).
+    private string Side(Guid? bucketId, IStringLocalizer<SharedResource> localizer) =>
+        bucketId is null ? localizer["Loans.Outside"] : Name(bucketId, localizer);
 
     private IEnumerable<Guid> BucketIds() =>
         new[] { Entry.BucketId, Entry.FromBucketId, Entry.ToBucketId }.OfType<Guid>();
@@ -109,11 +121,12 @@ public sealed class JournalRow(JournalEntryDto entry, IReadOnlyDictionary<Guid, 
             : localizer["Journal.UnknownBucket"];
 }
 
-/// <summary>The Journal screen's filters (plan 1a step 17): a bucket and a period, each optional.</summary>
+/// <summary>The Journal screen's filters (plan 1a step 17): a bucket and a period, each optional; a loan for its history (plan 1b step 7).</summary>
 /// <param name="BucketId">Only entries that touch this bucket.</param>
 /// <param name="From">Only entries on or after this day.</param>
 /// <param name="To">Only entries on or before this day.</param>
-public sealed record JournalFilter(Guid? BucketId, DateOnly? From, DateOnly? To)
+/// <param name="LoanId">Only the loan's borrow, its repayments and reversals of them.</param>
+public sealed record JournalFilter(Guid? BucketId, DateOnly? From, DateOnly? To, Guid? LoanId = null)
 {
     /// <summary>The period ends before it starts.</summary>
     public const string PeriodInvalid = "input.period_invalid";
@@ -122,7 +135,7 @@ public sealed record JournalFilter(Guid? BucketId, DateOnly? From, DateOnly? To)
     public static JournalFilter None { get; } = new(null, null, null);
 
     /// <summary>Whether any filter is set.</summary>
-    public bool IsActive => BucketId is not null || From is not null || To is not null;
+    public bool IsActive => BucketId is not null || From is not null || To is not null || LoanId is not null;
 
     /// <summary>Why the period cannot be asked for, or <c>null</c>.</summary>
     public ErrorInfo? PeriodError => From is { } from && To is { } to && from > to ? ErrorInfo.From(AppError.Validation(PeriodInvalid)) : null;
@@ -173,6 +186,11 @@ public sealed class JournalClient(ApiClient api)
         if (filter.BucketId is { } bucketId)
         {
             parts.Add($"bucketId={bucketId:D}");
+        }
+
+        if (filter.LoanId is { } loanId)
+        {
+            parts.Add($"loanId={loanId:D}");
         }
 
         if (filter.From is { } from)

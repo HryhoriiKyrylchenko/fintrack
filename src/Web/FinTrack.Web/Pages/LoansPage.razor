@@ -1,0 +1,191 @@
+@page "/loans"
+@using FinTrack.Budget.Contracts.V1.Buckets
+@using FinTrack.Web.Formatting
+@inject LoansClient Loans
+@inject BucketsClient Buckets
+@inject IDialogService Dialogs
+@inject NavigationManager Navigation
+@inject IStringLocalizer<SharedResource> L
+
+@* The owner's loans (plan 1b step 7): money borrowed from savings buckets, open ones first, closed ones on request. A
+   table on wide screens, cards below the md breakpoint (DESIGN 8). Every figure is the Api's; "Repay" opens the entry
+   form for the loan, "History" lists its borrow and repayments. *@
+
+<PageTitle>@L["Loans.PageTitle"]</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Class="mb-1">
+    <MudText Typo="Typo.h5" HtmlTag="h1">@L["Loans.Title"]</MudText>
+    @if (rows is { Count: > 0 })
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" StartIcon="@Icons.Material.Outlined.Add" Href="entries/new?kind=borrow">
+            @L["Loans.Borrow"]
+        </MudButton>
+    }
+</MudStack>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">@L["Loans.Description"]</MudText>
+
+<MudSwitch T="bool" Value="showClosed" ValueChanged="ShowClosedChangedAsync" Color="Color.Primary" Label="@L["Loans.ShowClosed"]" Class="mb-4" />
+
+@if (loadError is not null)
+{
+    <ErrorAlert Error="loadError" Class="mb-4" />
+    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="LoadAsync">@L["Common.Retry"]</MudButton>
+}
+else if (rows is null)
+{
+    <TableSkeleton Rows="4" />
+}
+else if (rows.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Outlined.Handshake" Title="@L[showClosed ? "Loans.Empty.Title" : "Loans.EmptyOpen.Title"]" Text="@L["Loans.Empty.Text"]">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" DropShadow="false" StartIcon="@Icons.Material.Outlined.Add" Href="entries/new?kind=borrow">
+            @L["Loans.Borrow"]
+        </MudButton>
+    </EmptyState>
+}
+else
+{
+    <MudHidden Breakpoint="Breakpoint.SmAndDown">
+        <MudSimpleTable Elevation="0" Outlined="true" Hover="true">
+            <thead>
+                <tr>
+                    <th scope="col">@L["Loans.Column.Loan"]</th>
+                    <th scope="col" class="fintrack-amount-column">@L["Loans.Column.Principal"]</th>
+                    <th scope="col" class="fintrack-amount-column">@L["Loans.Column.Repaid"]</th>
+                    <th scope="col" class="fintrack-amount-column">@L["Loans.Column.Outstanding"]</th>
+                    <th scope="col" class="fintrack-actions-column">@L["Loans.Column.Actions"]</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in rows)
+                {
+                    <tr>
+                        <td>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
+                                <span class="fintrack-strong">@L["Loans.FromTo", row.LenderName(L), row.DestinationName(L)]</span>
+                                <LoanStatusLabel Row="row" />
+                            </MudStack>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary" HtmlTag="p">@Dates(row)</MudText>
+                            @if (row.Loan.Note is { } note)
+                            {
+                                <MudText Typo="Typo.body2" HtmlTag="p" Class="fintrack-note">@note</MudText>
+                            }
+                        </td>
+                        <td class="fintrack-amount-column"><Amount Value="row.Loan.Principal" /></td>
+                        <td class="fintrack-amount-column"><Amount Value="row.Loan.Repaid" /></td>
+                        <td class="fintrack-amount-column"><Amount Value="row.Loan.Outstanding" Class="fintrack-strong" /></td>
+                        <td class="fintrack-actions-column">
+                            @if (row.IsOpen)
+                            {
+                                <MudTooltip Text="@L["Loans.Repay"]">
+                                    <MudIconButton Icon="@Icons.Material.Outlined.Payments" aria-label="@L["Loans.RepayNamed", row.Describe(L, CultureInfo.CurrentCulture)]" Href="@RepayHref(row)" />
+                                </MudTooltip>
+                            }
+                            <MudTooltip Text="@L["Loans.History"]">
+                                <MudIconButton Icon="@Icons.Material.Outlined.History" aria-label="@L["Loans.HistoryNamed", row.Describe(L, CultureInfo.CurrentCulture)]" OnClick="() => HistoryAsync(row)" />
+                            </MudTooltip>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </MudSimpleTable>
+    </MudHidden>
+
+    <MudHidden Breakpoint="Breakpoint.MdAndUp">
+        <MudStack Spacing="2">
+            @foreach (var row in rows)
+            {
+                <MudCard Elevation="0" Outlined="true">
+                    <MudCardContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
+                            <MudText Typo="Typo.subtitle1" HtmlTag="h2">@L["Loans.FromTo", row.LenderName(L), row.DestinationName(L)]</MudText>
+                            <LoanStatusLabel Row="row" />
+                        </MudStack>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" HtmlTag="p">@Dates(row)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" HtmlTag="p" Class="mt-2">@L["Loans.Column.Outstanding"]</MudText>
+                        <Amount Value="row.Loan.Outstanding" Class="fintrack-card-figure" />
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" HtmlTag="p" Class="fintrack-figures">
+                            @L["Loans.CardFigures", Money(row.Loan.Principal), Money(row.Loan.Repaid)]
+                        </MudText>
+                        @if (row.Loan.Note is { } note)
+                        {
+                            <MudText Typo="Typo.body2" HtmlTag="p" Class="fintrack-note mt-1">@note</MudText>
+                        }
+                    </MudCardContent>
+                    <MudCardActions>
+                        @if (row.IsOpen)
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Payments" Href="@RepayHref(row)"
+                                       aria-label="@L["Loans.RepayNamed", row.Describe(L, CultureInfo.CurrentCulture)]">
+                                @L["Loans.Repay"]
+                            </MudButton>
+                        }
+                        <MudButton Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.History" OnClick="() => HistoryAsync(row)"
+                                   aria-label="@L["Loans.HistoryNamed", row.Describe(L, CultureInfo.CurrentCulture)]">
+                            @L["Loans.History"]
+                        </MudButton>
+                    </MudCardActions>
+                </MudCard>
+            }
+        </MudStack>
+    </MudHidden>
+}
+
+@code {
+    private static readonly DialogOptions Options = new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+
+    private IReadOnlyList<LoanRow>? rows;
+    private IReadOnlyDictionary<Guid, BucketDto> buckets = new Dictionary<Guid, BucketDto>();
+    private ErrorInfo? loadError;
+    private bool showClosed;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        loadError = null;
+        rows = null;
+
+        // Archived buckets too: a closed loan's buckets may be archived since.
+        var bucketList = await Buckets.ListAsync(includeArchived: true, CancellationToken.None);
+        if (bucketList.Value is not { } allBuckets)
+        {
+            loadError = ErrorInfo.From(bucketList);
+            return;
+        }
+
+        var loans = await Loans.ListAsync(showClosed, CancellationToken.None);
+        if (loans.Value is not { } loanList)
+        {
+            loadError = ErrorInfo.From(loans);
+            return;
+        }
+
+        buckets = allBuckets.ToDictionary(bucket => bucket.Id);
+        rows = LoanRow.Order(loanList, buckets);
+    }
+
+    private Task ShowClosedChangedAsync(bool value)
+    {
+        showClosed = value;
+        return LoadAsync();
+    }
+
+    private string Dates(LoanRow row) => row.Loan.ClosedOn is { } closedOn
+        ? L["Loans.BorrowedAndClosed", row.Loan.BorrowedOn.ToString("d", CultureInfo.CurrentCulture), closedOn.ToString("d", CultureInfo.CurrentCulture)]
+        : L["Loans.Borrowed", row.Loan.BorrowedOn.ToString("d", CultureInfo.CurrentCulture)];
+
+    private static string RepayHref(LoanRow row) => $"entries/new?kind=repay&loan={row.Loan.Id:D}";
+
+    private static string Money(Money money) => MoneyFormatter.Format(money, CultureInfo.CurrentCulture);
+
+    private async Task HistoryAsync(LoanRow row)
+    {
+        var parameters = new DialogParameters<LoanHistoryDialog>
+        {
+            { dialog => dialog.LoanId, row.Loan.Id },
+            { dialog => dialog.Buckets, buckets },
+        };
+        await Dialogs.ShowAsync<LoanHistoryDialog>(L["Loans.HistoryTitle", row.Describe(L, CultureInfo.CurrentCulture)], parameters, Options);
+    }
+}

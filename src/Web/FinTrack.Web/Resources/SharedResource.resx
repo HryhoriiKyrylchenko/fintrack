@@ -859,4 +859,187 @@
   <data name="Error.currency.unknown" xml:space="preserve">
     <value>This currency is not supported.</value>
   </data>
+  <data name="Nav.Loans" xml:space="preserve">
+    <value>Loans</value>
+  </data>
+  <data name="Common.Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Loans.PageTitle" xml:space="preserve">
+    <value>Loans · FinTrack</value>
+  </data>
+  <data name="Loans.Title" xml:space="preserve">
+    <value>Loans</value>
+  </data>
+  <data name="Loans.Description" xml:space="preserve">
+    <value>Money you borrowed from your own savings and still owe them. Repayments are never income; open loans keep their bucket from being archived.</value>
+  </data>
+  <data name="Loans.Borrow" xml:space="preserve">
+    <value>Borrow</value>
+  </data>
+  <data name="Loans.ShowClosed" xml:space="preserve">
+    <value>Show paid-back loans</value>
+  </data>
+  <data name="Loans.EmptyOpen.Title" xml:space="preserve">
+    <value>No open loans</value>
+  </data>
+  <data name="Loans.Empty.Title" xml:space="preserve">
+    <value>No loans yet</value>
+  </data>
+  <data name="Loans.Empty.Text" xml:space="preserve">
+    <value>When you take money from a savings bucket and mean to put it back, record it as a loan: the bucket then shows what it is still owed.</value>
+  </data>
+  <data name="Loans.Column.Loan" xml:space="preserve">
+    <value>Loan</value>
+  </data>
+  <data name="Loans.Column.Principal" xml:space="preserve">
+    <value>Borrowed</value>
+  </data>
+  <data name="Loans.Column.Repaid" xml:space="preserve">
+    <value>Repaid</value>
+  </data>
+  <data name="Loans.Column.Outstanding" xml:space="preserve">
+    <value>Still owed</value>
+  </data>
+  <data name="Loans.Column.Actions" xml:space="preserve">
+    <value>Actions</value>
+  </data>
+  <data name="Loans.FromTo" xml:space="preserve">
+    <value>{0} → {1}</value>
+  </data>
+  <data name="Loans.Borrowed" xml:space="preserve">
+    <value>Borrowed on {0}</value>
+  </data>
+  <data name="Loans.BorrowedAndClosed" xml:space="preserve">
+    <value>Borrowed on {0}, paid back on {1}</value>
+  </data>
+  <data name="Loans.CardFigures" xml:space="preserve">
+    <value>Borrowed {0}, repaid {1}</value>
+  </data>
+  <data name="Loans.Status.Open" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="Loans.Status.Closed" xml:space="preserve">
+    <value>Paid back</value>
+  </data>
+  <data name="Loans.Repay" xml:space="preserve">
+    <value>Repay</value>
+  </data>
+  <data name="Loans.RepayNamed" xml:space="preserve">
+    <value>Repay the loan {0}</value>
+  </data>
+  <data name="Loans.History" xml:space="preserve">
+    <value>History</value>
+  </data>
+  <data name="Loans.HistoryNamed" xml:space="preserve">
+    <value>History of the loan {0}</value>
+  </data>
+  <data name="Loans.HistoryTitle" xml:space="preserve">
+    <value>Loan {0}</value>
+  </data>
+  <data name="Loans.Outside" xml:space="preserve">
+    <value>Outside the app</value>
+  </data>
+  <data name="Loans.Line" xml:space="preserve">
+    <value>{0} → {1}: {2}, {3}</value>
+  </data>
+  <data name="Entries.Kind.Borrow" xml:space="preserve">
+    <value>Borrow</value>
+  </data>
+  <data name="Entries.Kind.Repay" xml:space="preserve">
+    <value>Repay a loan</value>
+  </data>
+  <data name="Entries.Kind.Adjust" xml:space="preserve">
+    <value>Adjustment</value>
+  </data>
+  <data name="Entries.Kind.Borrow.Help" xml:space="preserve">
+    <value>Money taken from a savings bucket that you will put back. The bucket's available money falls until it is repaid.</value>
+  </data>
+  <data name="Entries.Kind.Repay.Help" xml:space="preserve">
+    <value>Money paid back to the bucket a loan came from. A repayment is never income.</value>
+  </data>
+  <data name="Entries.Kind.Adjust.Help" xml:space="preserve">
+    <value>A correction when a bucket's balance is not what it should be, up or down, with the reason. Never income.</value>
+  </data>
+  <data name="Entries.Saved.Borrow" xml:space="preserve">
+    <value>Loan saved.</value>
+  </data>
+  <data name="Entries.Saved.Repay" xml:space="preserve">
+    <value>Repayment saved.</value>
+  </data>
+  <data name="Entries.Saved.Adjust" xml:space="preserve">
+    <value>Adjustment saved.</value>
+  </data>
+  <data name="Entries.Lender" xml:space="preserve">
+    <value>Borrow from</value>
+  </data>
+  <data name="Entries.Lender.Help" xml:space="preserve">
+    <value>Only your savings buckets can lend.</value>
+  </data>
+  <data name="Entries.Destination" xml:space="preserve">
+    <value>Money goes to</value>
+  </data>
+  <data name="Entries.PrincipalIn" xml:space="preserve">
+    <value>Amount borrowed in {0}</value>
+  </data>
+  <data name="Entries.NoOpenLoans" xml:space="preserve">
+    <value>There are no open loans to repay.</value>
+  </data>
+  <data name="Entries.Loan" xml:space="preserve">
+    <value>Loan</value>
+  </data>
+  <data name="Entries.Outstanding" xml:space="preserve">
+    <value>Still owed: {0}</value>
+  </data>
+  <data name="Entries.Source" xml:space="preserve">
+    <value>Paid from</value>
+  </data>
+  <data name="Entries.Direction" xml:space="preserve">
+    <value>Direction</value>
+  </data>
+  <data name="Entries.Direction.Increase" xml:space="preserve">
+    <value>Increase</value>
+  </data>
+  <data name="Entries.Direction.Decrease" xml:space="preserve">
+    <value>Decrease</value>
+  </data>
+  <data name="Entries.Reason" xml:space="preserve">
+    <value>Reason</value>
+  </data>
+  <data name="Entries.Reason.Help" xml:space="preserve">
+    <value>Required: why the balance is corrected.</value>
+  </data>
+  <data name="Entries.Summary.Lender" xml:space="preserve">
+    <value>Borrowed from</value>
+  </data>
+  <data name="Entries.Summary.Destination" xml:space="preserve">
+    <value>Money goes to</value>
+  </data>
+  <data name="Entries.Summary.Principal" xml:space="preserve">
+    <value>Amount borrowed</value>
+  </data>
+  <data name="Entries.Summary.Loan" xml:space="preserve">
+    <value>Loan</value>
+  </data>
+  <data name="Entries.Summary.Outstanding" xml:space="preserve">
+    <value>Still owed before this</value>
+  </data>
+  <data name="Entries.Summary.Source" xml:space="preserve">
+    <value>Paid from</value>
+  </data>
+  <data name="Entries.Summary.Repaid" xml:space="preserve">
+    <value>Amount repaid</value>
+  </data>
+  <data name="Entries.Summary.Direction" xml:space="preserve">
+    <value>Direction</value>
+  </data>
+  <data name="Entries.Summary.Reason" xml:space="preserve">
+    <value>Reason</value>
+  </data>
+  <data name="Error.input.loan_required" xml:space="preserve">
+    <value>Choose a loan.</value>
+  </data>
+  <data name="Error.input.reason_required" xml:space="preserve">
+    <value>Give the reason for the adjustment.</value>
+  </data>
 </root>

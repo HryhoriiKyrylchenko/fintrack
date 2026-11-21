@@ -43,6 +43,16 @@ Every entry shows a summary before it is saved; nothing is written until you con
 
 The **Overview** shows each bucket and the totals; the **Journal** lists every entry.
 
+## Loans from your own savings
+
+When you take money from a savings bucket and mean to put it back, record it with **Add entry** as **Borrow**: choose the bucket it comes from and where it goes (another bucket of the same currency, or *Outside the app* when you spend it directly). The bucket's available money falls by the amount until it is repaid; the loan is not income and not a spend.
+
+Pay it back with **Repay a loan** (also from **Loans**, the *Repay* action): choose the loan, where the money comes from (a bucket, or *Outside the app* for new money), and the amount. A repayment can never be more than the loan still owes, which the form shows; it is not income. **Loans** lists open loans (paid-back ones with *Show paid-back loans*) with what was borrowed, repaid and is still owed, and each loan's history. A bucket that has lent money not yet paid back cannot be archived, and a loan with repayments cannot be reversed until its repayments are.
+
+## Correct a balance
+
+When a bucket holds more or less than FinTrack shows (a forgotten fee, a counting error), record an **Adjustment**: the bucket, *Increase* or *Decrease*, the amount, and the reason, which is required. An adjustment is never income, and a decrease never takes a savings bucket below zero.
+
 ## Fix a mistake
 
 Entries are never edited or deleted. To correct one, reverse it in the **Journal** (it then counts as if it never happened, on its original date) and add the right entry. A reversal cannot be undone. If reversing an entry would leave a savings bucket below zero on some day (for example a deposit that was spent later), it is refused: reverse the later entry first.
@@ -76,4 +86,4 @@ A backup keeps every document exactly, decimal amounts with their scale, and the
 
 ## Not there yet
 
-Phase 1a is the first usable version. Contribution plans, limits and loans between buckets arrive in phase 1b; reports and charts in phase 2; crypto and stock portfolios from phase 3 ([ARCHITECTURE.md](ARCHITECTURE.md), section 8). Keep your spreadsheet running alongside and compare the two for a while.
+Phase 1a is the first usable version. Phase 1b adds loans and adjustments (above); contribution plans, limits and splitting one payment across plans and loans follow in phase 1b too; reports and charts in phase 2; crypto and stock portfolios from phase 3 ([ARCHITECTURE.md](ARCHITECTURE.md), section 8). Keep your spreadsheet running alongside and compare the two for a while.

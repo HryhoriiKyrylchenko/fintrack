@@ -1,4 +1,5 @@
 using FinTrack.Budget.Contracts.V1.Journal;
+using FinTrack.Budget.Contracts.V1.Loans;
 using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Web.Api;
 
@@ -6,8 +7,11 @@ namespace FinTrack.Web.Entries;
 
 /// <summary>
 /// A checked entry, shown for confirmation before it is written (DESIGN 1.6) and then sent as its request.
-/// Either <see cref="Target"/> and <see cref="Amount"/> are set (opening balance, deposit, spend), or the transfer
-/// fields.
+/// Either <see cref="Target"/> and <see cref="Amount"/> are set (opening balance, deposit, spend, adjustment with its
+/// <see cref="Direction"/>), or the transfer fields; a borrow has its lender in <see cref="From"/>, its destination in
+/// <see cref="To"/> (<c>null</c>: outside the app) and its principal in <see cref="Amount"/>; a repayment has its
+/// <see cref="Loan"/>, its source in <see cref="From"/> (<c>null</c>: outside the app), the lender in <see cref="To"/>
+/// and its amount in <see cref="Amount"/>.
 /// </summary>
 /// <param name="Kind">What the entry does.</param>
 /// <param name="Id">The client-generated ID; the same for every submit of one form.</param>
@@ -22,6 +26,8 @@ namespace FinTrack.Web.Entries;
 /// <param name="OccurredOn">The business date.</param>
 /// <param name="Note">The note, or <c>null</c>.</param>
 /// <param name="Tags">The tags, possibly none.</param>
+/// <param name="Loan">The loan a repayment pays, as the Api listed it when the form was filled.</param>
+/// <param name="Direction">Whether an adjustment raises or lowers its bucket.</param>
 public sealed record EntryDraft(
     EntryKind Kind,
     Guid Id,
@@ -35,7 +41,9 @@ public sealed record EntryDraft(
     decimal? Rate,
     DateOnly OccurredOn,
     string? Note,
-    IReadOnlyList<string> Tags)
+    IReadOnlyList<string> Tags,
+    LoanDto? Loan = null,
+    AdjustmentDirection? Direction = null)
 {
     /// <summary>The Api route and body that write this entry.</summary>
     public EntryRequest ToRequest() => Kind switch
@@ -48,6 +56,12 @@ public sealed record EntryDraft(
             new AddSpendRequest(Id, Amount!, OccurredOn, Target!.BucketId, UnallocatedCurrency(Target), Note, Tags)),
         EntryKind.Transfer => new("v1/journal/transfers",
             new AddTransferRequest(Id, FromAmount!, ToAmount!, OccurredOn, From!.BucketId, UnallocatedCurrency(From), To!.BucketId, UnallocatedCurrency(To), Fee, Note, Tags)),
+        EntryKind.Borrow => new("v1/journal/borrows",
+            new AddBorrowRequest(Id, From!.BucketId!.Value, Amount!, OccurredOn, To?.BucketId, To is { } to ? UnallocatedCurrency(to) : null, Note, Tags)),
+        EntryKind.Repay => new("v1/journal/repayments",
+            new AddRepaymentRequest(Id, Loan!.Id, Amount!, OccurredOn, From?.BucketId, From is { } from ? UnallocatedCurrency(from) : null, Note, Tags)),
+        EntryKind.Adjust => new("v1/journal/adjustments",
+            new AddAdjustmentRequest(Id, Amount!, Direction!.Value, OccurredOn, Note, Target!.BucketId, UnallocatedCurrency(Target), Tags)),
         _ => throw new InvalidOperationException($"Unknown entry kind {Kind}."),
     };
 

@@ -1,17 +1,22 @@
 @page "/entries/new"
+@using FinTrack.Budget.Contracts.V1.Buckets
+@using FinTrack.Budget.Contracts.V1.Journal
+@using FinTrack.Budget.Contracts.V1.Loans
 @using FinTrack.Web.Buckets
 @using FinTrack.Web.Entries
 @using FinTrack.Web.Formatting
+@using FinTrack.Web.Loans
 @inject BucketsClient Buckets
+@inject LoansClient Loans
 @inject EntriesClient Entries
 @inject OwnerSettingsState Settings
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IStringLocalizer<SharedResource> L
 
-@* "Add entry" (plan 1a step 16): one form for opening balance, deposit, spend and transfer, then a summary to
-   confirm before anything is written (DESIGN 1.6). The rules live in EntryFormModel; a refusal from the Api is
-   explained from its code in the summary (DESIGN 9). One ID per form, so a double click writes once. *@
+@* "Add entry" (plan 1a step 16; borrow, repay and adjust from plan 1b step 7): one form for every kind of entry, then a
+   summary to confirm before anything is written (DESIGN 1.6). The rules live in EntryFormModel; a refusal from the Api
+   is explained from its code in the summary (DESIGN 9). One ID per form, so a double click writes once. *@
 
 <PageTitle>@L["Entries.PageTitle"]</PageTitle>
 
@@ -44,60 +49,113 @@
                         }
                     </MudSelect>
 
-                    @if (model.Kind != EntryKind.Transfer)
+                    @switch (model.Kind)
                     {
-                        <TargetSelect Label="@L["Entries.Target"]" Targets="model.Targets" @bind-Key="model.TargetKey" Error="@FieldError(EntryField.Target)" />
-                        <MudTextField T="string" @bind-Value="model.AmountText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
-                                      Label="@(model.Target is { } target ? L["Entries.AmountIn", target.Currency.Code] : L["Entries.Amount"])"
-                                      Error="@(FieldError(EntryField.Amount) is not null)" ErrorText="@FieldError(EntryField.Amount)" Class="fintrack-figures" />
-                    }
-                    else
-                    {
-                        <TargetSelect Label="@L["Entries.From"]" Targets="model.TransferTargets" @bind-Key="model.FromKey" Error="@FieldError(EntryField.From)" />
-                        <TargetSelect Label="@L["Entries.To"]" Targets="model.TransferTargets" @bind-Key="model.ToKey" Error="@FieldError(EntryField.To)" />
-                        <MudTextField T="string" @bind-Value="model.AmountText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
-                                      Label="@(model.From is { } from ? L["Entries.SentIn", from.Currency.Code] : L["Entries.Amount"])"
-                                      Error="@(FieldError(EntryField.Amount) is not null)" ErrorText="@FieldError(EntryField.Amount)" Class="fintrack-figures" />
-                        @if (model.From is { } source)
-                        {
-                            <MudTextField T="string" @bind-Value="model.FeeText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
-                                          Label="@L["Entries.FeeIn", source.Currency.Code]"
-                                          Error="@(FieldError(EntryField.Fee) is not null)" ErrorText="@FieldError(EntryField.Fee)" Class="fintrack-figures" />
-                        }
-
-                        @if (model.IsCrossCurrencyTransfer)
-                        {
-                            <div>
-                                <MudText Typo="Typo.subtitle2" HtmlTag="p">@L["Entries.TransferInput"]</MudText>
-                                <MudRadioGroup T="TransferInput" @bind-Value="model.TransferInput">
-                                    <MudRadio T="TransferInput" Value="TransferInput.ReceivedAmount" Color="Color.Primary">@L["Entries.TransferInput.Received"]</MudRadio>
-                                    <MudRadio T="TransferInput" Value="TransferInput.Rate" Color="Color.Primary">@L["Entries.TransferInput.Rate"]</MudRadio>
-                                </MudRadioGroup>
-                            </div>
-                            @if (model.TransferInput == TransferInput.ReceivedAmount)
+                        case EntryKind.Transfer:
+                            <TargetSelect Label="@L["Entries.From"]" Targets="model.TransferTargets" @bind-Key="model.FromKey" Error="@FieldError(EntryField.From)" />
+                            <TargetSelect Label="@L["Entries.To"]" Targets="model.TransferTargets" @bind-Key="model.ToKey" Error="@FieldError(EntryField.To)" />
+                            <MudTextField T="string" @bind-Value="model.AmountText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
+                                          Label="@(model.From is { } from ? L["Entries.SentIn", from.Currency.Code] : L["Entries.Amount"])"
+                                          Error="@(FieldError(EntryField.Amount) is not null)" ErrorText="@FieldError(EntryField.Amount)" Class="fintrack-figures" />
+                            @if (model.From is { } source)
                             {
-                                <MudTextField T="string" @bind-Value="model.ReceivedText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
-                                              Label="@L["Entries.ReceivedIn", model.To!.Currency.Code]"
-                                              Error="@(FieldError(EntryField.Received) is not null)" ErrorText="@FieldError(EntryField.Received)" Class="fintrack-figures" />
+                                <MudTextField T="string" @bind-Value="model.FeeText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
+                                              Label="@L["Entries.FeeIn", source.Currency.Code]"
+                                              Error="@(FieldError(EntryField.Fee) is not null)" ErrorText="@FieldError(EntryField.Fee)" Class="fintrack-figures" />
+                            }
+
+                            @if (model.IsCrossCurrencyTransfer)
+                            {
+                                <div>
+                                    <MudText Typo="Typo.subtitle2" HtmlTag="p">@L["Entries.TransferInput"]</MudText>
+                                    <MudRadioGroup T="TransferInput" @bind-Value="model.TransferInput">
+                                        <MudRadio T="TransferInput" Value="TransferInput.ReceivedAmount" Color="Color.Primary">@L["Entries.TransferInput.Received"]</MudRadio>
+                                        <MudRadio T="TransferInput" Value="TransferInput.Rate" Color="Color.Primary">@L["Entries.TransferInput.Rate"]</MudRadio>
+                                    </MudRadioGroup>
+                                </div>
+                                @if (model.TransferInput == TransferInput.ReceivedAmount)
+                                {
+                                    <MudTextField T="string" @bind-Value="model.ReceivedText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
+                                                  Label="@L["Entries.ReceivedIn", model.To!.Currency.Code]"
+                                                  Error="@(FieldError(EntryField.Received) is not null)" ErrorText="@FieldError(EntryField.Received)" Class="fintrack-figures" />
+                                }
+                                else
+                                {
+                                    <MudTextField T="string" @bind-Value="model.RateText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
+                                                  Label="@L["Entries.RateFor", model.From!.Currency.Code, model.To!.Currency.Code]"
+                                                  Error="@(FieldError(EntryField.Rate) is not null)" ErrorText="@FieldError(EntryField.Rate)" Class="fintrack-figures" />
+                                }
+                            }
+                            else if (model.IsSameCurrencyTransfer && model.ToDraft() is { ToAmount: { } arrives })
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">@L["Entries.Arrives", Money(arrives)]</MudText>
+                            }
+                            break;
+
+                        case EntryKind.Borrow:
+                            <TargetSelect Label="@L["Entries.Lender"]" Targets="model.Lenders" @bind-Key="model.LenderKey"
+                                          HelperText="@L["Entries.Lender.Help"]" Error="@FieldError(EntryField.Lender)" />
+                            @if (model.Lender is { } lender)
+                            {
+                                <TargetSelect Label="@L["Entries.Destination"]" Targets="model.Destinations" AllowOutside="true" @bind-Key="model.DestinationKey"
+                                              Error="@FieldError(EntryField.Destination)" />
+                                <MudTextField T="string" @bind-Value="model.AmountText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
+                                              Label="@L["Entries.PrincipalIn", lender.Currency.Code]"
+                                              Error="@(FieldError(EntryField.Amount) is not null)" ErrorText="@FieldError(EntryField.Amount)" Class="fintrack-figures" />
+                            }
+                            break;
+
+                        case EntryKind.Repay:
+                            @if (model.OpenLoans.Count == 0)
+                            {
+                                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">@L["Entries.NoOpenLoans"]</MudAlert>
                             }
                             else
                             {
-                                <MudTextField T="string" @bind-Value="model.RateText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
-                                              Label="@L["Entries.RateFor", model.From!.Currency.Code, model.To!.Currency.Code]"
-                                              Error="@(FieldError(EntryField.Rate) is not null)" ErrorText="@FieldError(EntryField.Rate)" Class="fintrack-figures" />
+                                <MudSelect T="string" Label="@L["Entries.Loan"]" Value="model.LoanKey" ValueChanged="LoanChanged" ToStringFunc="LoanLabel" Variant="Variant.Outlined"
+                                           HelperText="@(model.Loan is { } chosen ? L["Entries.Outstanding", Money(chosen.Outstanding)].Value : null)"
+                                           Error="@(FieldError(EntryField.Loan) is not null)" ErrorText="@FieldError(EntryField.Loan)">
+                                    @foreach (var loan in model.OpenLoans)
+                                    {
+                                        <MudSelectItem T="string" Value="@loan.Id.ToString()">@LoanLabel(loan.Id.ToString())</MudSelectItem>
+                                    }
+                                </MudSelect>
+                                @if (model.Loan is { } loan)
+                                {
+                                    <TargetSelect Label="@L["Entries.Source"]" Targets="model.Sources" AllowOutside="true" @bind-Key="model.SourceKey"
+                                                  Error="@FieldError(EntryField.Source)" />
+                                    <MudTextField T="string" @bind-Value="model.AmountText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
+                                                  Label="@L["Entries.AmountIn", loan.Principal.Currency.Code]"
+                                                  Error="@(FieldError(EntryField.Amount) is not null)" ErrorText="@FieldError(EntryField.Amount)" Class="fintrack-figures" />
+                                }
                             }
-                        }
-                        else if (model.IsSameCurrencyTransfer && model.ToDraft() is { ToAmount: { } arrives })
-                        {
-                            <MudText Typo="Typo.body2" Color="Color.Secondary">@L["Entries.Arrives", Money(arrives)]</MudText>
-                        }
+                            break;
+
+                        default:
+                            <TargetSelect Label="@L["Entries.Target"]" Targets="model.Targets" @bind-Key="model.TargetKey" Error="@FieldError(EntryField.Target)" />
+                            @if (model.Kind == EntryKind.Adjust)
+                            {
+                                <div>
+                                    <MudText Typo="Typo.subtitle2" HtmlTag="p">@L["Entries.Direction"]</MudText>
+                                    <MudRadioGroup T="AdjustmentDirection" @bind-Value="model.Direction">
+                                        <MudRadio T="AdjustmentDirection" Value="AdjustmentDirection.Increase" Color="Color.Primary">@L["Entries.Direction.Increase"]</MudRadio>
+                                        <MudRadio T="AdjustmentDirection" Value="AdjustmentDirection.Decrease" Color="Color.Primary">@L["Entries.Direction.Decrease"]</MudRadio>
+                                    </MudRadioGroup>
+                                </div>
+                            }
+                            <MudTextField T="string" @bind-Value="model.AmountText" Immediate="true" Variant="Variant.Outlined" InputMode="DecimalKeyboard"
+                                          Label="@(model.Target is { } target ? L["Entries.AmountIn", target.Currency.Code] : L["Entries.Amount"])"
+                                          Error="@(FieldError(EntryField.Amount) is not null)" ErrorText="@FieldError(EntryField.Amount)" Class="fintrack-figures" />
+                            break;
                     }
 
                     <MudDatePicker Label="@L["Entries.Date"]" HelperText="@L["Entries.Date.Help"]" Date="DateValue" DateChanged="DateChanged"
                                    MaxDate="model.Today.ToDateTime(TimeOnly.MinValue)" Variant="Variant.Outlined" Culture="CultureInfo.CurrentCulture"
                                    Error="@(FieldError(EntryField.Date) is not null)" ErrorText="@FieldError(EntryField.Date)" />
 
-                    <MudTextField T="string" @bind-Value="model.Note" Immediate="true" Label="@L["Entries.Note"]" Variant="Variant.Outlined"
+                    <MudTextField T="string" @bind-Value="model.Note" Immediate="true" Variant="Variant.Outlined"
+                                  Label="@(model.Kind == EntryKind.Adjust ? L["Entries.Reason"] : L["Entries.Note"])"
+                                  HelperText="@(model.Kind == EntryKind.Adjust ? L["Entries.Reason.Help"].Value : null)"
                                   Lines="2" Sizing="InputSizing.Auto" Counter="EntryFormModel.MaxNoteLength"
                                   Error="@(FieldError(EntryField.Note) is not null)" ErrorText="@FieldError(EntryField.Note)" />
 
@@ -130,39 +188,66 @@
                 <dl class="fintrack-summary">
                     <dt>@L["Entries.Summary.Kind"]</dt>
                     <dd>@KindLabel(draft.Kind)</dd>
-                    @if (draft.Kind != EntryKind.Transfer)
+                    @switch (draft.Kind)
                     {
-                        <dt>@L["Entries.Summary.Bucket"]</dt>
-                        <dd>@TargetLabel(draft.Target!)</dd>
-                        <dt>@L["Entries.Summary.Amount"]</dt>
-                        <dd><Amount Value="draft.Amount!" Class="fintrack-card-figure" /></dd>
-                    }
-                    else
-                    {
-                        <dt>@L["Entries.Summary.From"]</dt>
-                        <dd>@TargetLabel(draft.From!)</dd>
-                        <dt>@L["Entries.Summary.To"]</dt>
-                        <dd>@TargetLabel(draft.To!)</dd>
-                        <dt>@L["Entries.Summary.Sent"]</dt>
-                        <dd><Amount Value="draft.FromAmount!" Class="fintrack-card-figure" /></dd>
-                        @if (draft.Fee is { } fee)
-                        {
-                            <dt>@L["Entries.Summary.Fee"]</dt>
-                            <dd><Amount Value="fee" /></dd>
-                        }
-                        <dt>@L["Entries.Summary.Received"]</dt>
-                        <dd><Amount Value="draft.ToAmount!" Class="fintrack-card-figure" /></dd>
-                        @if (draft.From!.Currency != draft.To!.Currency)
-                        {
-                            <dt>@L["Entries.Summary.Rate"]</dt>
-                            <dd class="fintrack-figures">@L["Entries.RateValue", draft.From.Currency.Code, RateInput.Format(draft.Rate!.Value, CultureInfo.CurrentCulture), draft.To.Currency.Code]</dd>
-                        }
+                        case EntryKind.Transfer:
+                            <dt>@L["Entries.Summary.From"]</dt>
+                            <dd>@TargetLabel(draft.From!)</dd>
+                            <dt>@L["Entries.Summary.To"]</dt>
+                            <dd>@TargetLabel(draft.To!)</dd>
+                            <dt>@L["Entries.Summary.Sent"]</dt>
+                            <dd><Amount Value="draft.FromAmount!" Class="fintrack-card-figure" /></dd>
+                            @if (draft.Fee is { } fee)
+                            {
+                                <dt>@L["Entries.Summary.Fee"]</dt>
+                                <dd><Amount Value="fee" /></dd>
+                            }
+                            <dt>@L["Entries.Summary.Received"]</dt>
+                            <dd><Amount Value="draft.ToAmount!" Class="fintrack-card-figure" /></dd>
+                            @if (draft.From!.Currency != draft.To!.Currency)
+                            {
+                                <dt>@L["Entries.Summary.Rate"]</dt>
+                                <dd class="fintrack-figures">@L["Entries.RateValue", draft.From.Currency.Code, RateInput.Format(draft.Rate!.Value, CultureInfo.CurrentCulture), draft.To.Currency.Code]</dd>
+                            }
+                            break;
+
+                        case EntryKind.Borrow:
+                            <dt>@L["Entries.Summary.Lender"]</dt>
+                            <dd>@TargetLabel(draft.From!)</dd>
+                            <dt>@L["Entries.Summary.Destination"]</dt>
+                            <dd>@SideLabel(draft.To)</dd>
+                            <dt>@L["Entries.Summary.Principal"]</dt>
+                            <dd><Amount Value="draft.Amount!" Class="fintrack-card-figure" /></dd>
+                            break;
+
+                        case EntryKind.Repay:
+                            <dt>@L["Entries.Summary.Loan"]</dt>
+                            <dd>@LoanLabel(draft.Loan!.Id.ToString())</dd>
+                            <dt>@L["Entries.Summary.Outstanding"]</dt>
+                            <dd><Amount Value="draft.Loan.Outstanding" /></dd>
+                            <dt>@L["Entries.Summary.Source"]</dt>
+                            <dd>@SideLabel(draft.From)</dd>
+                            <dt>@L["Entries.Summary.Repaid"]</dt>
+                            <dd><Amount Value="draft.Amount!" Class="fintrack-card-figure" /></dd>
+                            break;
+
+                        default:
+                            <dt>@L["Entries.Summary.Bucket"]</dt>
+                            <dd>@TargetLabel(draft.Target!)</dd>
+                            @if (draft.Direction is { } direction)
+                            {
+                                <dt>@L["Entries.Summary.Direction"]</dt>
+                                <dd>@L["Entries.Direction." + direction]</dd>
+                            }
+                            <dt>@L["Entries.Summary.Amount"]</dt>
+                            <dd><Amount Value="draft.Amount!" Class="fintrack-card-figure" /></dd>
+                            break;
                     }
                     <dt>@L["Entries.Summary.Date"]</dt>
                     <dd>@draft.OccurredOn.ToString("d", CultureInfo.CurrentCulture)</dd>
                     @if (draft.Note is { } note)
                     {
-                        <dt>@L["Entries.Summary.Note"]</dt>
+                        <dt>@(draft.Kind == EntryKind.Adjust ? L["Entries.Summary.Reason"] : L["Entries.Summary.Note"])</dt>
                         <dd class="fintrack-note">@note</dd>
                     }
                     @if (draft.Tags.Count > 0)
@@ -198,6 +283,7 @@
 
     private EntryFormModel? model;
     private EntryDraft? draft;
+    private IReadOnlyDictionary<Guid, BucketDto> bucketsById = new Dictionary<Guid, BucketDto>();
     private ErrorInfo? loadError;
     private ErrorInfo? submitError;
     private ErrorInfo? tagError;
@@ -206,9 +292,13 @@
     private bool showErrors;
     private bool busy;
 
-    /// <summary>The kind to start with, from <c>?kind=</c> (for example <c>transfer</c>); a deposit when absent or unknown.</summary>
+    /// <summary>The kind to start with, from <c>?kind=</c> (for example <c>transfer</c> or <c>repay</c>); a deposit when absent or unknown.</summary>
     [SupplyParameterFromQuery(Name = "kind")]
     public string? KindQuery { get; set; }
+
+    /// <summary>The loan to repay, from <c>?loan=</c> (the Loans screen's "Repay"); ignored unless it is an open loan.</summary>
+    [SupplyParameterFromQuery(Name = "loan")]
+    public string? LoanQuery { get; set; }
 
     private DateTime? DateValue => model?.OccurredOn.ToDateTime(TimeOnly.MinValue);
 
@@ -217,17 +307,29 @@
     private async Task LoadAsync()
     {
         loadError = null;
-        var result = await Buckets.ListAsync(includeArchived: false, CancellationToken.None);
-        if (result.Value is not { } buckets)
+
+        // Archived buckets too: a loan's destination may be archived, and loans name their buckets.
+        var buckets = await Buckets.ListAsync(includeArchived: true, CancellationToken.None);
+        if (buckets.Value is not { } bucketList)
         {
-            loadError = ErrorInfo.From(result);
+            loadError = ErrorInfo.From(buckets);
             return;
         }
+
+        var loans = await Loans.ListAsync(includeClosed: false, CancellationToken.None);
+        if (loans.Value is not { } loanList)
+        {
+            loadError = ErrorInfo.From(loans);
+            return;
+        }
+
+        bucketsById = bucketList.ToDictionary(bucket => bucket.Id);
 
         // The layout shows pages only with saved settings.
         var today = OwnerDate.Today(DateTimeOffset.UtcNow, Settings.Settings!.TimeZone);
         var kind = Enum.TryParse<EntryKind>(KindQuery, ignoreCase: true, out var asked) ? asked : EntryKind.Deposit;
-        model = EntryFormModel.Create(kind, buckets, today, CultureInfo.CurrentCulture);
+        model = EntryFormModel.Create(kind, bucketList, today, CultureInfo.CurrentCulture, loanList);
+        model.LoanKey = model.OpenLoans.Any(loan => loan.Id.ToString() == LoanQuery) ? LoanQuery : null;
     }
 
     private string? FieldError(string field) =>
@@ -238,6 +340,12 @@
     private string TargetLabel(EntryTarget target) =>
         target.IsUnallocated ? BucketNames.Display(null, target.Currency, L) : L["Entries.TargetOption", target.Name!, target.Currency.Code];
 
+    // A borrow's destination or a repayment's source: a bucket, or outside the app.
+    private string SideLabel(EntryTarget? target) => target is null ? L["Loans.Outside"] : TargetLabel(target);
+
+    private string LoanLabel(string? key) =>
+        model?.OpenLoans.FirstOrDefault(loan => loan.Id.ToString() == key) is { } loan ? new LoanRow(loan, bucketsById).Describe(L, CultureInfo.CurrentCulture) : string.Empty;
+
     private static string Money(Money money) => MoneyFormatter.Format(money, CultureInfo.CurrentCulture);
 
     private void KindChanged(EntryKind kind)
@@ -246,6 +354,16 @@
         if (model.Target is null)
         {
             model.TargetKey = null;
+        }
+    }
+
+    // Another loan may have another currency and lender: the source chosen for the previous one may not fit.
+    private void LoanChanged(string? key)
+    {
+        model!.LoanKey = key;
+        if (model.Source is null && model.SourceKey != EntryFormModel.OutsideKey)
+        {
+            model.SourceKey = null;
         }
     }
 
@@ -306,14 +424,21 @@
         // Set before the first await: a second click finds the button disabled, and it would send the same ID anyway.
         busy = true;
         var result = await Entries.SubmitAsync(draft.ToRequest(), CancellationToken.None);
-        busy = false;
 
         if (!result.IsSuccess)
         {
+            busy = false;
             submitError = ErrorInfo.From(result);
             return;
         }
 
+        // A borrow opens a loan and a repayment may close one: the Repay list follows the Api.
+        if (draft.Kind is EntryKind.Borrow or EntryKind.Repay && (await Loans.ListAsync(includeClosed: false, CancellationToken.None)).Value is { } loans)
+        {
+            model!.ReplaceLoans(loans);
+        }
+
+        busy = false;
         Snackbar.Add(L["Entries.Saved." + draft.Kind], Severity.Success, config =>
         {
             config.Action = L["Entries.ToOverview"];

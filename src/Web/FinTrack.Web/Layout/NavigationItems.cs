@@ -15,6 +15,7 @@ public static class NavigationItems
     [
         new("", "Nav.Overview", Icons.Material.Outlined.Dashboard, NavLinkMatch.All),
         new("buckets", "Nav.Buckets", Icons.Material.Outlined.Savings, NavLinkMatch.Prefix),
+        new("loans", "Nav.Loans", Icons.Material.Outlined.Handshake, NavLinkMatch.Prefix),
         new("journal", "Nav.Journal", Icons.Material.Outlined.ReceiptLong, NavLinkMatch.Prefix),
         new("settings", "Nav.Settings", Icons.Material.Outlined.Settings, NavLinkMatch.Prefix),
     ];

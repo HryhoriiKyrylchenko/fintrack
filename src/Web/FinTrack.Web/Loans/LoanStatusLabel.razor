@@ -1,0 +1,17 @@
+@* A loan's status as a label with an icon (DESIGN 1.5: never colour alone): open, or closed (paid back). *@
+@inject IStringLocalizer<SharedResource> L
+
+@if (Row.IsOpen)
+{
+    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Icon="@Icons.Material.Outlined.Schedule">@L["Loans.Status.Open"]</MudChip>
+}
+else
+{
+    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success" Icon="@Icons.Material.Outlined.CheckCircle">@L["Loans.Status.Closed"]</MudChip>
+}
+
+@code {
+    /// <summary>The loan.</summary>
+    [Parameter, EditorRequired]
+    public LoanRow Row { get; set; } = default!;
+}
