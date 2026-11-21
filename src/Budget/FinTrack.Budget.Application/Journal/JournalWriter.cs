@@ -18,8 +18,9 @@ namespace FinTrack.Budget.Application.Journal;
 /// client IDs (UUIDv7, the group's too); state (one consistent read, version first); settings (for "today"); the
 /// command's draft (targets resolved, the entries built, their rules about the buckets); a repeat (D4, B15),
 /// recognised before any rule because it was valid when written; the bucket rules; the entries' own rules;
-/// invariant 1 on one replay that includes every new entry (<see cref="BudgetErrorCodes.BucketInsufficientFunds"/>,
-/// D2); then one commit with the entries and any <c>Unallocated</c> bucket the draft created (D5).
+/// invariants 4 and 1, in this order, on one replay that includes every new entry
+/// (<see cref="BudgetErrorCodes.LoanRepaymentExceedsOutstanding"/>, plan 1b B3; <see cref="BudgetErrorCodes.BucketInsufficientFunds"/>,
+/// D2; each with the first day it breaks); then one commit with the entries and any <c>Unallocated</c> bucket the draft created (D5).
 /// </summary>
 /// <remarks>
 /// A repeat: when any of the command's entry IDs exists, or its group ID is already stored, the command writes
@@ -96,7 +97,15 @@ public sealed class JournalWriter(BudgetStateLoader loader, ILedger ledger, IOwn
         }
 
         IReadOnlyList<JournalEntry> written = [.. entries.Select(entry => entry.Value)];
-        if (BudgetState.Replay([.. state.Buckets, .. context.NewBuckets], [.. state.Journal, .. written], context.Today).FirstOverdraft is { } overdraft)
+        var replayed = BudgetState.Replay([.. state.Buckets, .. context.NewBuckets], [.. state.Journal, .. written], context.Today);
+        if (replayed.FirstOverRepayment is { } overRepayment)
+        {
+            return Result.Fail(AppError.BusinessRule(
+                BudgetErrorCodes.LoanRepaymentExceedsOutstanding,
+                ("date", overRepayment.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))));
+        }
+
+        if (replayed.FirstOverdraft is { } overdraft)
         {
             return Result.Fail(AppError.BusinessRule(
                 BudgetErrorCodes.BucketInsufficientFunds,

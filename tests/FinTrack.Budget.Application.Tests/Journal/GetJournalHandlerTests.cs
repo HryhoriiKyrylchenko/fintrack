@@ -103,6 +103,29 @@ public class GetJournalHandlerTests
     }
 
     [Fact]
+    public async Task BorrowAndRepayment_CarryTheirLoan_LenderAndOtherSide_AndTheBucketFilterKeepsThem()
+    {
+        Deposit(cushion, 500m, Today.AddDays(-9));
+        var borrow = Add(Domain.Journal.Borrow.Create(NewId(), FakeOwnerContext.Owner, cushion.BucketId, Pln(100m), holiday.BucketId, Today.AddDays(-5), Today,
+            new EntryInfo("Car", [], EntrySource.Manual), NextRecordedAt()).Value);
+        var outside = Add(Domain.Journal.Borrow.Create(NewId(), FakeOwnerContext.Owner, cushion.BucketId, Pln(20m), null, Today.AddDays(-4), Today, EntryInfo.None, NextRecordedAt()).Value);
+        var fromHoliday = Add(Repayment.Create(NewId(), FakeOwnerContext.Owner, borrow.LoanId, Pln(30m), holiday.BucketId, Today.AddDays(-3), Today, EntryInfo.None, NextRecordedAt()).Value);
+        var fromOutside = Add(Repayment.Create(NewId(), FakeOwnerContext.Owner, outside.LoanId, Pln(20m), null, Today.AddDays(-2), Today, EntryInfo.None, NextRecordedAt()).Value);
+
+        var entries = (await Journal(new GetJournal())).Value.Entries;
+
+        entries.Take(4).Select(Untagged).ShouldBe(
+        [
+            Common(fromOutside, JournalEntryType.Repayment, null) with { FromBucketId = null, ToBucketId = cushion.Id, Amount = Pln(20m), LoanId = outside.Id },
+            Common(fromHoliday, JournalEntryType.Repayment, null) with { FromBucketId = holiday.Id, ToBucketId = cushion.Id, Amount = Pln(30m), LoanId = borrow.Id },
+            Common(outside, JournalEntryType.Borrow, null) with { FromBucketId = cushion.Id, ToBucketId = null, Amount = Pln(20m), LoanId = outside.Id },
+            Common(borrow, JournalEntryType.Borrow, "Car") with { FromBucketId = cushion.Id, ToBucketId = holiday.Id, Amount = Pln(100m), LoanId = borrow.Id },
+        ]);
+        (await Ids(new GetJournal(BucketId: holiday.Id))).ShouldBe([fromHoliday.Id, borrow.Id]);
+        (await Ids(new GetJournal(BucketId: cushion.Id))).Count.ShouldBe(5);
+    }
+
+    [Fact]
     public async Task Transfer_CarriesBothSides_TheFeeAndTheRate()
     {
         Deposit(cushion, 100m, Today.AddDays(-9));
@@ -281,6 +304,10 @@ public class GetJournalHandlerTests
     private static readonly IReadOnlyList<string> NoTags = [];
 
     private static JournalEntryDto Untagged(JournalEntryDto entry) => entry with { Tags = NoTags };
+
+    private static JournalEntryDto Common(JournalEntry entry, JournalEntryType type, string? note) =>
+        new(entry.Id, type, entry.OccurredOn, entry.RecordedAt, note, NoTags, null, "Manual", null,
+            null, null, null, null, null, null, null, null, null, null);
 
     private static JournalEntryDto Single(SingleBucketEntry entry, JournalEntryType type, string? note, Money amount) =>
         new(entry.Id, type, entry.OccurredOn, entry.RecordedAt, note, NoTags, null, "Manual", null,

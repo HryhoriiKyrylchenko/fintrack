@@ -280,6 +280,120 @@ public sealed class JournalStorageTests(BudgetFixture fixture)
     }
 
     [Fact]
+    public async Task Borrow_HasThePinnedShape_WithItsDestination()
+    {
+        var owner = BudgetFixture.NewOwner();
+        var lender = BucketId.From(Guid.CreateVersion7());
+        var destination = BucketId.From(Guid.CreateVersion7());
+        var borrow = Borrow.Create(JournalEntryId.From(Guid.CreateVersion7()), owner, lender, Money.From(250m, Currency.Pln), destination, Day, Day,
+            EntryInfo.None, FakeClock.DefaultStart).Value;
+        await AppendAsync(owner, borrow);
+
+        (await RawAsync(borrow.Id)).ShouldBe(new BsonDocument
+        {
+            { "_id", Uuid(borrow.Id) },
+            { "type", "Borrow" },
+            { "ownerId", Uuid(owner.Value) },
+            { "schemaVersion", 1 },
+            { "recordedAt", new BsonDateTime(FakeClock.DefaultStart.UtcDateTime) },
+            { "occurredOn", "2026-01-15" },
+            { "tags", new BsonArray() },
+            { "source", "Manual" },
+            { "lenderBucketId", Uuid(lender.Value) },
+            { "principal", new BsonDocument { { "amount", new BsonDecimal128(250.00m) }, { "currency", "PLN" } } },
+            { "toBucketId", Uuid(destination.Value) },
+        });
+    }
+
+    [Fact]
+    public async Task Repayment_HasThePinnedShape_WithItsSource()
+    {
+        var owner = BudgetFixture.NewOwner();
+        var loan = Domain.Loans.LoanId.From(Guid.CreateVersion7());
+        var source = BucketId.From(Guid.CreateVersion7());
+        var repayment = Repayment.Create(JournalEntryId.From(Guid.CreateVersion7()), owner, loan, Money.From(12.5m, Currency.Pln), source, Day, Day,
+            new EntryInfo("First part", [], EntrySource.Manual), FakeClock.DefaultStart).Value;
+        await AppendAsync(owner, repayment);
+
+        (await RawAsync(repayment.Id)).ShouldBe(new BsonDocument
+        {
+            { "_id", Uuid(repayment.Id) },
+            { "type", "Repayment" },
+            { "ownerId", Uuid(owner.Value) },
+            { "schemaVersion", 1 },
+            { "recordedAt", new BsonDateTime(FakeClock.DefaultStart.UtcDateTime) },
+            { "occurredOn", "2026-01-15" },
+            { "note", "First part" },
+            { "tags", new BsonArray() },
+            { "source", "Manual" },
+            { "loanId", Uuid(loan.Value) },
+            { "amount", new BsonDocument { { "amount", new BsonDecimal128(12.50m) }, { "currency", "PLN" } } },
+            { "fromBucketId", Uuid(source.Value) },
+        });
+    }
+
+    [Fact]
+    public async Task OutsideTheApp_TheOptionalSideIsNotWritten_AndReadsBackAsNone()
+    {
+        var owner = BudgetFixture.NewOwner();
+        var borrow = Borrow.Create(JournalEntryId.From(Guid.CreateVersion7()), owner, BucketId.From(Guid.CreateVersion7()), Money.From(1m, Currency.Eur), null, Day, Day,
+            EntryInfo.None, FakeClock.DefaultStart).Value;
+        var repayment = Repayment.Create(JournalEntryId.From(Guid.CreateVersion7()), owner, borrow.LoanId, Money.From(1m, Currency.Eur), null, Day, Day,
+            EntryInfo.None, FakeClock.DefaultStart.AddMilliseconds(1)).Value;
+        await AppendAsync(owner, borrow, repayment);
+
+        (await RawAsync(borrow.Id)).Names.ShouldNotContain("toBucketId");
+        (await RawAsync(repayment.Id)).Names.ShouldNotContain("fromBucketId");
+        var read = await ReadAsync(owner);
+        read.OfType<Borrow>().ShouldHaveSingleItem().HasSameContent(borrow).ShouldBeTrue();
+        read.OfType<Repayment>().ShouldHaveSingleItem().HasSameContent(repayment).ShouldBeTrue();
+        read.OfType<Borrow>().Single().ToBucketId.ShouldBeNull();
+        read.OfType<Repayment>().Single().FromBucketId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task StoredBorrowAndRepayment_WithTheirOptionalSides_ReadBackWithTheSameContent()
+    {
+        var owner = BudgetFixture.NewOwner();
+        var borrow = Borrow.Create(JournalEntryId.From(Guid.CreateVersion7()), owner, BucketId.From(Guid.CreateVersion7()), Money.From(3m, Currency.Pln),
+            BucketId.From(Guid.CreateVersion7()), Day, Day, new EntryInfo("Car", ["car"], EntrySource.Manual), FakeClock.DefaultStart).Value;
+        var repayment = Repayment.Create(JournalEntryId.From(Guid.CreateVersion7()), owner, borrow.LoanId, Money.From(1m, Currency.Pln), BucketId.From(Guid.CreateVersion7()),
+            Day, Day, EntryInfo.None, FakeClock.DefaultStart.AddMilliseconds(1)).Value;
+        await AppendAsync(owner, borrow, repayment);
+
+        var read = await ReadAsync(owner);
+
+        read.OfType<Borrow>().ShouldHaveSingleItem().HasSameContent(borrow).ShouldBeTrue();
+        read.OfType<Repayment>().ShouldHaveSingleItem().HasSameContent(repayment).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("Borrow", "lenderBucketId")]
+    [InlineData("Borrow", "principal")]
+    [InlineData("Repayment", "loanId")]
+    [InlineData("Repayment", "amount")]
+    public async Task StoredLoanEntry_WithoutARequiredElement_FailsToRead(string type, string element)
+    {
+        var owner = BudgetFixture.NewOwner();
+        var document = LoanDocument(owner, type);
+        document.Remove(element);
+        await fixture.Raw(BudgetCollections.Journal).InsertOneAsync(document, cancellationToken: Cancellation);
+
+        await Should.ThrowAsync<Exception>(() => ReadAsync(owner));
+    }
+
+    [Theory]
+    [InlineData("Borrow")]
+    [InlineData("Repayment")]
+    public async Task StoredLoanEntry_WrittenByHand_IsRead(string type)
+    {
+        var owner = BudgetFixture.NewOwner();
+        await fixture.Raw(BudgetCollections.Journal).InsertOneAsync(LoanDocument(owner, type), cancellationToken: Cancellation);
+
+        (await ReadAsync(owner)).ShouldHaveSingleItem().GetType().Name.ShouldBe(type);
+    }
+
+    [Fact]
     public void EveryEntryType_HasAnExplicitStableName()
     {
         BudgetMongoMapping.Register();
@@ -424,6 +538,27 @@ public sealed class JournalStorageTests(BudgetFixture fixture)
         await fixture.Raw(BudgetCollections.Journal).Find(new BsonDocument("_id", Uuid(id))).SingleAsync(Cancellation);
 
     private static BsonBinaryData Uuid(Guid value) => new(value, GuidRepresentation.Standard);
+
+    private static BsonDocument LoanDocument(OwnerId owner, string type)
+    {
+        var document = ValidDocument(owner);
+        document["type"] = type;
+        document.Remove("bucketId");
+        document.Remove("amount");
+        var money = new BsonDocument { { "amount", new BsonDecimal128(10m) }, { "currency", "PLN" } };
+        if (type == "Borrow")
+        {
+            document.Add("lenderBucketId", Uuid(Guid.CreateVersion7()));
+            document.Add("principal", money);
+        }
+        else
+        {
+            document.Add("loanId", Uuid(Guid.CreateVersion7()));
+            document.Add("amount", money);
+        }
+
+        return document;
+    }
 
     private static BsonDocument AdjustmentDocument(OwnerId owner, BsonValue direction)
     {

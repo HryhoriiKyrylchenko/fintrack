@@ -241,6 +241,30 @@
   <data name="Error.entry.has_dependents" xml:space="preserve">
     <value>Later entries still refer to this entry. Reverse them first, then reverse this one.</value>
   </data>
+  <data name="Error.bucket.has_open_loan" xml:space="preserve">
+    <value>This bucket has lent money that is not paid back yet. Repay the loan first, then archive the bucket.</value>
+  </data>
+  <data name="Error.bucket.borrow_not_allowed" xml:space="preserve">
+    <value>You can borrow only from a savings bucket, not from an investment bucket.</value>
+  </data>
+  <data name="Error.borrow.same_bucket" xml:space="preserve">
+    <value>The money cannot go to the bucket it is borrowed from. Choose another bucket or "outside the app".</value>
+  </data>
+  <data name="Error.loan.not_found" xml:space="preserve">
+    <value>This loan was not found. It may have been reversed.</value>
+  </data>
+  <data name="Error.loan.closed" xml:space="preserve">
+    <value>This loan is already paid back in full.</value>
+  </data>
+  <data name="Error.loan.repayment_exceeds_outstanding" xml:space="preserve">
+    <value>This is more than the loan still owes at that time. Check the amount and the date.</value>
+  </data>
+  <data name="Error.loan.repayment_exceeds_outstanding.WithParams" xml:space="preserve">
+    <value>This is more than the loan still owes on {date}. Check the amount and the date.</value>
+  </data>
+  <data name="Error.repayment.from_lender" xml:space="preserve">
+    <value>A loan cannot be paid back from the bucket that lent the money. Choose another bucket or "outside the app".</value>
+  </data>
   <data name="Error.fx.rate_unavailable" xml:space="preserve">
     <value>No exchange rate is available yet, so the total in your reporting currency cannot be shown. It appears once the app can reach the rate service.</value>
   </data>
@@ -709,6 +733,12 @@
   <data name="Journal.Type.Adjustment" xml:space="preserve">
     <value>Adjustment</value>
   </data>
+  <data name="Journal.Type.Borrow" xml:space="preserve">
+    <value>Borrow</value>
+  </data>
+  <data name="Journal.Type.Repayment" xml:space="preserve">
+    <value>Repayment</value>
+  </data>
   <data name="Journal.TheType.OpeningBalance" xml:space="preserve">
     <value>the opening balance</value>
   </data>
@@ -726,6 +756,12 @@
   </data>
   <data name="Journal.TheType.Adjustment" xml:space="preserve">
     <value>the adjustment</value>
+  </data>
+  <data name="Journal.TheType.Borrow" xml:space="preserve">
+    <value>the borrow</value>
+  </data>
+  <data name="Journal.TheType.Repayment" xml:space="preserve">
+    <value>the repayment</value>
   </data>
   <data name="Journal.TransferLine" xml:space="preserve">
     <value>{0} → {1}</value>

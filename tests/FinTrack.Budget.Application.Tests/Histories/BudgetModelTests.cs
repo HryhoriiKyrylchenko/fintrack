@@ -5,6 +5,7 @@ using FinTrack.Budget.Application.Overview;
 using FinTrack.Budget.Application.Settings;
 using FinTrack.Budget.Domain.Buckets;
 using FinTrack.Budget.Domain.Journal;
+using FinTrack.Budget.Domain.Loans;
 using FinTrack.Budget.Domain.State;
 using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Tests.Common;
@@ -17,9 +18,9 @@ namespace FinTrack.Budget.Application.Tests.Histories;
 
 /// <summary>
 /// The model test of plan 1a step 10: random sequences of every Budget command (buckets in three
-/// currencies, opening balances, deposits, spends, adjustments up and down (plan 1b step 4), transfers with and without fee and across
-/// currencies, reversals, archiving, unarchiving (plan 1b step 2), renaming, backdating, and repeats of earlier commands) run through
-/// the real handlers. After every command and at the end, invariants 1, 2, 5, 10, 11 and 13 must hold. At the
+/// currencies, opening balances, deposits, spends, adjustments up and down (plan 1b step 4), borrows and repayments (step 5), transfers
+/// with and without fee and across currencies, reversals, archiving, unarchiving (plan 1b step 2), renaming, backdating, and repeats of earlier commands) run through
+/// the real handlers. After every command and at the end, invariants 1, 2, 4, 5, 10, 11 and 13 must hold. At the
 /// end, the read queries (step 12) must agree with the state: the overview's balances and totals, and the
 /// journal read page by page.
 /// </summary>
@@ -37,6 +38,8 @@ public class BudgetModelTests
         Deposit,
         Spend,
         Adjust,
+        Borrow,
+        Repay,
         Transfer,
         Reverse,
         Archive,
@@ -170,18 +173,37 @@ public class BudgetModelTests
             var reversed = BudgetState.ReversedEntryIds(journal);
             var effective = journal.Where(entry => entry is not Reversal && !reversed.Contains(entry.Id)).ToList();
 
-            // Invariant 1, checked independently: running sums over the effective journal in replay order.
+            // Invariants 1 and 4, checked independently: running sums of Available per bucket and of the outstanding
+            // principal per loan over the effective journal in replay order.
             var sums = bucketList.ToDictionary(bucket => bucket.BucketId, _ => 0m);
+            var outstanding = new Dictionary<Guid, decimal>();
+            var borrows = journal.OfType<Borrow>().ToDictionary(borrow => borrow.Id);
             foreach (var entry in ReplayOrder.Sort(effective))
             {
-                foreach (var (bucketId, change) in Changes(entry))
+                foreach (var (bucketId, change) in Changes(entry, borrows))
                 {
                     sums[bucketId] += change;
                 }
 
                 bucketList.Where(bucket => bucket.Kind == BucketKind.Savings)
                     .ShouldAllBe(bucket => sums[bucket.BucketId] >= 0m, "a savings bucket went below zero");
+
+                if (entry is Borrow borrow)
+                {
+                    outstanding[borrow.Id] = borrow.Principal.Amount;
+                }
+                else if (entry is Repayment repayment)
+                {
+                    outstanding.ShouldContainKey(repayment.LoanId.Value, "a repayment came before its borrow");
+                    outstanding[repayment.LoanId.Value] -= repayment.Amount.Amount;
+                    outstanding[repayment.LoanId.Value].ShouldBeGreaterThanOrEqualTo(0m, "a repayment exceeded the outstanding principal");
+                }
             }
+
+            state.FirstOverRepayment.ShouldBeNull();
+            state.Loans.Select(loan => (loan.LoanId.Value, loan.Outstanding.Amount)).ShouldBe(outstanding.Select(pair => (pair.Key, pair.Value)), ignoreOrder: true);
+            bucketList.ShouldAllBe(bucket => state.BalanceOf(bucket.BucketId).OutstandingPrincipal.Amount
+                == state.Loans.Where(loan => loan.LenderBucketId == bucket.BucketId).Sum(loan => loan.Outstanding.Amount));
 
             // Invariant 5, checked independently: income is the effective deposits only (adjustments, opening balances and
             // transfers never count), and adjustments are tracked apart by direction.
@@ -277,13 +299,17 @@ public class BudgetModelTests
             read.ShouldAllBe(entry => entry.ReversedBy == (reversals.ContainsKey(entry.Id) ? reversals[entry.Id] : null));
         }
 
-        private static IEnumerable<(BucketId Bucket, decimal Change)> Changes(JournalEntry entry) => entry switch
+        // How an effective entry changes Available, written without BudgetState; a repayment's lender is its borrow's.
+        private static IEnumerable<(BucketId Bucket, decimal Change)> Changes(JournalEntry entry, Dictionary<Guid, Borrow> borrows) => entry switch
         {
             Spend spend => [(spend.BucketId, -spend.Amount.Amount)],
             Adjustment { Direction: AdjustmentDirection.Decrease } decrease => [(decrease.BucketId, -decrease.Amount.Amount)],
             SingleBucketEntry single => [(single.BucketId, single.Amount.Amount)],
             Transfer transfer => [(transfer.FromBucketId, -transfer.FromAmount.Amount), (transfer.ToBucketId, transfer.ToAmount.Amount)],
-            _ => [],
+            Borrow borrow => [(borrow.LenderBucketId, -borrow.Principal.Amount), .. (borrow.ToBucketId is { } to ? [(to, borrow.Principal.Amount)] : Array.Empty<(BucketId, decimal)>())],
+            Repayment repayment => [(borrows[repayment.LoanId.Value].LenderBucketId, repayment.Amount.Amount),
+                .. (repayment.FromBucketId is { } from ? [(from, -repayment.Amount.Amount)] : Array.Empty<(BucketId, decimal)>())],
+            _ => throw new InvalidOperationException($"The model does not know the entry type {entry.GetType().Name}."),
         };
 
         private object Interpret(Operation operation)
@@ -318,6 +344,78 @@ public class BudgetModelTests
                     return new AddAdjustment(id, Money.From(operation.Units / 100m, adjusted.Currency),
                         operation.B % 2 == 0 ? Contracts.V1.Journal.AdjustmentDirection.Increase : Contracts.V1.Journal.AdjustmentDirection.Decrease,
                         occurredOn, adjusted.BucketId, adjusted.Unallocated, "Recount", []);
+
+                case Kind.Borrow:
+                    // Usually (Fee 0 and 1) an active savings bucket of the user lends today at most what it holds, into another
+                    // bucket of its currency, into Unallocated of that currency, or to the outside, so borrows are accepted often.
+                    // Otherwise any bucket lends (Fee 2: investment, system and archived ones included), or (Fee 3) the
+                    // destination is any bucket, the lender itself or one of another currency included, at the generated date and
+                    // amount.
+                    var today = BudgetState.Replay(all, budget.Journal, Today);
+                    var lenders = active.Where(bucket => bucket.Kind == BucketKind.Savings && bucket.SystemRole == BucketSystemRole.None)
+                        .OrderByDescending(bucket => today.BalanceOf(bucket.BucketId).Available.Amount > 0m)
+                        .ToList();
+                    var funded = lenders.Count(bucket => today.BalanceOf(bucket.BucketId).Available.Amount > 0m);
+                    var lender = operation.Fee != 2 && lenders.Count > 0
+                        ? lenders[operation.A % (funded > 0 ? funded : lenders.Count)]
+                        : all.Count == 0 ? null : all[operation.A % all.Count];
+                    var lenderCurrency = lender?.Currency ?? Currencies[operation.A % 3];
+                    var principal = operation.Units / 100m;
+                    Guid? toBucket = null;
+                    Currency? toUnallocated = null;
+                    if (operation.Fee == 3)
+                    {
+                        (toBucket, toUnallocated, _) = Target(operation.Unallocated, operation.B, active, all);
+                    }
+                    else
+                    {
+                        var available = lender is null ? 0m : today.BalanceOf(lender.BucketId).Available.Amount;
+                        principal = available >= 0.01m ? Math.Min(principal, available) : principal;
+                        occurredOn = operation.Fee == 2 ? occurredOn : Today;
+                        var destinations = active.Where(bucket => bucket.Currency == lenderCurrency && bucket.Id != lender?.Id).ToList();
+                        if (operation.B % 3 == 1 && destinations.Count > 0)
+                        {
+                            toBucket = destinations[operation.B % destinations.Count].Id;
+                        }
+                        else if (operation.B % 3 == 2)
+                        {
+                            toUnallocated = lenderCurrency;
+                        }
+                    }
+
+                    return new AddBorrow(id, lender?.Id ?? Guid.CreateVersion7(), Money.From(principal, lenderCurrency), occurredOn, toBucket, toUnallocated, null, []);
+
+                case Kind.Repay:
+                    // Usually (Fee 0 and 1) a loan open today, dated no earlier than its borrow, within what it owes, paid from
+                    // outside or from the bucket the money went to, so repayments are accepted often. Otherwise any loan ever
+                    // opened (Fee 2: closed and reversed ones included) or an unknown one (Fee 3), at the generated date and
+                    // amount, from any bucket (perhaps the lender), from Unallocated of the loan's currency, or from outside.
+                    var open = BudgetState.Replay(all, budget.Journal, Today).Loans.Where(candidate => candidate.Status == LoanStatus.Open).ToList();
+                    var loans = budget.Journal.OfType<Borrow>().ToList();
+                    var regular = operation.Fee < 2 && open.Count > 0;
+                    var loan = regular
+                        ? loans.Single(borrow => borrow.LoanId == open[operation.A % open.Count].LoanId)
+                        : operation.Fee == 3 || loans.Count == 0 ? null : loans[operation.A % loans.Count];
+                    var loanCurrency = loan?.Principal.Currency ?? Currencies[operation.A % 3];
+                    var units = operation.Units / 100m;
+                    Guid? fromBucket = null;
+                    Currency? fromUnallocated = null;
+                    if (regular)
+                    {
+                        occurredOn = occurredOn < loan!.OccurredOn ? loan.OccurredOn : occurredOn;
+                        units = Math.Min(units, open.Single(candidate => candidate.LoanId == loan.LoanId).Outstanding.Amount);
+                        fromBucket = operation.B % 2 == 1 ? loan.ToBucketId?.Value : null;
+                    }
+                    else if (operation.B % 3 == 1)
+                    {
+                        (fromBucket, fromUnallocated, _) = Target(false, operation.B, active, all);
+                    }
+                    else if (operation.B % 3 == 2)
+                    {
+                        fromUnallocated = loanCurrency;
+                    }
+
+                    return new AddRepayment(id, loan?.Id ?? Guid.CreateVersion7(), Money.From(units, loanCurrency), occurredOn, fromBucket, fromUnallocated, null, []);
 
                 case Kind.Transfer:
                     var from = Target(operation.Unallocated && operation.A % 2 == 0, operation.A, active, all);
@@ -355,7 +453,7 @@ public class BudgetModelTests
 
                 default:
                     // A repeat of an earlier successful command that has a client ID (CreateBucket or an entry).
-                    var repeatable = succeeded.Where(command => command is CreateBucket or IBucketEntryCommand or AddTransfer or ReverseEntry).ToList();
+                    var repeatable = succeeded.Where(command => command is CreateBucket or IBucketEntryCommand or AddTransfer or AddBorrow or AddRepayment or ReverseEntry).ToList();
                     return repeatable.Count == 0
                         ? new CreateBucket(id, "Repeatable", Currency.Pln, Contract.BucketKind.Savings, null)
                         : repeatable[operation.A % repeatable.Count];
@@ -402,6 +500,8 @@ public class BudgetModelTests
                 AddDeposit deposit => new AddDepositHandler(entries).Handle(deposit, cancellation),
                 AddSpend spend => new AddSpendHandler(entries).Handle(spend, cancellation),
                 AddAdjustment adjustment => new AddAdjustmentHandler(entries).Handle(adjustment, cancellation),
+                AddBorrow borrow => new AddBorrowHandler(writer).Handle(borrow, cancellation),
+                AddRepayment repayment => new AddRepaymentHandler(writer).Handle(repayment, cancellation),
                 AddTransfer transfer => new AddTransferHandler(writer).Handle(transfer, cancellation),
                 ReverseEntry reverse => new ReverseEntryHandler(writer, new JournalEntryDependencies()).Handle(reverse, cancellation),
                 _ => throw new InvalidOperationException($"Unknown command {command.GetType().Name}."),

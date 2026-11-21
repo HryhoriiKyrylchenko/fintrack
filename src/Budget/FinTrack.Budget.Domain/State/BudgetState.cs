@@ -1,5 +1,6 @@
 using FinTrack.Budget.Domain.Buckets;
 using FinTrack.Budget.Domain.Journal;
+using FinTrack.Budget.Domain.Loans;
 using FinTrack.Shared.Kernel.Monetary;
 
 namespace FinTrack.Budget.Domain.State;
@@ -13,9 +14,17 @@ namespace FinTrack.Budget.Domain.State;
 /// <remarks>
 /// <para>
 /// Balances follow 4.3: <c>NetContributed</c> = opening balance + deposits + transfers in − spends −
-/// transfers out + adjustments up − adjustments down; <c>OutstandingPrincipal</c> is 0 until loans exist
-/// (phase 1b); <c>Available</c> = <c>NetContributed</c> − <c>OutstandingPrincipal</c>. Every amount stays in
-/// its bucket's currency; currencies are never added together (invariant 11).
+/// transfers out + adjustments up − adjustments down + borrowed into the bucket − repayments paid from it;
+/// <c>OutstandingPrincipal</c> = borrowed from the bucket − repaid to it; <c>Available</c> = <c>NetContributed</c> −
+/// <c>OutstandingPrincipal</c> (invariant 2). Every amount stays in its bucket's currency; currencies are never added
+/// together (invariant 11).
+/// </para>
+/// <para>
+/// Loans (4.4, plan 1b B2, B3) are derived here, never stored: a <see cref="Borrow"/> opens one, each
+/// <see cref="Repayment"/> lowers what is outstanding. Invariant 4 holds at every point of the replay order:
+/// <see cref="FirstOverRepayment"/> reports the first point at which a repayment exceeded its loan's outstanding
+/// principal, including a repayment replayed before its borrow (its lender is not known there, so only the source
+/// changes).
 /// </para>
 /// <para>
 /// Invariant 1 holds at every point of the replay order (D2): each balance remembers the first date its
@@ -33,15 +42,27 @@ namespace FinTrack.Budget.Domain.State;
 public sealed class BudgetState
 {
     private readonly IReadOnlyList<BucketBalance> balances;
+    private readonly IReadOnlyList<Loan> loans;
 
-    private BudgetState(IReadOnlyList<BucketBalance> balances, DateOnly today)
+    private BudgetState(IReadOnlyList<BucketBalance> balances, IReadOnlyList<Loan> loans, OverRepayment? firstOverRepayment, DateOnly today)
     {
         this.balances = balances;
+        this.loans = loans;
+        FirstOverRepayment = firstOverRepayment;
         Today = today;
     }
 
     /// <summary>One balance per bucket, in the order the buckets were given.</summary>
     public IReadOnlyList<BucketBalance> Balances => balances;
+
+    /// <summary>Every loan opened by an effective borrow, open and closed, in the replay order of their borrows.</summary>
+    public IReadOnlyList<Loan> Loans => loans;
+
+    /// <summary>
+    /// The first point in replay order at which a repayment exceeded its loan's outstanding principal, or was replayed
+    /// before its borrow (invariant 4), or <c>null</c>. A journal that respects invariant 4 has none.
+    /// </summary>
+    public OverRepayment? FirstOverRepayment { get; }
 
     /// <summary>
     /// Today in the owner's time zone: the day this state is for (plan 1b B20). It gives the current month that
@@ -76,7 +97,7 @@ public sealed class BudgetState
         var reversed = ReversedEntryIds(entries);
         var effective = entries.Where(entry => entry is not Reversal && !reversed.Contains(entry.Id));
 
-        var state = new BudgetState([.. buckets.Select(BucketBalance.Empty)], today);
+        var state = new BudgetState([.. buckets.Select(BucketBalance.Empty)], [], firstOverRepayment: null, today);
         return ReplayOrder.Sort(effective).Aggregate(state, (current, entry) => current.Apply(entry));
     }
 
@@ -123,6 +144,8 @@ public sealed class BudgetState
             {
                 NetContributed = balance.NetContributed + transfer.ToAmount,
             }),
+        Borrow borrow => Borrowed(borrow),
+        Repayment repayment => Repaid(repayment),
         Reversal => this,
         _ => throw new InvalidOperationException($"The state builder does not know the entry type {entry?.GetType().Name}."),
     };
@@ -132,6 +155,79 @@ public sealed class BudgetState
     public BucketBalance BalanceOf(BucketId bucketId) =>
         balances.FirstOrDefault(balance => balance.BucketId == bucketId)
         ?? throw new InvalidOperationException($"Bucket {bucketId} is not part of this state.");
+
+    /// <summary>The loan <paramref name="loanId"/>, or <c>null</c> when no effective borrow opened it (yet, in replay order).</summary>
+    public Loan? FindLoan(LoanId loanId) => loans.FirstOrDefault(loan => loan.LoanId == loanId);
+
+    // A borrow: the lender lends (its Available falls), the destination receives like a transfer in, a loan opens.
+    private BudgetState Borrowed(Borrow borrow)
+    {
+        var state = With(borrow.LenderBucketId, borrow.OccurredOn, balance => balance with
+        {
+            OutstandingPrincipal = balance.OutstandingPrincipal + borrow.Principal,
+        });
+        if (borrow.ToBucketId is { } destination)
+        {
+            state = state.With(destination, borrow.OccurredOn, balance => balance with
+            {
+                NetContributed = balance.NetContributed + borrow.Principal,
+            });
+        }
+
+        var loan = new Loan(borrow.LoanId, borrow.LenderBucketId, borrow.ToBucketId, borrow.Principal, borrow.OccurredOn, Money.Zero(borrow.Principal.Currency), ClosedOn: null);
+        return new BudgetState(state.balances, [.. state.loans, loan], state.FirstOverRepayment, Today);
+    }
+
+    // A repayment: the source pays like a transfer out, the lender's outstanding principal falls, the loan closes at
+    // zero. A repayment of a loan not opened yet in replay order, or one that goes below zero, breaks invariant 4.
+    private BudgetState Repaid(Repayment repayment)
+    {
+        var state = this;
+        if (repayment.FromBucketId is { } source)
+        {
+            state = state.With(source, repayment.OccurredOn, balance => balance with
+            {
+                NetContributed = balance.NetContributed - repayment.Amount,
+            });
+        }
+
+        var index = state.IndexOfLoan(repayment.LoanId);
+        if (index < 0)
+        {
+            return state.WithOverRepayment(repayment.LoanId, repayment.OccurredOn);
+        }
+
+        var loan = state.loans[index];
+        var repaid = loan with { Repaid = loan.Repaid + repayment.Amount };
+        repaid = repaid with { ClosedOn = repaid.Status == LoanStatus.Closed ? repayment.OccurredOn : null };
+
+        state = state.With(loan.LenderBucketId, repayment.OccurredOn, balance => balance with
+        {
+            OutstandingPrincipal = balance.OutstandingPrincipal - repayment.Amount,
+        });
+        var changedLoans = state.loans.ToArray();
+        changedLoans[index] = repaid;
+        state = new BudgetState(state.balances, changedLoans, state.FirstOverRepayment, Today);
+
+        return repaid.Outstanding.Amount < 0m ? state.WithOverRepayment(repayment.LoanId, repayment.OccurredOn) : state;
+    }
+
+    private int IndexOfLoan(LoanId loanId)
+    {
+        for (var position = 0; position < loans.Count; position++)
+        {
+            if (loans[position].LoanId == loanId)
+            {
+                return position;
+            }
+        }
+
+        return -1;
+    }
+
+    // Only the first break counts: entries are applied in replay order, so it is the earliest.
+    private BudgetState WithOverRepayment(LoanId loanId, DateOnly date) =>
+        FirstOverRepayment is null ? new BudgetState(balances, loans, new OverRepayment(loanId, date), Today) : this;
 
     // Applies a change to one bucket and records the first date its Available goes below zero.
     private BudgetState With(BucketId bucketId, DateOnly occurredOn, Func<BucketBalance, BucketBalance> change)
@@ -159,15 +255,15 @@ public sealed class BudgetState
         }
 
         changed[index] = balance;
-        return new BudgetState(changed, Today);
+        return new BudgetState(changed, loans, FirstOverRepayment, Today);
     }
 }
 
 /// <summary>One bucket's balances (ARCHITECTURE 4.3), all in the bucket's currency.</summary>
 /// <param name="BucketId">The bucket.</param>
 /// <param name="Kind">Savings or investment (only savings buckets must never go below zero).</param>
-/// <param name="NetContributed">Opening balance + deposits + transfers in − spends − transfers out + adjustments up − adjustments down.</param>
-/// <param name="OutstandingPrincipal">Borrowed − repaid principal; 0 until loans exist (phase 1b).</param>
+/// <param name="NetContributed">Opening balance + deposits + transfers in − spends − transfers out + adjustments up − adjustments down + borrowed into the bucket − repayments paid from it.</param>
+/// <param name="OutstandingPrincipal">Principal lent from this bucket and not repaid yet (plan 1b B3).</param>
 /// <param name="Deposited">The sum of deposits: the only income (invariant 5).</param>
 /// <param name="AdjustedIn">The sum of adjustments up (plan 1b B14): never income, kept apart for the reports.</param>
 /// <param name="AdjustedOut">The sum of adjustments down, above zero.</param>
@@ -200,3 +296,8 @@ public sealed record BucketBalance(
 /// <param name="BucketId">The bucket.</param>
 /// <param name="Date">The first date on which it was below zero.</param>
 public sealed record Overdraft(BucketId BucketId, DateOnly Date);
+
+/// <summary>A repayment above its loan's outstanding principal at some point of the replay order (invariant 4 broken).</summary>
+/// <param name="LoanId">The loan.</param>
+/// <param name="Date">The first date on which it happened.</param>
+public sealed record OverRepayment(LoanId LoanId, DateOnly Date);

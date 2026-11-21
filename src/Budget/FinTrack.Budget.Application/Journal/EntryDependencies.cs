@@ -1,4 +1,5 @@
 using FinTrack.Budget.Domain.Journal;
+using FinTrack.Budget.Domain.State;
 
 namespace FinTrack.Budget.Application.Journal;
 
@@ -17,7 +18,8 @@ public interface IEntryDependencies
 }
 
 /// <summary>
-/// The dependency rule of the entry types that exist. No type of phase 1a, and no <c>Adjustment</c> (plan 1b step 4), is
+/// The dependency rule of the entry types that exist. A <c>Borrow</c> has dependents while an effective <c>Repayment</c>
+/// of its loan exists (plan 1b step 5). No type of phase 1a, no <c>Adjustment</c> (step 4) and no <c>Repayment</c> is
 /// referred to by another entry except through a reversal (which is not effective), so none has dependents; the types that do get their case in the
 /// step that adds them (loans step 5, plans step 9, pauses step 10). An unknown type is a bug: every new type must
 /// decide here.
@@ -33,8 +35,16 @@ public sealed class JournalEntryDependencies : IEntryDependencies
 
         return entry switch
         {
-            OpeningBalance or Deposit or Spend or Transfer or Reversal or Adjustment => false,
+            Borrow borrow => HasEffectiveRepayment(borrow, state),
+            OpeningBalance or Deposit or Spend or Transfer or Reversal or Adjustment or Repayment => false,
             _ => throw new InvalidOperationException($"The dependency rule does not know the entry type {entry.GetType().Name}."),
         };
+    }
+
+    // A borrow with an effective repayment (B5); a repayment plan (step 12) will count too.
+    private static bool HasEffectiveRepayment(Borrow borrow, BudgetSnapshot state)
+    {
+        var reversed = BudgetState.ReversedEntryIds(state.Journal);
+        return state.Journal.OfType<Repayment>().Any(repayment => repayment.LoanId == borrow.LoanId && !reversed.Contains(repayment.Id));
     }
 }

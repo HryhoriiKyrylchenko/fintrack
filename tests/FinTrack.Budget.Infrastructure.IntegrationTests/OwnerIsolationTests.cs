@@ -48,6 +48,9 @@ public sealed class OwnerIsolationTests(BudgetFixture fixture)
         await SendAsync<AddDepositHandler, AddDeposit>(a, new AddDeposit(deposit, Pln(100m), Today.AddDays(-5), null, Currency.Pln, null, []));
         await SendAsync<AddSpendHandler, AddSpend>(a, new AddSpend(Guid.CreateVersion7(), Pln(50m), Today, cushion, null, null, []));
         await SendAsync<AddTransferHandler, AddTransfer>(a, new AddTransfer(Guid.CreateVersion7(), Pln(20m), Pln(20m), null, Today, cushion, null, holiday, null, null, []));
+        var loan = Guid.CreateVersion7();
+        (await SendAsync<AddBorrowHandler, AddBorrow>(a, new AddBorrow(loan, cushion, Pln(30m), Today.AddDays(-1), holiday, null, null, []))).IsSuccess.ShouldBeTrue();
+        (await SendAsync<AddRepaymentHandler, AddRepayment>(a, new AddRepayment(Guid.CreateVersion7(), loan, Pln(10m), Today, holiday, null, null, []))).IsSuccess.ShouldBeTrue();
         (await SendAsync<ReverseEntryHandler, ReverseEntry>(a, new ReverseEntry(Guid.CreateVersion7(), opening, Today, null, []))).IsSuccess.ShouldBeFalse(
             "reversing A's opening balance would overdraw, so A's own rules reject it");
         var before = await RawAsync(a);
@@ -80,6 +83,10 @@ public sealed class OwnerIsolationTests(BudgetFixture fixture)
             .ShouldFailWith(BudgetErrorCodes.BucketNotFound, ErrorKind.NotFound);
         (await SendAsync<ReverseEntryHandler, ReverseEntry>(b, new ReverseEntry(Guid.CreateVersion7(), deposit, Today, null, [])))
             .ShouldFailWith(BudgetErrorCodes.EntryNotFound, ErrorKind.NotFound);
+        (await SendAsync<AddBorrowHandler, AddBorrow>(b, new AddBorrow(Guid.CreateVersion7(), cushion, Pln(1m), Today, null, null, null, [])))
+            .ShouldFailWith(BudgetErrorCodes.BucketNotFound, ErrorKind.NotFound);
+        (await SendAsync<AddRepaymentHandler, AddRepayment>(b, new AddRepayment(Guid.CreateVersion7(), loan, Pln(1m), Today, null, null, null, [])))
+            .ShouldFailWith(BudgetErrorCodes.LoanNotFound, ErrorKind.NotFound);
 
         // A's IDs cannot be reused by B: the commit conflicts (the unique _id), it never overwrites or leaks.
         (await SendAsync<CreateBucketHandler, CreateBucket>(b, new CreateBucket(cushion, "Cushion", Currency.Pln, BucketKind.Savings, null)))

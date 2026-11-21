@@ -8,8 +8,8 @@ using FinTrack.Tests.Common;
 namespace FinTrack.Budget.Domain.Tests.Buckets;
 
 /// <summary>
-/// Archiving a bucket (ARCHITECTURE 4.1): only an empty bucket of the user, never a system bucket. In
-/// phase 1a "empty" is an <c>Available</c> of zero (no loans or plans exist yet).
+/// Archiving a bucket (ARCHITECTURE 4.1, invariant 8, plan 1b B17): only a bucket of the user that lends to no open
+/// loan and whose <c>NetContributed</c> is zero, never a system bucket; checked in that order.
 /// </summary>
 public class ArchiveTests
 {
@@ -20,7 +20,7 @@ public class ArchiveTests
     {
         var bucket = StoredBuckets.Restore(BucketId.From(Guid.CreateVersion7()), Owner, "Cushion", Currency.Pln, BucketKind.Savings, null, BucketStatus.Active, BucketSystemRole.None, version: 4);
 
-        var archived = bucket.Archive(Balance(bucket, 0m)).Value;
+        var archived = bucket.Archive(Balance(bucket, 0m), lendsToAnOpenLoan: false).Value;
 
         archived.Status.ShouldBe(BucketStatus.Archived);
         archived.Id.ShouldBe(bucket.Id);
@@ -36,7 +36,26 @@ public class ArchiveTests
     {
         var bucket = Bucket.Create(BucketId.From(Guid.CreateVersion7()), Owner, "Stocks", Currency.Pln, BucketKind.Investment, InvestmentProfile.Crypto, []).Value;
 
-        bucket.Archive(Balance(bucket, (decimal)available)).ShouldFailWith(BudgetErrorCodes.BucketNotEmpty, ErrorKind.BusinessRule);
+        bucket.Archive(Balance(bucket, (decimal)available), lendsToAnOpenLoan: false).ShouldFailWith(BudgetErrorCodes.BucketNotEmpty, ErrorKind.BusinessRule);
+    }
+
+    [Fact]
+    public void ALenderOfAnOpenLoan_HasAnOpenLoan_BeforeItIsNotEmpty()
+    {
+        var bucket = Bucket.Create(BucketId.From(Guid.CreateVersion7()), Owner, "Cushion", Currency.Pln, BucketKind.Savings, null, []).Value;
+
+        bucket.Archive(Balance(bucket, 0m), lendsToAnOpenLoan: true).ShouldFailWith(BudgetErrorCodes.BucketHasOpenLoan, ErrorKind.BusinessRule);
+        bucket.Archive(Balance(bucket, 50m), lendsToAnOpenLoan: true).ShouldFailWith(BudgetErrorCodes.BucketHasOpenLoan, ErrorKind.BusinessRule);
+    }
+
+    [Fact]
+    public void ALenderWhoseMoneyIsAllLentOut_IsNotEmpty_ThoughItsAvailableIsZero()
+    {
+        var bucket = Bucket.Create(BucketId.From(Guid.CreateVersion7()), Owner, "Cushion", Currency.Pln, BucketKind.Savings, null, []).Value;
+        var balance = Balance(bucket, 100m) with { OutstandingPrincipal = Money.From(100m, Currency.Pln) };
+        balance.Available.ShouldBe(Money.Zero(Currency.Pln));
+
+        bucket.Archive(balance, lendsToAnOpenLoan: false).ShouldFailWith(BudgetErrorCodes.BucketNotEmpty, ErrorKind.BusinessRule);
     }
 
     [Fact]
@@ -44,7 +63,7 @@ public class ArchiveTests
     {
         var unallocated = Bucket.Unallocated(BucketId.From(Guid.CreateVersion7()), Owner, Currency.Pln);
 
-        unallocated.Archive(Balance(unallocated, 0m)).ShouldFailWith(BudgetErrorCodes.BucketSystemBucket, ErrorKind.BusinessRule);
+        unallocated.Archive(Balance(unallocated, 0m), lendsToAnOpenLoan: true).ShouldFailWith(BudgetErrorCodes.BucketSystemBucket, ErrorKind.BusinessRule);
     }
 
     [Fact]
@@ -53,7 +72,7 @@ public class ArchiveTests
         var bucket = Bucket.Create(BucketId.From(Guid.CreateVersion7()), Owner, "Cushion", Currency.Pln, BucketKind.Savings, null, []).Value;
         var other = Bucket.Create(BucketId.From(Guid.CreateVersion7()), Owner, "Holiday", Currency.Pln, BucketKind.Savings, null, []).Value;
 
-        Should.Throw<ArgumentException>(() => bucket.Archive(Balance(other, 0m)));
+        Should.Throw<ArgumentException>(() => bucket.Archive(Balance(other, 0m), lendsToAnOpenLoan: false));
     }
 
     private static BucketBalance Balance(Bucket bucket, decimal available) =>

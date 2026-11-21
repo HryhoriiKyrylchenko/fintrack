@@ -1,5 +1,6 @@
 using FinTrack.Budget.Domain;
 using FinTrack.Budget.Domain.Buckets;
+using FinTrack.Budget.Domain.Loans;
 using FinTrack.Shared.Kernel.Ledger;
 using FinTrack.Shared.Kernel.Results;
 using FinTrack.Shared.Kernel.Time;
@@ -13,7 +14,8 @@ namespace FinTrack.Budget.Application.Buckets;
 /// its name and accepts no new entries. Archiving an archived bucket succeeds and writes nothing. Fails
 /// with <see cref="BudgetErrorCodes.SettingsNotFound"/> (404, before the first run: the balance is for today in the
 /// owner's time zone, plan 1b B20), <see cref="BudgetErrorCodes.BucketNotFound"/> (404),
-/// <see cref="BudgetErrorCodes.BucketSystemBucket"/> or <see cref="BudgetErrorCodes.BucketNotEmpty"/> (422).
+/// <see cref="BudgetErrorCodes.BucketSystemBucket"/>, <see cref="BudgetErrorCodes.BucketHasOpenLoan"/> (it lends to a loan open today) or
+/// <see cref="BudgetErrorCodes.BucketNotEmpty"/> (its <c>NetContributed</c> is not zero; 422 each, plan 1b B17).
 /// </summary>
 /// <param name="Id">The bucket's ID.</param>
 public sealed record ArchiveBucket(Guid Id) : ICommand<Result>, ILedgerCommand;
@@ -49,7 +51,9 @@ public sealed class ArchiveBucketHandler(BudgetStateLoader loader, ILedger ledge
             return Result.Ok();
         }
 
-        var archived = bucket.Archive(state.StateAsOf(settings.Today(clock.UtcNow)).BalanceOf(bucket.BucketId));
+        var today = state.StateAsOf(settings.Today(clock.UtcNow));
+        var lendsToAnOpenLoan = today.Loans.Any(loan => loan.LenderBucketId == bucket.BucketId && loan.Status == LoanStatus.Open);
+        var archived = bucket.Archive(today.BalanceOf(bucket.BucketId), lendsToAnOpenLoan);
         if (archived.IsFailed)
         {
             return archived.ToResult();
