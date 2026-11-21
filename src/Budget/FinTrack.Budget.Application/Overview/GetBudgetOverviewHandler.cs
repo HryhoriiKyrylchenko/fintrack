@@ -2,6 +2,7 @@ using FinTrack.Budget.Application.Buckets;
 using FinTrack.Budget.Contracts.V1.Overview;
 using FinTrack.Budget.Domain;
 using FinTrack.Budget.Domain.Buckets;
+using FinTrack.Budget.Domain.Loans;
 using FinTrack.Budget.Domain.State;
 using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Shared.Kernel.Results;
@@ -114,7 +115,8 @@ public sealed class GetBudgetOverviewHandler(BudgetStateLoader loader, IFxRatePr
             BucketContractMapping.ToContract(bucket.SystemRole),
             balance.Available,
             balance.NetContributed,
-            balance.OutstandingPrincipal);
+            balance.OutstandingPrincipal,
+            state.Loans.Count(loan => loan.LenderBucketId == bucket.BucketId && loan.Status == LoanStatus.Open));
     }
 
     // The provider's own code (fx.rate_unavailable); a failure without one is a bug in the provider.

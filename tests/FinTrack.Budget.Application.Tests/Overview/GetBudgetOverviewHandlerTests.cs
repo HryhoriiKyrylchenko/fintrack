@@ -200,6 +200,30 @@ public class GetBudgetOverviewHandlerTests
     }
 
     [Fact]
+    public async Task OpenLoans_CountTheOpenLoansABucketLendsTo_BesideItsOutstandingPrincipal()
+    {
+        var cushion = Savings("Cushion", Currency.Pln);
+        var car = Savings("Car", Currency.Pln);
+        Deposit(cushion, Pln(100m));
+        Borrow(cushion, car, Pln(30m));
+        Borrow(cushion, null, Pln(20m));
+        var closed = Borrow(cushion, null, Pln(10m));
+        store.Journal.Add(Repayment.Create(JournalEntryId.From(Guid.CreateVersion7()), FakeOwnerContext.Owner, closed.LoanId, Pln(10m), null, Today, Today,
+            EntryInfo.None, NextRecordedAt()).Value);
+
+        var buckets = (await Overview()).Value.Buckets;
+
+        var lender = buckets.Single(bucket => bucket.Id == cushion.Id);
+        lender.OpenLoans.ShouldBe(2);
+        lender.OutstandingPrincipal.ShouldBe(Pln(50m));
+        lender.Available.ShouldBe(Pln(50m));
+        lender.NetContributed.ShouldBe(Pln(100m));
+        var destination = buckets.Single(bucket => bucket.Id == car.Id);
+        destination.OpenLoans.ShouldBe(0);
+        destination.NetContributed.ShouldBe(Pln(30m));
+    }
+
+    [Fact]
     public async Task ArchivedBuckets_AreLeftOut_AndTheirCurrencyNeedsNoRate()
     {
         Savings("Cushion", Currency.Pln);
@@ -284,6 +308,14 @@ public class GetBudgetOverviewHandlerTests
             Today.AddDays(-5), Today, EntryInfo.None, NextRecordedAt()).Value;
         store.Journal.Add(deposit);
         return deposit;
+    }
+
+    private Borrow Borrow(Bucket lender, Bucket? to, Money principal)
+    {
+        var borrow = Domain.Journal.Borrow.Create(JournalEntryId.From(Guid.CreateVersion7()), FakeOwnerContext.Owner, lender.BucketId, principal, to?.BucketId,
+            Today.AddDays(-2), Today, EntryInfo.None, NextRecordedAt()).Value;
+        store.Journal.Add(borrow);
+        return borrow;
     }
 
     private void Transfer(Bucket from, Bucket to, Money amount) =>

@@ -1,9 +1,11 @@
 using FinTrack.Budget.Application;
 using FinTrack.Budget.Application.Buckets;
 using FinTrack.Budget.Application.Journal;
+using FinTrack.Budget.Application.Loans;
 using FinTrack.Budget.Application.Overview;
 using FinTrack.Budget.Application.Settings;
 using FinTrack.Budget.Contracts.V1.Journal;
+using FinTrack.Budget.Contracts.V1.Loans;
 using FinTrack.Budget.Contracts.V1.Overview;
 using FinTrack.Budget.Domain.Journal;
 using FinTrack.Shared.Kernel.Ids;
@@ -144,6 +146,49 @@ public sealed class ReadContractTests(BudgetFixture fixture)
     [Fact]
     public void ContractEntryTypes_AreTheStoredTypeNames() =>
         Enum.GetNames<JournalEntryType>().ShouldBe(BudgetMongoMapping.JournalEntryTypes.Values, ignoreOrder: true);
+
+    [Fact]
+    public async Task Loans_OpenAndClosed_AreReplayedFromMongoDb_AndALoansHistoryPagesThroughTheFilter()
+    {
+        var owner = await NewOwnerAsync(Currency.Pln);
+        var cushion = await CreateBucketAsync(owner, "Cushion", Currency.Pln);
+        var car = await CreateBucketAsync(owner, "Car", Currency.Pln);
+        await SendAsync<AddDepositHandler, AddDeposit>(owner, new AddDeposit(Guid.CreateVersion7(), Pln(1000m), Today.AddDays(-30), cushion, null, null, []));
+        var open = Guid.CreateVersion7();
+        var closed = Guid.CreateVersion7();
+        await SendAsync<AddBorrowHandler, AddBorrow>(owner, new AddBorrow(closed, cushion, Pln(50m), Today.AddDays(-20), null, null, "Gift", []));
+        await SendAsync<AddBorrowHandler, AddBorrow>(owner, new AddBorrow(open, cushion, Pln(300m), Today.AddDays(-15), car, null, "Car repair", []));
+        await SendAsync<AddRepaymentHandler, AddRepayment>(owner, new AddRepayment(Guid.CreateVersion7(), closed, Pln(50m), Today.AddDays(-10), null, null, null, []));
+        var repayments = new List<Guid>();
+        for (var day = 9; day >= 5; day--)
+        {
+            var id = Guid.CreateVersion7();
+            repayments.Add(id);
+            await SendAsync<AddRepaymentHandler, AddRepayment>(owner, new AddRepayment(id, open, Pln(10m), Today.AddDays(-day), car, null, null, []));
+        }
+
+        var openOnly = (await LoansAsync(owner, new GetLoans())).Value;
+        openOnly.ShouldHaveSingleItem().ShouldBe(new LoanDto(open, cushion, car, Pln(300m), Today.AddDays(-15), Pln(50m), Pln(250m), LoanStatus.Open, null, "Car repair"));
+        var all = (await LoansAsync(owner, new GetLoans(IncludeClosed: true))).Value;
+        all.Select(loan => loan.Id).ShouldBe([closed, open]);
+        all[0].ShouldBe(new LoanDto(closed, cushion, null, Pln(50m), Today.AddDays(-20), Pln(50m), Pln(0m), LoanStatus.Closed, Today.AddDays(-10), "Gift"));
+
+        var first = (await JournalAsync(owner, new GetJournal(Limit: 4, LoanId: open))).Value;
+        var second = (await JournalAsync(owner, new GetJournal(Limit: 4, Cursor: first.NextCursor, LoanId: open))).Value;
+        first.Entries.Concat(second.Entries).Select(entry => entry.Id).ShouldBe([.. Enumerable.Reverse(repayments), open]);
+        second.NextCursor.ShouldBeNull();
+        first.Entries.ShouldAllBe(entry => entry.LoanId == open);
+
+        var overview = (await OverviewAsync(owner)).Value;
+        overview.Buckets.Single(bucket => bucket.Id == cushion).OpenLoans.ShouldBe(1);
+        overview.Buckets.Single(bucket => bucket.Id == cushion).OutstandingPrincipal.ShouldBe(Pln(250m));
+    }
+
+    private async Task<Result<IReadOnlyList<LoanDto>>> LoansAsync(OwnerId owner, GetLoans query)
+    {
+        await using var scope = fixture.ScopeFor(owner);
+        return await ActivatorUtilities.CreateInstance<GetLoansHandler>(scope.ServiceProvider).Handle(query, Cancellation);
+    }
 
     private async Task<OwnerId> NewOwnerAsync(Currency reporting)
     {

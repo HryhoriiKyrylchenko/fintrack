@@ -126,6 +126,59 @@ public class GetJournalHandlerTests
     }
 
     [Fact]
+    public async Task LoanFilter_KeepsTheBorrow_ItsRepayments_AndReversalsOfThem_Only()
+    {
+        Deposit(cushion, 500m, Today.AddDays(-9));
+        var borrow = Add(Domain.Journal.Borrow.Create(NewId(), FakeOwnerContext.Owner, cushion.BucketId, Pln(100m), holiday.BucketId, Today.AddDays(-8), Today, EntryInfo.None, NextRecordedAt()).Value);
+        var other = Add(Domain.Journal.Borrow.Create(NewId(), FakeOwnerContext.Owner, cushion.BucketId, Pln(10m), null, Today.AddDays(-7), Today, EntryInfo.None, NextRecordedAt()).Value);
+        var first = Add(Repayment.Create(NewId(), FakeOwnerContext.Owner, borrow.LoanId, Pln(30m), holiday.BucketId, Today.AddDays(-6), Today, EntryInfo.None, NextRecordedAt()).Value);
+        Add(Repayment.Create(NewId(), FakeOwnerContext.Owner, other.LoanId, Pln(5m), null, Today.AddDays(-5), Today, EntryInfo.None, NextRecordedAt()).Value);
+        var mistake = Add(Repayment.Create(NewId(), FakeOwnerContext.Owner, borrow.LoanId, Pln(20m), null, Today.AddDays(-4), Today, EntryInfo.None, NextRecordedAt()).Value);
+        var undo = Reverse(mistake, "Typo");
+        Deposit(holiday, 1m, Today.AddDays(-3));
+
+        (await Ids(new GetJournal(LoanId: borrow.Id))).ShouldBe([undo.Id, mistake.Id, first.Id, borrow.Id]);
+        (await Ids(new GetJournal(LoanId: borrow.Id, BucketId: holiday.Id))).ShouldBe([first.Id, borrow.Id]);
+        (await Ids(new GetJournal(LoanId: borrow.Id, From: Today.AddDays(-6), To: Today.AddDays(-4)))).ShouldBe([mistake.Id, first.Id]);
+    }
+
+    [Fact]
+    public async Task LoanFilter_PagesWithTheSameCursor()
+    {
+        Deposit(cushion, 500m, Today.AddDays(-20));
+        var borrow = Add(Domain.Journal.Borrow.Create(NewId(), FakeOwnerContext.Owner, cushion.BucketId, Pln(100m), null, Today.AddDays(-15), Today, EntryInfo.None, NextRecordedAt()).Value);
+        var repayments = Enumerable.Range(1, 5)
+            .Select(day => Add(Repayment.Create(NewId(), FakeOwnerContext.Owner, borrow.LoanId, Pln(1m), null, Today.AddDays(-15 + day), Today, EntryInfo.None, NextRecordedAt()).Value))
+            .ToList();
+
+        var first = (await Journal(new GetJournal(LoanId: borrow.Id, Limit: 4))).Value;
+        var second = (await Journal(new GetJournal(LoanId: borrow.Id, Limit: 4, Cursor: first.NextCursor))).Value;
+
+        first.Entries.Select(entry => entry.Id).Concat(second.Entries.Select(entry => entry.Id))
+            .ShouldBe([.. Enumerable.Reverse(repayments).Select(repayment => repayment.Id), borrow.Id]);
+        second.NextCursor.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task LoanFilter_OfAReversedBorrow_StillShowsItsHistory()
+    {
+        Deposit(cushion, 500m, Today.AddDays(-9));
+        var borrow = Add(Domain.Journal.Borrow.Create(NewId(), FakeOwnerContext.Owner, cushion.BucketId, Pln(100m), null, Today.AddDays(-8), Today, EntryInfo.None, NextRecordedAt()).Value);
+        var undo = Reverse(borrow, null);
+
+        (await Ids(new GetJournal(LoanId: borrow.Id))).ShouldBe([undo.Id, borrow.Id]);
+    }
+
+    [Fact]
+    public async Task LoanFilter_OfAnUnknownLoan_OrAnotherEntry_IsLoanNotFound()
+    {
+        var deposit = Deposit(cushion, 500m, Today.AddDays(-9));
+
+        (await Journal(new GetJournal(LoanId: Guid.CreateVersion7()))).ShouldFailWith(BudgetErrorCodes.LoanNotFound, ErrorKind.NotFound);
+        (await Journal(new GetJournal(LoanId: deposit.Id))).ShouldFailWith(BudgetErrorCodes.LoanNotFound, ErrorKind.NotFound);
+    }
+
+    [Fact]
     public async Task Transfer_CarriesBothSides_TheFeeAndTheRate()
     {
         Deposit(cushion, 100m, Today.AddDays(-9));

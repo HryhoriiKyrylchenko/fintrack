@@ -1,10 +1,12 @@
 using FinTrack.Budget.Application;
 using FinTrack.Budget.Application.Buckets;
 using FinTrack.Budget.Application.Journal;
+using FinTrack.Budget.Application.Loans;
 using FinTrack.Budget.Application.Overview;
 using FinTrack.Budget.Application.Settings;
 using FinTrack.Budget.Contracts.V1.Buckets;
 using FinTrack.Budget.Contracts.V1.Journal;
+using FinTrack.Budget.Contracts.V1.Loans;
 using FinTrack.Budget.Contracts.V1.Overview;
 using FinTrack.Budget.Contracts.V1.Settings;
 using FinTrack.Budget.Domain;
@@ -65,6 +67,10 @@ public sealed class OwnerIsolationTests(BudgetFixture fixture)
         (await QueryAsync<GetJournalHandler, GetJournal, JournalPageDto>(b, new GetJournal())).Value.Entries.ShouldBeEmpty();
         (await QueryAsync<GetJournalHandler, GetJournal, JournalPageDto>(b, new GetJournal(BucketId: cushion)))
             .ShouldFailWith(BudgetErrorCodes.BucketNotFound, ErrorKind.NotFound);
+        (await QueryAsync<GetJournalHandler, GetJournal, JournalPageDto>(b, new GetJournal(LoanId: loan)))
+            .ShouldFailWith(BudgetErrorCodes.LoanNotFound, ErrorKind.NotFound);
+        (await QueryAsync<GetLoansHandler, GetLoans, IReadOnlyList<LoanDto>>(b, new GetLoans()))
+            .ShouldFailWith(BudgetErrorCodes.SettingsNotFound, ErrorKind.NotFound);
         var state = await StateAsync(b);
         state.Buckets.ShouldBeEmpty();
         state.Journal.ShouldBeEmpty();
@@ -93,6 +99,10 @@ public sealed class OwnerIsolationTests(BudgetFixture fixture)
             .ShouldFailWith(ErrorCodes.ConcurrencyConflict, ErrorKind.Conflict);
         (await SendAsync<AddDepositHandler, AddDeposit>(b, new AddDeposit(deposit, Pln(100m), Today.AddDays(-5), null, Currency.Pln, null, [])))
             .ShouldFailWith(ErrorCodes.ConcurrencyConflict, ErrorKind.Conflict);
+
+        // B, now set up, has no loans: A's are not B's.
+        (await QueryAsync<GetLoansHandler, GetLoans, IReadOnlyList<LoanDto>>(b, new GetLoans(IncludeClosed: true))).Value.ShouldBeEmpty();
+        (await QueryAsync<GetLoansHandler, GetLoans, IReadOnlyList<LoanDto>>(a, new GetLoans())).Value.ShouldHaveSingleItem().Id.ShouldBe(loan);
 
         // B's own Unallocated in A's currency is B's, not A's.
         (await SendAsync<AddDepositHandler, AddDeposit>(b, new AddDeposit(Guid.CreateVersion7(), Pln(7m), Today, null, Currency.Pln, null, []))).IsSuccess.ShouldBeTrue();

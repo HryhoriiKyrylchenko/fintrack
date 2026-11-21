@@ -66,12 +66,18 @@ public sealed class GetJournalHandler(BudgetStateLoader loader) : IQueryHandler<
         }
 
         var byId = snapshot.Journal.ToDictionary(entry => entry.Id);
+        if (query.LoanId is { } loanId && !(byId.TryGetValue(loanId, out var opened) && opened is Borrow))
+        {
+            return Result.Fail<JournalPageDto>(AppError.NotFound(BudgetErrorCodes.LoanNotFound));
+        }
+
         var reversedBy = snapshot.Journal.OfType<Reversal>().ToDictionary(reversal => reversal.ReversedEntryId.Value, reversal => reversal.Id);
 
         var page = snapshot.Journal
             .Where(entry => query.From is null || entry.OccurredOn >= query.From)
             .Where(entry => query.To is null || entry.OccurredOn <= query.To)
             .Where(entry => query.BucketId is null || Touches(entry, BucketId.From(query.BucketId.Value), byId))
+            .Where(entry => query.LoanId is null || BelongsTo(entry, query.LoanId.Value, byId))
             .Where(entry => after is null || ReplayPosition.Of(entry) < after.Value)
             .OrderDescending(ReplayOrder.Instance)
             .Take(query.Limit + 1)
@@ -88,6 +94,15 @@ public sealed class GetJournalHandler(BudgetStateLoader loader) : IQueryHandler<
 
         return Result.Ok(new JournalPageDto(entries, hasMore ? JournalCursor.Encode(ReplayPosition.Of(page[^1])) : null));
     }
+
+    // Whether an entry is part of the loan's history: its borrow, its repayments, and reversals of either.
+    private static bool BelongsTo(JournalEntry entry, Guid loanId, IReadOnlyDictionary<Guid, JournalEntry> byId) => entry switch
+    {
+        Borrow borrow => borrow.Id == loanId,
+        Repayment repayment => repayment.LoanId.Value == loanId,
+        Reversal reversal => byId.TryGetValue(reversal.ReversedEntryId.Value, out var reversed) && BelongsTo(reversed, loanId, byId),
+        _ => false,
+    };
 
     // Whether an entry moves money of the bucket; a reversal touches what the entry it cancels touches.
     private static bool Touches(JournalEntry entry, BucketId bucketId, IReadOnlyDictionary<Guid, JournalEntry> byId) => entry switch

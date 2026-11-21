@@ -17,6 +17,7 @@ using FinTrack.Shared.Kernel.Results;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
+using LoanDto = FinTrack.Budget.Contracts.V1.Loans.LoanDto;
 
 namespace FinTrack.Api.IntegrationTests.Budget;
 
@@ -115,7 +116,7 @@ public sealed class LoanFunctionTests(ApiFixture fixture)
         var repayment = Guid.CreateVersion7();
         (await RepayAsync($$"""{"id":"{{repayment}}","loanId":"{{loan}}","amount":{"amount":"20","currency":"PLN"},"occurredOn":"{{Day(-1)}}"}""")).ShouldBeOfType<NoContentResult>();
 
-        var page = (await JournalAsync()).ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<JournalPageDto>();
+        var page = (await JournalAsync(string.Empty)).ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<JournalPageDto>();
 
         Json(page.Entries[0]).ShouldBe(
             "{\"id\":\"" + repayment + "\",\"type\":\"Repayment\",\"occurredOn\":\"" + Day(-1) + "\",\"note\":null,\"tags\":[],\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,"
@@ -125,6 +126,92 @@ public sealed class LoanFunctionTests(ApiFixture fixture)
             "{\"id\":\"" + loan + "\",\"type\":\"Borrow\",\"occurredOn\":\"" + Day(-5) + "\",\"note\":\"Repair\",\"tags\":[],\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,"
             + "\"bucketId\":null,\"amount\":{\"amount\":\"200.00\",\"currency\":\"PLN\"},\"fromBucketId\":\"" + cushion + "\",\"toBucketId\":\"" + car + "\",\"fromAmount\":null,\"toAmount\":null,"
             + "\"fee\":null,\"rate\":null,\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":null,\"loanId\":\"" + loan + "\"}");
+    }
+
+    [Fact]
+    public async Task Loans_BeforeTheFirstRun_Are404SettingsNotFound() =>
+        Code(await LoansAsync(string.Empty), 404).ShouldBe("settings.not_found");
+
+    [Fact]
+    public async Task Loans_TheLoanJournal_AndTheOverview_ShowTheLoans_InTheV1Shape()
+    {
+        await SaveSettingsAsync();
+        var cushion = await CreateBucketAsync("Cushion");
+        var car = await CreateBucketAsync("Car");
+        (await DepositAsync(cushion, "500.00", Day(-10))).ShouldBeOfType<NoContentResult>();
+        var open = Guid.CreateVersion7();
+        var closed = Guid.CreateVersion7();
+        (await BorrowAsync($$"""{"id":"{{closed}}","lenderBucketId":"{{cushion}}","principal":{"amount":"20","currency":"PLN"},"occurredOn":"{{Day(-6)}}"}""")).ShouldBeOfType<NoContentResult>();
+        (await BorrowAsync($$"""{"id":"{{open}}","lenderBucketId":"{{cushion}}","principal":{"amount":"200","currency":"PLN"},"occurredOn":"{{Day(-5)}}","toBucketId":"{{car}}","note":"Repair"}"""))
+            .ShouldBeOfType<NoContentResult>();
+        (await RepayAsync(Repayment(closed, "20", Day(-3), null))).ShouldBeOfType<NoContentResult>();
+        (await RepayAsync(Repayment(open, "50", Day(-2), car))).ShouldBeOfType<NoContentResult>();
+
+        var openOnly = (await LoansAsync(string.Empty)).ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IReadOnlyList<LoanDto>>()!;
+        JsonSerializer.Serialize(openOnly, FinTrackJson.Options).ShouldBe(
+            "[{\"id\":\"" + open + "\",\"lenderBucketId\":\"" + cushion + "\",\"toBucketId\":\"" + car + "\",\"principal\":{\"amount\":\"200.00\",\"currency\":\"PLN\"},"
+            + "\"borrowedOn\":\"" + Day(-5) + "\",\"repaid\":{\"amount\":\"50.00\",\"currency\":\"PLN\"},\"outstanding\":{\"amount\":\"150.00\",\"currency\":\"PLN\"},"
+            + "\"status\":\"Open\",\"closedOn\":null,\"note\":\"Repair\"}]");
+
+        var all = (await LoansAsync("?includeClosed=true")).ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IReadOnlyList<LoanDto>>()!;
+        all.Select(loan => loan.Id).ShouldBe([closed, open]);
+        JsonSerializer.Serialize(all[0], FinTrackJson.Options).ShouldBe(
+            "{\"id\":\"" + closed + "\",\"lenderBucketId\":\"" + cushion + "\",\"toBucketId\":null,\"principal\":{\"amount\":\"20.00\",\"currency\":\"PLN\"},"
+            + "\"borrowedOn\":\"" + Day(-6) + "\",\"repaid\":{\"amount\":\"20.00\",\"currency\":\"PLN\"},\"outstanding\":{\"amount\":\"0.00\",\"currency\":\"PLN\"},"
+            + "\"status\":\"Closed\",\"closedOn\":\"" + Day(-3) + "\",\"note\":null}");
+
+        var history = (await JournalAsync($"?loanId={open}")).ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<JournalPageDto>();
+        history.Entries.Select(entry => entry.Type).ShouldBe([JournalEntryType.Repayment, JournalEntryType.Borrow]);
+        history.Entries.ShouldAllBe(entry => entry.LoanId == open);
+
+        var overview = (await OverviewAsync()).ShouldBeOfType<OkObjectResult>().Value!;
+        var lender = JsonNode.Parse(JsonSerializer.Serialize(overview, FinTrackJson.Options))!["buckets"]!.AsArray().Single(bucket => (string)bucket!["id"]! == cushion.ToString())!;
+        lender["outstandingPrincipal"]!.ToJsonString().ShouldBe("{\"amount\":\"150.00\",\"currency\":\"PLN\"}");
+        lender["openLoans"]!.ToJsonString().ShouldBe("1");
+    }
+
+    [Theory]
+    [InlineData("loans", "?includeClosed=yes", "includeClosed")]
+    [InlineData("journal", "?loanId=not-a-guid", "loanId")]
+    public async Task AQueryValueThatCannotBeRead_Is400QueryFormat(string function, string query, string field)
+    {
+        await SaveSettingsAsync();
+
+        var problem = Problem(function == "loans" ? await LoansAsync(query) : await JournalAsync(query), 400);
+
+        problem.Extensions["code"].ShouldBe(ErrorCodes.ValidationFailed);
+        Params(problem)["field"].ShouldBe(field);
+        Params(problem)["rule"].ShouldBe(RequestValues.QueryFormatRule);
+    }
+
+    [Fact]
+    public async Task TheJournalOfAnUnknownLoan_Is404()
+    {
+        await SaveSettingsAsync();
+
+        Code(await JournalAsync($"?loanId={Guid.CreateVersion7()}"), 404).ShouldBe("loan.not_found");
+    }
+
+    private async Task<IActionResult> LoansAsync(string query)
+    {
+        await using var scope = await ScopeAsync();
+        var request = new DefaultHttpContext().Request;
+        request.QueryString = new QueryString(query.Length == 0 ? null : query);
+        return await ActivatorUtilities.CreateInstance<GetLoansFunction>(scope.ServiceProvider).Run(request, Cancellation);
+    }
+
+    private async Task<IActionResult> JournalAsync(string query)
+    {
+        await using var scope = await ScopeAsync();
+        var request = new DefaultHttpContext().Request;
+        request.QueryString = new QueryString(query.Length == 0 ? null : query);
+        return await ActivatorUtilities.CreateInstance<GetJournalFunction>(scope.ServiceProvider).Run(request, Cancellation);
+    }
+
+    private async Task<IActionResult> OverviewAsync()
+    {
+        await using var scope = await ScopeAsync();
+        return await ActivatorUtilities.CreateInstance<GetBudgetOverviewFunction>(scope.ServiceProvider).Run(new DefaultHttpContext().Request, Cancellation);
     }
 
     // The entry as JSON, without the instant it was recorded (set by the clock).
@@ -183,12 +270,6 @@ public sealed class LoanFunctionTests(ApiFixture fixture)
         await using var scope = await ScopeAsync();
         var request = new DefaultHttpContext().Request;
         return await ActivatorUtilities.CreateInstance<ArchiveBucketFunction>(scope.ServiceProvider).Run(request, bucket.ToString(), Cancellation);
-    }
-
-    private async Task<IActionResult> JournalAsync()
-    {
-        await using var scope = await ScopeAsync();
-        return await ActivatorUtilities.CreateInstance<GetJournalFunction>(scope.ServiceProvider).Run(new DefaultHttpContext().Request, Cancellation);
     }
 
     private async Task<BudgetSnapshot> StateAsync()

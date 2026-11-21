@@ -1,9 +1,11 @@
 using FinTrack.Budget.Application.Buckets;
 using FinTrack.Budget.Application.Journal;
+using FinTrack.Budget.Application.Loans;
 using FinTrack.Budget.Application.Overview;
 using FinTrack.Budget.Application.Settings;
 using FinTrack.Budget.Contracts.V1.Buckets;
 using FinTrack.Budget.Contracts.V1.Journal;
+using FinTrack.Budget.Contracts.V1.Loans;
 using FinTrack.Budget.Contracts.V1.Overview;
 using FinTrack.Budget.Contracts.V1.Settings;
 using FinTrack.Shared.Kernel.Monetary;
@@ -36,7 +38,7 @@ public class StateKeepsChangingTests
 
     public static TheoryData<string> Handlers =>
     [
-        "GetBuckets", "GetOwnerSettings", "GetBudgetOverview", "GetJournal",
+        "GetBuckets", "GetOwnerSettings", "GetBudgetOverview", "GetJournal", "GetLoans",
         "CreateBucket", "RenameBucket", "ArchiveBucket", "UnarchiveBucket", "SaveOwnerSettings", "AddDeposit", "AddAdjustment", "AddBorrow", "AddRepayment", "ReverseEntry",
     ];
 
@@ -64,6 +66,7 @@ public class StateKeepsChangingTests
             "GetOwnerSettings" => await new GetOwnerSettingsHandler(loader).Handle(new GetOwnerSettings(), Cancellation),
             "GetBudgetOverview" => await new GetBudgetOverviewHandler(loader, new FakeFxRateProvider(), clock).Handle(new GetBudgetOverview(), Cancellation),
             "GetJournal" => await new GetJournalHandler(loader).Handle(new GetJournal(), Cancellation),
+            "GetLoans" => await new GetLoansHandler(loader, clock).Handle(new GetLoans(), Cancellation),
             "CreateBucket" => await new CreateBucketHandler(loader, ledger, owner).Handle(
                 new CreateBucket(Guid.CreateVersion7(), "Cushion", Currency.Pln, BucketKind.Savings, null), Cancellation),
             "RenameBucket" => await new RenameBucketHandler(loader, ledger).Handle(new RenameBucket(Guid.CreateVersion7(), "Safety net"), Cancellation),
