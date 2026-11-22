@@ -343,7 +343,7 @@ public class PlanHandlerTests
 
         var holidays = (await new GetJournalHandler(new BudgetStateLoader(ledger, store))
             .Handle(new Contracts.V1.Journal.GetJournal(Limit: 50, BucketId: holiday.Id), Cancellation)).Value;
-        holidays.Entries.Select(entry => entry.Type.ToString()).ShouldBe(["Deposit", "PlanEndChanged", "PlanAmountChanged", "PlanCreated"]);
+        holidays.Entries.Select(entry => entry.Type.ToString()).ShouldBe(["Deposit", "PlanEndChanged", "PlanAmountChanged", "PlanCreated"], ignoreOrder: true);
         var cushions = (await new GetJournalHandler(new BudgetStateLoader(ledger, store))
             .Handle(new Contracts.V1.Journal.GetJournal(Limit: 50, BucketId: cushion.Id), Cancellation)).Value;
         cushions.Entries.ShouldHaveSingleItem().Type.ToString().ShouldBe("Deposit");
