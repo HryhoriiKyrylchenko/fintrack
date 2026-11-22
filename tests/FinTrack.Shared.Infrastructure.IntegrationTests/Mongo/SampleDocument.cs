@@ -1,6 +1,7 @@
 using FinTrack.Shared.Kernel.Ids;
 using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Shared.Kernel.Persistence;
+using FinTrack.Shared.Kernel.Time;
 
 namespace FinTrack.Shared.Infrastructure.IntegrationTests.Mongo;
 
@@ -35,6 +36,10 @@ internal sealed record SampleDocument : IMutableDocument
 
     public SampleId? ParentId { get; init; }
 
+    public required YearMonth Month { get; init; }
+
+    public YearMonth? OptionalMonth { get; init; }
+
     /// <summary>A fully populated sample; tests change single fields with <c>with</c>.</summary>
     public static SampleDocument Create() => new()
     {
@@ -52,6 +57,8 @@ internal sealed record SampleDocument : IMutableDocument
         Rate = 4.3215m,
         OptionalRate = 0.000000000000000001m,
         ParentId = SampleId.From(Guid.Parse("019a8f3e-5b2c-7d41-8a6e-000000000001")),
+        Month = new YearMonth(2026, 1),
+        OptionalMonth = new YearMonth(9999, 12),
     };
 }
 

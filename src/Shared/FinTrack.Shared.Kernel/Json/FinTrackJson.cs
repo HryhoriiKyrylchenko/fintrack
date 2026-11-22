@@ -15,14 +15,14 @@ namespace FinTrack.Shared.Kernel.Json;
 /// a JSON number is read as a binary double by JavaScript and most tools;</description></item>
 /// <item><description><c>Currency</c> as its code; <c>Money</c> as <c>{ "amount": "1.10", "currency": "PLN" }</c>;</description></item>
 /// <item><description>strongly typed IDs as the GUID string (<c>D</c> format);</description></item>
-/// <item><description><see cref="DateOnly"/> as <c>yyyy-MM-dd</c>; <see cref="DateTimeOffset"/> as ISO 8601 in UTC
-/// ending in <c>Z</c>, with the fraction only as long as needed;</description></item>
+/// <item><description><see cref="DateOnly"/> as <c>yyyy-MM-dd</c>; <c>YearMonth</c> as <c>yyyy-MM</c>; <see cref="DateTimeOffset"/>
+/// as ISO 8601 in UTC ending in <c>Z</c>, with the fraction only as long as needed;</description></item>
 /// <item><description>enums as their names.</description></item>
 /// </list>
 /// <para>
 /// Reading is strict, like the storage format: an amount sent as a number, a decimal that would
 /// be rounded, an unknown currency or one with too many decimals, an enum as a number or in another
-/// case, an instant without <c>Z</c>, an unknown, repeated or missing property and <c>null</c> for
+/// case, a month in any spelling but <c>yyyy-MM</c> or out of range, an instant without <c>Z</c>, an unknown, repeated or missing property and <c>null</c> for
 /// a non-nullable value all fail with a <see cref="JsonException"/>. A property is optional only
 /// when its constructor parameter has a default value. Messages never contain amounts.
 /// </para>
@@ -64,6 +64,7 @@ public static class FinTrackJson
             new CurrencyJsonConverter(),
             new MoneyJsonConverter(),
             new IsoDateOnlyJsonConverter(),
+            new YearMonthJsonConverter(),
             new UtcInstantJsonConverter(),
             new StronglyTypedIdJsonConverterFactory(),
             new EnumNameJsonConverterFactory(),
