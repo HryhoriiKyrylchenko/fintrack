@@ -29,7 +29,7 @@ public sealed class AddTransferFunction(ISender sender)
         var transfer = body.Value;
         var command = new AddTransfer(
             transfer.Id, transfer.FromAmount, transfer.ToAmount, transfer.Fee, transfer.OccurredOn,
-            transfer.FromBucketId, transfer.FromUnallocated, transfer.ToBucketId, transfer.ToUnallocated, transfer.Note, transfer.Tags ?? []);
+            transfer.FromBucketId, transfer.FromUnallocated, transfer.ToBucketId, transfer.ToUnallocated, transfer.Note, transfer.Tags ?? [], transfer.PlanId);
         return ProblemDetailsMapper.ToActionResult(await sender.Send(command, cancellationToken).ConfigureAwait(false));
     }
 }

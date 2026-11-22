@@ -1,8 +1,10 @@
+using FinTrack.Budget.Application.Plans;
 using FinTrack.Budget.Domain;
 using FinTrack.Budget.Domain.Journal;
 using FinTrack.Shared.Kernel.Ledger;
 using FinTrack.Shared.Kernel.Monetary;
 using FluentResults;
+using FluentValidation;
 using Mediator;
 
 namespace FinTrack.Budget.Application.Journal;
@@ -20,6 +22,10 @@ namespace FinTrack.Budget.Application.Journal;
 /// <param name="Unallocated">The currency of the target <c>Unallocated</c> bucket, or <c>null</c>.</param>
 /// <param name="Note">An optional note.</param>
 /// <param name="Tags">Tags, possibly none.</param>
+/// <param name="PlanId">
+/// The contribution plan of the receiving bucket that the deposit pays (plan 1b B9), or <c>null</c> for a one-time deposit; fails with
+/// <see cref="BudgetErrorCodes.PlanNotFound"/> (404) or <see cref="BudgetErrorCodes.PlanBucketMismatch"/> (422).
+/// </param>
 public sealed record AddDeposit(
     Guid Id,
     Money Amount,
@@ -27,20 +33,31 @@ public sealed record AddDeposit(
     Guid? BucketId,
     Currency? Unallocated,
     string? Note,
-    IReadOnlyList<string> Tags) : ICommand<Result>, ILedgerCommand, IBucketEntryCommand;
+    IReadOnlyList<string> Tags,
+    Guid? PlanId = null) : ICommand<Result>, ILedgerCommand, IBucketEntryCommand;
 
-/// <summary>Shape checks (<see cref="BucketEntryValidator{TCommand}"/>).</summary>
-public sealed class AddDepositValidator : BucketEntryValidator<AddDeposit>;
+/// <summary>Shape checks (<see cref="BucketEntryValidator{TCommand}"/>) and a plan ID that is not empty when set.</summary>
+public sealed class AddDepositValidator : BucketEntryValidator<AddDeposit>
+{
+    /// <summary>Creates the rules.</summary>
+    public AddDepositValidator() => RuleFor(command => command.PlanId).NotEqual(Guid.Empty);
+}
 
-/// <summary>Writes the deposit through <see cref="BucketEntryWriter"/>; a deposit has no rule of its own.</summary>
+/// <summary>Writes the deposit through <see cref="BucketEntryWriter"/>; its own rule is its plan's (B9).</summary>
 public sealed class AddDepositHandler(BucketEntryWriter writer) : ICommandHandler<AddDeposit, Result>
 {
     /// <inheritdoc />
-    public ValueTask<Result> Handle(AddDeposit command, CancellationToken cancellationToken) =>
-        writer.WriteAsync(
+    public ValueTask<Result> Handle(AddDeposit command, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        return writer.WriteAsync(
             command,
-            arguments => Deposit.Create(arguments.Id, arguments.OwnerId, arguments.BucketId, command.Amount, command.OccurredOn, arguments.Today, arguments.Info, arguments.RecordedAt)
+            arguments => Deposit.Create(
+                    arguments.Id, arguments.OwnerId, arguments.BucketId, command.Amount, command.OccurredOn, arguments.Today, arguments.Info, arguments.RecordedAt,
+                    command.PlanId is { } planId ? Domain.Plans.PlanId.From(planId) : null)
                 .Map(entry => (JournalEntry)entry),
-            (_, _) => Result.Ok(),
+            (bucket, context) => PlanRules.CheckContribution(command.PlanId, bucket, context.Balances),
             cancellationToken);
+    }
 }

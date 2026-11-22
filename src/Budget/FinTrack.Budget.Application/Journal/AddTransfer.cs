@@ -1,3 +1,5 @@
+using FinTrack.Budget.Application.Plans;
+using FinTrack.Budget.Domain;
 using FinTrack.Budget.Domain.Journal;
 using FinTrack.Shared.Kernel.Ledger;
 using FinTrack.Shared.Kernel.Monetary;
@@ -25,6 +27,10 @@ namespace FinTrack.Budget.Application.Journal;
 /// <param name="ToUnallocated">The currency of the destination <c>Unallocated</c> bucket, or <c>null</c>.</param>
 /// <param name="Note">An optional note.</param>
 /// <param name="Tags">Tags, possibly none.</param>
+/// <param name="PlanId">
+/// The destination's contribution plan that the transfer pays with <paramref name="ToAmount"/> (plan 1b B9), or <c>null</c>; fails with
+/// <see cref="BudgetErrorCodes.PlanNotFound"/> (404) or <see cref="BudgetErrorCodes.PlanBucketMismatch"/> (422). Still never income.
+/// </param>
 public sealed record AddTransfer(
     Guid Id,
     Money FromAmount,
@@ -36,7 +42,8 @@ public sealed record AddTransfer(
     Guid? ToBucketId,
     Currency? ToUnallocated,
     string? Note,
-    IReadOnlyList<string> Tags) : ICommand<Result>, ILedgerCommand;
+    IReadOnlyList<string> Tags,
+    Guid? PlanId = null) : ICommand<Result>, ILedgerCommand;
 
 /// <summary>Shape checks: each side names exactly one target; note and tags.</summary>
 public sealed class AddTransferValidator : AbstractValidator<AddTransfer>
@@ -52,6 +59,7 @@ public sealed class AddTransferValidator : AbstractValidator<AddTransfer>
         RuleFor(command => command.ToBucketId)
             .Must((command, bucketId) => (bucketId is null) != (command.ToUnallocated is null))
             .WithErrorCode(BucketEntryValidator<AddDeposit>.ExactlyOneTarget);
+        RuleFor(command => command.PlanId).NotEqual(Guid.Empty);
         RuleFor(command => command.Note).EntryNote();
         RuleFor(command => command.Tags).EntryTags();
         RuleForEach(command => command.Tags).EntryTag();
@@ -84,11 +92,13 @@ public sealed class AddTransferHandler(JournalWriter writer) : ICommandHandler<A
 
                 var entry = Transfer.Create(
                         context.EntryId, context.Owner, from.Value.BucketId, to.Value.BucketId, command.FromAmount, command.ToAmount, command.Fee,
-                        command.OccurredOn, context.Today, new EntryInfo(command.Note, command.Tags, EntrySource.Manual), context.Now)
+                        command.OccurredOn, context.Today, new EntryInfo(command.Note, command.Tags, EntrySource.Manual), context.Now,
+                        command.PlanId is { } planId ? Domain.Plans.PlanId.From(planId) : null)
                     .Map(transfer => (JournalEntry)transfer);
 
                 var rules = JournalWriteContext.CheckBucket(from.Value, command.FromAmount)
-                    .Bind(() => JournalWriteContext.CheckBucket(to.Value, command.ToAmount));
+                    .Bind(() => JournalWriteContext.CheckBucket(to.Value, command.ToAmount))
+                    .Bind(() => PlanRules.CheckContribution(command.PlanId, to.Value, context.Balances));
 
                 return Result.Ok(new JournalDraft(entry, rules));
             },

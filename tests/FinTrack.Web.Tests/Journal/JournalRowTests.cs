@@ -68,6 +68,21 @@ public sealed class JournalRowTests : IDisposable
         MoneyFormatter.Format(row.SignedAmount, Polish, MoneySign.Always).ShouldStartWith(signedStart);
     }
 
+    // Until the Journal shows plan details (plan 1b step 16), a plan entry reads as its type and its plan's bucket, and moves no money.
+    [Theory]
+    [InlineData(JournalEntryType.PlanCreated, "Plan created")]
+    [InlineData(JournalEntryType.PlanAmountChanged, "Plan amount changed")]
+    [InlineData(JournalEntryType.PlanEndChanged, "Plan end changed")]
+    public void PlanEntry_ReadsAsItsTypeAndBucket_WithoutAnAmount(JournalEntryType type, string label)
+    {
+        var row = Row(Single(type, Cushion, 500m) with { PlanId = Guid.CreateVersion7() });
+
+        L[row.TypeKey].Value.ShouldBe(label);
+        row.Describe(L, Polish).ShouldBe("Cushion");
+        row.SignedAmount.ShouldBeNull();
+        row.MovedAmount.ShouldBeNull();
+    }
+
     [Theory]
     [InlineData(AdjustmentDirection.Increase, "+12,50")]
     [InlineData(AdjustmentDirection.Decrease, "\u221212,50")]

@@ -2,6 +2,7 @@ using FinTrack.Budget.Application.Buckets;
 using FinTrack.Budget.Application.Journal;
 using FinTrack.Budget.Application.Loans;
 using FinTrack.Budget.Application.Overview;
+using FinTrack.Budget.Application.Plans;
 using FinTrack.Budget.Application.Settings;
 using FinTrack.Budget.Contracts.V1.Buckets;
 using FinTrack.Budget.Contracts.V1.Journal;
@@ -10,6 +11,7 @@ using FinTrack.Budget.Contracts.V1.Overview;
 using FinTrack.Budget.Contracts.V1.Settings;
 using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Shared.Kernel.Results;
+using FinTrack.Shared.Kernel.Time;
 using FinTrack.Tests.Common;
 using FluentResults;
 
@@ -40,6 +42,7 @@ public class StateKeepsChangingTests
     [
         "GetBuckets", "GetOwnerSettings", "GetBudgetOverview", "GetJournal", "GetLoans",
         "CreateBucket", "RenameBucket", "ArchiveBucket", "UnarchiveBucket", "SaveOwnerSettings", "AddDeposit", "AddAdjustment", "AddBorrow", "AddRepayment", "ReverseEntry",
+        "CreatePlan", "ChangePlanAmount", "SetPlanEnd",
     ];
 
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -82,6 +85,12 @@ public class StateKeepsChangingTests
                 new AddBorrow(Guid.CreateVersion7(), Guid.CreateVersion7(), Money.From(10m, Currency.Pln), today, null, null, null, []), Cancellation),
             "AddRepayment" => await new AddRepaymentHandler(new JournalWriter(loader, ledger, owner, clock)).Handle(
                 new AddRepayment(Guid.CreateVersion7(), Guid.CreateVersion7(), Money.From(10m, Currency.Pln), today, null, null, null, []), Cancellation),
+            "CreatePlan" => await new CreatePlanHandler(new JournalWriter(loader, ledger, owner, clock)).Handle(
+                new CreatePlan(Guid.CreateVersion7(), Guid.CreateVersion7(), Money.From(10m, Currency.Pln), new YearMonth(2026, 1), null, today, null, []), Cancellation),
+            "ChangePlanAmount" => await new ChangePlanAmountHandler(new JournalWriter(loader, ledger, owner, clock)).Handle(
+                new ChangePlanAmount(Guid.CreateVersion7(), Guid.CreateVersion7(), Money.From(10m, Currency.Pln), new YearMonth(2026, 1), today, null, []), Cancellation),
+            "SetPlanEnd" => await new SetPlanEndHandler(new JournalWriter(loader, ledger, owner, clock)).Handle(
+                new SetPlanEnd(Guid.CreateVersion7(), Guid.CreateVersion7(), null, today, null, []), Cancellation),
             _ => await new ReverseEntryHandler(new JournalWriter(loader, ledger, owner, clock), new JournalEntryDependencies()).Handle(
                 new ReverseEntry(Guid.CreateVersion7(), Guid.CreateVersion7(), today, null, []), Cancellation),
         };

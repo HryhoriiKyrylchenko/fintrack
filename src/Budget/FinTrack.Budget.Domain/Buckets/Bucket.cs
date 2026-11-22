@@ -178,15 +178,16 @@ public sealed class Bucket : IMutableDocument
     /// <summary>
     /// The same bucket, archived (ARCHITECTURE 4.1, invariant 8, plan 1b B17): it frees its name and accepts no new
     /// entries. Fails, in this order, with <see cref="BudgetErrorCodes.BucketSystemBucket"/> for a system bucket, with
-    /// <see cref="BudgetErrorCodes.BucketHasOpenLoan"/> while it lends to an open loan, and with
+    /// <see cref="BudgetErrorCodes.BucketHasOpenLoan"/> while it lends to an open loan, with
+    /// <see cref="BudgetErrorCodes.BucketHasActivePlan"/> while one of its plans is active, and with
     /// <see cref="BudgetErrorCodes.BucketNotEmpty"/> while its <c>NetContributed</c> is not zero (<c>Available</c> alone
-    /// would miss a lender whose money is all lent out). An active plan (<c>bucket.has_active_plan</c>) joins in step 9.
-    /// Identity and version are kept.
+    /// would miss a lender whose money is all lent out). Identity and version are kept.
     /// </summary>
     /// <param name="balance">This bucket's balance, from the state builder.</param>
     /// <param name="lendsToAnOpenLoan">Whether the bucket is the lender of a loan that is open today, from the state builder.</param>
+    /// <param name="hasActivePlan">Whether a plan of the bucket is active this month (it still accrues, or has money due), from the state builder.</param>
     /// <exception cref="ArgumentException">The balance is another bucket's (a bug).</exception>
-    public Result<Bucket> Archive(BucketBalance balance, bool lendsToAnOpenLoan)
+    public Result<Bucket> Archive(BucketBalance balance, bool lendsToAnOpenLoan, bool hasActivePlan)
     {
         ArgumentNullException.ThrowIfNull(balance);
         if (balance.BucketId != BucketId)
@@ -202,6 +203,11 @@ public sealed class Bucket : IMutableDocument
         if (lendsToAnOpenLoan)
         {
             return Result.Fail<Bucket>(AppError.BusinessRule(BudgetErrorCodes.BucketHasOpenLoan));
+        }
+
+        if (hasActivePlan)
+        {
+            return Result.Fail<Bucket>(AppError.BusinessRule(BudgetErrorCodes.BucketHasActivePlan));
         }
 
         return balance.NetContributed.Amount != 0m

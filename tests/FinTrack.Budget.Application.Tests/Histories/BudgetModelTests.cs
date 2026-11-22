@@ -3,12 +3,15 @@ using FinTrack.Budget.Application.Buckets;
 using FinTrack.Budget.Application.Journal;
 using FinTrack.Budget.Application.Loans;
 using FinTrack.Budget.Application.Overview;
+using FinTrack.Budget.Application.Plans;
 using FinTrack.Budget.Application.Settings;
 using FinTrack.Budget.Domain.Buckets;
 using FinTrack.Budget.Domain.Journal;
 using FinTrack.Budget.Domain.Loans;
+using FinTrack.Budget.Domain.Plans;
 using FinTrack.Budget.Domain.State;
 using FinTrack.Shared.Kernel.Monetary;
+using FinTrack.Shared.Kernel.Time;
 using FinTrack.Tests.Common;
 using FluentResults;
 using Contract = FinTrack.Budget.Contracts.V1.Buckets;
@@ -21,10 +24,11 @@ namespace FinTrack.Budget.Application.Tests.Histories;
 /// <summary>
 /// The model test of plan 1a step 10: random sequences of every Budget command (buckets in three
 /// currencies, opening balances, deposits, spends, adjustments up and down (plan 1b step 4), borrows and repayments (step 5), transfers
-/// with and without fee and across currencies, reversals, archiving, unarchiving (plan 1b step 2), renaming, backdating, and repeats of earlier commands) run through
-/// the real handlers. After every command and at the end, invariants 1, 2, 4, 5, 10, 11 and 13 must hold. At the
+/// with and without fee and across currencies, contribution plans with versions and ends and deposits and transfers linked to them
+/// (step 9), reversals, archiving, unarchiving (plan 1b step 2), renaming, backdating, and repeats of earlier commands) run through
+/// the real handlers. After every command and at the end, invariants 1, 2, 4, 5, 6, 10, 11 and 13 must hold. At the
 /// end, the read queries (step 12) must agree with the state: the overview's balances and totals, and the
-/// journal read page by page.
+/// journal read page by page; and every plan's dues must equal an independent month-by-month sum.
 /// </summary>
 public class BudgetModelTests
 {
@@ -32,6 +36,7 @@ public class BudgetModelTests
 
     // The fake clock starts at 2026-01-15 09:30 UTC; the owner is in Warsaw.
     private static readonly DateOnly Today = new(2026, 1, 15);
+    private static readonly YearMonth CurrentMonth = YearMonth.FromDate(Today);
 
     private enum Kind
     {
@@ -43,6 +48,9 @@ public class BudgetModelTests
         Borrow,
         Repay,
         Transfer,
+        CreatePlan,
+        ChangePlanAmount,
+        SetPlanEnd,
         Reverse,
         Archive,
         Unarchive,
@@ -134,6 +142,7 @@ public class BudgetModelTests
             var version = budget.Version;
             var entries = budget.Journal.Count;
             var buckets = budget.Buckets.ToList();
+            var journalBefore = budget.Journal.ToList();
 
             var result = Send(command);
 
@@ -161,9 +170,73 @@ public class BudgetModelTests
             else
             {
                 succeeded.Add(command);
+                CheckPastMonthsUnchanged(command, journalBefore);
             }
 
             return (operation.Kind, result);
+        }
+
+        // Invariant 6, checked independently: an accepted plan command, or the reversal of a plan entry, leaves what every plan
+        // that existed before accrued in each month before the current one unchanged. Money entries are not held to it (B8).
+        private void CheckPastMonthsUnchanged(object command, List<JournalEntry> journalBefore)
+        {
+            var isDefinitionChange = command is CreatePlan or ChangePlanAmount or SetPlanEnd
+                || (command is ReverseEntry reverse && journalBefore.Exists(entry => entry.Id == reverse.ReversedEntryId && entry is IDefinitionEntry));
+            if (!isDefinitionChange)
+            {
+                return;
+            }
+
+            var before = Accruals(journalBefore, CurrentMonth.Previous());
+            var after = Accruals([.. budget.Journal], CurrentMonth.Previous());
+            var plansBefore = before.Keys.Select(key => key.Plan).ToHashSet();
+            foreach (var key in before.Keys.Union(after.Keys).Where(key => plansBefore.Contains(key.Plan)))
+            {
+                after.GetValueOrDefault(key).ShouldBe(before.GetValueOrDefault(key), $"plan {key.Plan} changed in {key.Month}");
+            }
+        }
+
+        // What each effective plan accrues in each month through "last", rebuilt from the entries without BudgetState: versions
+        // and ends in replay order, the version with the latest "from" at or before the month (later on a tie).
+        private static Dictionary<(Guid Plan, YearMonth Month), decimal> Accruals(List<JournalEntry> journal, YearMonth last)
+        {
+            var reversed = BudgetState.ReversedEntryIds(journal);
+            var effective = ReplayOrder.Sort(journal.Where(entry => entry is not Reversal && !reversed.Contains(entry.Id)));
+            var accruals = new Dictionary<(Guid, YearMonth), decimal>();
+            foreach (var created in effective.OfType<PlanCreated>())
+            {
+                var versions = new List<(YearMonth From, decimal Amount)> { (created.ValidFrom, created.Amount.Amount) };
+                var validTo = created.ValidTo;
+                foreach (var entry in effective)
+                {
+                    if (entry is PlanAmountChanged changed && changed.PlanId == created.PlanId)
+                    {
+                        versions.Add((changed.From, changed.Amount.Amount));
+                    }
+                    else if (entry is PlanEndChanged ended && ended.PlanId == created.PlanId)
+                    {
+                        validTo = ended.ValidTo;
+                    }
+                }
+
+                for (var month = created.ValidFrom; month <= last; month = month.Next())
+                {
+                    decimal amount = 0m;
+                    YearMonth? inForce = null;
+                    foreach (var (from, value) in versions)
+                    {
+                        if (from <= month && (inForce is null || from >= inForce))
+                        {
+                            inForce = from;
+                            amount = value;
+                        }
+                    }
+
+                    accruals[(created.Id, month)] = validTo is { } end && month > end ? 0m : amount;
+                }
+            }
+
+            return accruals;
         }
 
         public void CheckInvariants()
@@ -239,9 +312,36 @@ public class BudgetModelTests
             bucketList.Where(bucket => bucket.Status == BucketStatus.Archived)
                 .ShouldAllBe(bucket => sums[bucket.BucketId] == 0m);
 
+            // Invariant 8 for plans: an archived bucket has no active plan.
+            bucketList.Where(bucket => bucket.Status == BucketStatus.Archived)
+                .ShouldAllBe(bucket => !state.Plans.Any(plan => plan.BucketId == bucket.BucketId && state.StandingOf(plan).IsActive));
+
+            CheckPlans(state, effective);
             CheckOverview(state, bucketList);
             CheckLoans(state, journal);
             CheckJournalPages(journal);
+        }
+
+        // Every plan's dues, checked independently: accrued through the current month (or its end) month by month, credit the
+        // effective linked deposits and transfers in, DueNow, Shortfall and Prepaid from them (B7).
+        private static void CheckPlans(BudgetState state, List<JournalEntry> effective)
+        {
+            var accruals = Accruals(effective, CurrentMonth);
+            state.Plans.Select(plan => plan.PlanId.Value).ShouldBe(effective.OfType<PlanCreated>().Select(created => created.Id), ignoreOrder: true);
+            foreach (var plan in state.Plans)
+            {
+                var standing = state.StandingOf(plan);
+                var before = accruals.Where(pair => pair.Key.Plan == plan.PlanId.Value && pair.Key.Month < CurrentMonth).Sum(pair => pair.Value);
+                var current = accruals.GetValueOrDefault((plan.PlanId.Value, CurrentMonth));
+                var credit = effective.OfType<Deposit>().Where(deposit => deposit.PlanId == plan.PlanId).Sum(deposit => deposit.Amount.Amount)
+                    + effective.OfType<Transfer>().Where(transfer => transfer.PlanId == plan.PlanId).Sum(transfer => transfer.ToAmount.Amount);
+
+                standing.Credit.Amount.ShouldBe(credit);
+                standing.Accrued.Amount.ShouldBe(before + current);
+                standing.DueNow.Amount.ShouldBe(Math.Max(0m, before + current - credit));
+                standing.Shortfall.Amount.ShouldBe(Math.Max(0m, before - credit));
+                standing.Prepaid.Amount.ShouldBe(Math.Max(0m, credit - before - current));
+            }
         }
 
         // The overview shows the replayed balances; each currency's total is the sum of its active buckets,
@@ -344,6 +444,7 @@ public class BudgetModelTests
             Borrow borrow => [(borrow.LenderBucketId, -borrow.Principal.Amount), .. (borrow.ToBucketId is { } to ? [(to, borrow.Principal.Amount)] : Array.Empty<(BucketId, decimal)>())],
             Repayment repayment => [(borrows[repayment.LoanId.Value].LenderBucketId, repayment.Amount.Amount),
                 .. (repayment.FromBucketId is { } from ? [(from, -repayment.Amount.Amount)] : Array.Empty<(BucketId, decimal)>())],
+            PlanCreated or PlanAmountChanged or PlanEndChanged => [],
             _ => throw new InvalidOperationException($"The model does not know the entry type {entry.GetType().Name}."),
         };
 
@@ -364,11 +465,26 @@ public class BudgetModelTests
 
                 case Kind.OpeningBalance or Kind.Deposit or Kind.Spend:
                     var (bucketId, unallocated, currency) = Target(operation.Unallocated, operation.A, active, all);
+
+                    // A deposit pays a plan: usually (Fee 1) into the plan's own active bucket, sometimes (Fee 2) naming a plan
+                    // ever created, reversed ones included, at the generated target.
+                    var plans = budget.Journal.OfType<PlanCreated>().ToList();
+                    Guid? paidPlan = null;
+                    if (operation.Kind == Kind.Deposit && operation.Fee is 1 or 2 && plans.Count > 0)
+                    {
+                        var plan = plans[operation.B % plans.Count];
+                        paidPlan = plan.Id;
+                        if (operation.Fee == 1 && active.Find(bucket => bucket.BucketId == plan.BucketId) is { } planBucket)
+                        {
+                            (bucketId, unallocated, currency) = (planBucket.Id, null, planBucket.Currency);
+                        }
+                    }
+
                     var amount = Money.From(operation.Units / 100m, currency);
                     return operation.Kind switch
                     {
                         Kind.OpeningBalance => new AddOpeningBalance(id, amount, occurredOn, bucketId, unallocated, null, []),
-                        Kind.Deposit => new AddDeposit(id, amount, occurredOn, bucketId, unallocated, null, []),
+                        Kind.Deposit => new AddDeposit(id, amount, occurredOn, bucketId, unallocated, null, [], paidPlan),
                         _ => new AddSpend(id, amount, occurredOn, bucketId, unallocated, null, []),
                     };
 
@@ -455,12 +571,58 @@ public class BudgetModelTests
                 case Kind.Transfer:
                     var from = Target(operation.Unallocated && operation.A % 2 == 0, operation.A, active, all);
                     var to = Target(operation.Unallocated && operation.A % 2 == 1, operation.B, active, all);
+
+                    // A quarter of the transfers pay a plan, usually into its own active bucket.
+                    var planIds = budget.Journal.OfType<PlanCreated>().ToList();
+                    Guid? transferPlan = null;
+                    if (operation.B % 4 == 3 && planIds.Count > 0)
+                    {
+                        var plan = planIds[operation.A % planIds.Count];
+                        transferPlan = plan.Id;
+                        if (active.Find(bucket => bucket.BucketId == plan.BucketId) is { } planBucket && planBucket.Id != from.BucketId)
+                        {
+                            to = (planBucket.Id, null, planBucket.Currency);
+                        }
+                    }
                     var fee = operation.Fee == 0 ? null : Money.From(operation.Fee, from.Currency);
                     var fromAmount = Money.From(operation.Units / 100m + operation.Fee, from.Currency);
                     var toAmount = from.Currency == to.Currency
                         ? Money.From(operation.Units / 100m, to.Currency)
                         : Money.From(operation.OtherUnits / 100m, to.Currency);
-                    return new AddTransfer(id, fromAmount, toAmount, fee, occurredOn, from.BucketId, from.Unallocated, to.BucketId, to.Unallocated, null, []);
+                    return new AddTransfer(id, fromAmount, toAmount, fee, occurredOn, from.BucketId, from.Unallocated, to.BucketId, to.Unallocated, null, [], transferPlan);
+
+                case Kind.CreatePlan:
+                    // Usually (Fee 0 and 1) an active bucket of the user in its currency, starting up to four months back or two
+                    // ahead, sometimes ending; otherwise (Fee 2) another currency, or (Fee 3) any bucket, Unallocated and
+                    // archived ones included. An end may come before the start.
+                    var users = active.Where(bucket => bucket.SystemRole == BucketSystemRole.None).ToList();
+                    var planned = operation.Fee < 3 && users.Count > 0 ? users[operation.A % users.Count] : all.Count == 0 ? null : all[operation.A % all.Count];
+                    var planCurrency = planned is null ? Currency.Pln : operation.Fee == 2 ? Currencies[(Array.IndexOf(Currencies, planned.Currency) + 1) % 3] : planned.Currency;
+                    var validFrom = CurrentMonth.AddMonths((operation.B % 7) - 4);
+                    YearMonth? validTo = operation.Unallocated ? validFrom.AddMonths((int)(operation.OtherUnits % 6) - 1) : null;
+                    return new CreatePlan(id, planned?.Id ?? Guid.CreateVersion7(), Money.From(operation.Units / 100m, planCurrency), validFrom, validTo, occurredOn, null, []);
+
+                case Kind.ChangePlanAmount or Kind.SetPlanEnd:
+                    // Usually (Fee 0 to 2) a plan that exists (Fee 0 and 1: one that has not ended), otherwise any plan ever
+                    // created or an unknown one; a month from two back to three ahead, so past months are tried (and refused
+                    // unless nothing changes), kept within the plan's months for Fee 0 and 1 so changes are accepted often.
+                    var state = BudgetState.Replay(all, budget.Journal, Today);
+                    var running = state.Plans.Where(plan => operation.Fee >= 2 || state.StandingOf(plan).Status == PlanStatus.Active).ToList();
+                    var created = budget.Journal.OfType<PlanCreated>().ToList();
+                    var planTarget = operation.Fee < 3 && running.Count > 0 ? running[operation.A % running.Count] : null;
+                    var changedPlan = planTarget?.PlanId.Value
+                        ?? (created.Count > 0 && operation.Unallocated ? created[operation.A % created.Count].Id : Guid.CreateVersion7());
+                    var planMoney = state.Plans.FirstOrDefault(plan => plan.PlanId.Value == changedPlan)?.Currency ?? Currency.Pln;
+                    var month = CurrentMonth.AddMonths((operation.B % 6) - 2);
+                    if (planTarget is not null && operation.Fee < 2)
+                    {
+                        month = month < planTarget.ValidFrom ? planTarget.ValidFrom : month;
+                        month = planTarget.ValidTo is { } end && month > end ? end : month;
+                    }
+
+                    return operation.Kind == Kind.ChangePlanAmount
+                        ? new ChangePlanAmount(id, changedPlan, Money.From(operation.Units / 100m, planMoney), month, Today, null, [])
+                        : new SetPlanEnd(id, changedPlan, operation.OtherUnits % 4 == 0 ? null : month, Today, null, []);
 
                 case Kind.Reverse:
                     var journal = budget.Journal;
@@ -488,7 +650,8 @@ public class BudgetModelTests
 
                 default:
                     // A repeat of an earlier successful command that has a client ID (CreateBucket or an entry).
-                    var repeatable = succeeded.Where(command => command is CreateBucket or IBucketEntryCommand or AddTransfer or AddBorrow or AddRepayment or ReverseEntry).ToList();
+                    var repeatable = succeeded.Where(command => command is CreateBucket or IBucketEntryCommand or AddTransfer or AddBorrow or AddRepayment or ReverseEntry
+                        or CreatePlan or ChangePlanAmount or SetPlanEnd).ToList();
                     return repeatable.Count == 0
                         ? new CreateBucket(id, "Repeatable", Currency.Pln, Contract.BucketKind.Savings, null)
                         : repeatable[operation.A % repeatable.Count];
@@ -538,6 +701,9 @@ public class BudgetModelTests
                 AddBorrow borrow => new AddBorrowHandler(writer).Handle(borrow, cancellation),
                 AddRepayment repayment => new AddRepaymentHandler(writer).Handle(repayment, cancellation),
                 AddTransfer transfer => new AddTransferHandler(writer).Handle(transfer, cancellation),
+                CreatePlan plan => new CreatePlanHandler(writer).Handle(plan, cancellation),
+                ChangePlanAmount change => new ChangePlanAmountHandler(writer).Handle(change, cancellation),
+                SetPlanEnd end => new SetPlanEndHandler(writer).Handle(end, cancellation),
                 ReverseEntry reverse => new ReverseEntryHandler(writer, new JournalEntryDependencies()).Handle(reverse, cancellation),
                 _ => throw new InvalidOperationException($"Unknown command {command.GetType().Name}."),
             }).AsTask().GetAwaiter().GetResult();

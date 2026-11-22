@@ -27,7 +27,7 @@ public sealed class AddDepositFunction(ISender sender)
         }
 
         var deposit = body.Value;
-        var command = new AddDeposit(deposit.Id, deposit.Amount, deposit.OccurredOn, deposit.BucketId, deposit.Unallocated, deposit.Note, deposit.Tags ?? []);
+        var command = new AddDeposit(deposit.Id, deposit.Amount, deposit.OccurredOn, deposit.BucketId, deposit.Unallocated, deposit.Note, deposit.Tags ?? [], deposit.PlanId);
         return ProblemDetailsMapper.ToActionResult(await sender.Send(command, cancellationToken).ConfigureAwait(false));
     }
 }
