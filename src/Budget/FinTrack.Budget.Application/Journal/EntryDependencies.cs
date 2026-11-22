@@ -20,7 +20,8 @@ public interface IEntryDependencies
 /// <summary>
 /// The dependency rule of the entry types that exist. A <c>Borrow</c> has dependents while an effective <c>Repayment</c>
 /// of its loan exists (plan 1b step 5); a <c>PlanCreated</c> while an effective change of its plan or a deposit or transfer
-/// linked to it exists (step 9). No type of phase 1a, no <c>Adjustment</c> (step 4) and no <c>Repayment</c> is
+/// linked to it exists (step 9), or a pause or waiver of it (step 10); a <c>PlanPaused</c> while an effective change of its pause
+/// exists (step 10). No type of phase 1a, no <c>Adjustment</c> (step 4) and no <c>Repayment</c> is
 /// referred to by another entry except through a reversal (which is not effective), so none has dependents; the types that do get their case in the
 /// step that adds them (loans step 5, plans step 9, pauses step 10). An unknown type is a bug: every new type must
 /// decide here.
@@ -38,7 +39,9 @@ public sealed class JournalEntryDependencies : IEntryDependencies
         {
             Borrow borrow => HasEffectiveRepayment(borrow, state),
             PlanCreated created => HasEffectivePlanEntry(created, state),
-            OpeningBalance or Deposit or Spend or Transfer or Reversal or Adjustment or Repayment or PlanAmountChanged or PlanEndChanged => false,
+            PlanPaused paused => HasEffectivePauseChange(paused, state),
+            OpeningBalance or Deposit or Spend or Transfer or Reversal or Adjustment or Repayment or PlanAmountChanged or PlanEndChanged
+                or PlanPauseChanged or ShortfallWaived => false,
             _ => throw new InvalidOperationException($"The dependency rule does not know the entry type {entry.GetType().Name}."),
         };
     }
@@ -50,7 +53,7 @@ public sealed class JournalEntryDependencies : IEntryDependencies
         return state.Journal.OfType<Repayment>().Any(repayment => repayment.LoanId == borrow.LoanId && !reversed.Contains(repayment.Id));
     }
 
-    // A plan with an effective change or linked contribution (B5); pauses and waivers (step 10) will count too.
+    // A plan with an effective change, pause, waiver or linked contribution (B5).
     private static bool HasEffectivePlanEntry(PlanCreated created, BudgetSnapshot state)
     {
         var reversed = BudgetState.ReversedEntryIds(state.Journal);
@@ -58,9 +61,18 @@ public sealed class JournalEntryDependencies : IEntryDependencies
         {
             PlanAmountChanged changed => changed.PlanId == created.PlanId,
             PlanEndChanged ended => ended.PlanId == created.PlanId,
+            PlanPaused paused => paused.PlanId == created.PlanId,
+            ShortfallWaived waived => waived.PlanId == created.PlanId,
             Deposit deposit => deposit.PlanId == created.PlanId,
             Transfer transfer => transfer.PlanId == created.PlanId,
             _ => false,
         });
+    }
+
+    // A pause with an effective change of it (B5).
+    private static bool HasEffectivePauseChange(PlanPaused paused, BudgetSnapshot state)
+    {
+        var reversed = BudgetState.ReversedEntryIds(state.Journal);
+        return state.Journal.OfType<PlanPauseChanged>().Any(changed => changed.PauseId == paused.PauseId && !reversed.Contains(changed.Id));
     }
 }

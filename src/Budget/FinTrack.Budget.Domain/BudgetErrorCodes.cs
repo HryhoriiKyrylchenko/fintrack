@@ -79,6 +79,18 @@ public static class BudgetErrorCodes
     /// </summary>
     public const string PlanMonthsInvalid = "plan.months_invalid";
 
+    /// <summary>No pause with this ID exists for the plan: no effective <c>PlanPaused</c> of it has it (plan 1b B10). No parameters.</summary>
+    public const string PlanPauseNotFound = "plan.pause_not_found";
+
+    /// <summary>The pause would overlap another pause of the same plan (plan 1b B10). No parameters.</summary>
+    public const string PlanPauseOverlaps = "plan.pause_overlaps";
+
+    /// <summary>
+    /// The waiver is above the plan's shortfall at its date: what the months before the waiver's month still lack after the
+    /// contributions and earlier waivers (plan 1b B11). The current month's due is not a shortfall yet. No parameters.
+    /// </summary>
+    public const string PlanWaiverExceedsShortfall = "plan.waiver_exceeds_shortfall";
+
     /// <summary>Money can be borrowed from a savings bucket only, never from an investment bucket (ARCHITECTURE 4.9, plan 1b B2). No parameters.</summary>
     public const string BucketBorrowNotAllowed = "bucket.borrow_not_allowed";
 

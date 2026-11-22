@@ -286,6 +286,15 @@
   <data name="Error.plan.months_invalid" xml:space="preserve">
     <value>The months do not fit the plan: the end cannot be before the start, and a new amount must start within the plan.</value>
   </data>
+  <data name="Error.plan.pause_not_found" xml:space="preserve">
+    <value>This pause was not found for this plan. It may have been reversed.</value>
+  </data>
+  <data name="Error.plan.pause_overlaps" xml:space="preserve">
+    <value>This pause overlaps another pause of the plan. Change that pause or choose other months.</value>
+  </data>
+  <data name="Error.plan.waiver_exceeds_shortfall" xml:space="preserve">
+    <value>This is more than the plan's shortfall at that date. Only months that have already passed can be written off.</value>
+  </data>
   <data name="Error.fx.rate_unavailable" xml:space="preserve">
     <value>No exchange rate is available yet, so the total in your reporting currency cannot be shown. It appears once the app can reach the rate service.</value>
   </data>
@@ -769,6 +778,15 @@
   <data name="Journal.Type.PlanEndChanged" xml:space="preserve">
     <value>Plan end changed</value>
   </data>
+  <data name="Journal.Type.PlanPaused" xml:space="preserve">
+    <value>Plan paused</value>
+  </data>
+  <data name="Journal.Type.PlanPauseChanged" xml:space="preserve">
+    <value>Plan pause changed</value>
+  </data>
+  <data name="Journal.Type.ShortfallWaived" xml:space="preserve">
+    <value>Shortfall written off</value>
+  </data>
   <data name="Journal.TheType.OpeningBalance" xml:space="preserve">
     <value>the opening balance</value>
   </data>
@@ -801,6 +819,15 @@
   </data>
   <data name="Journal.TheType.PlanEndChanged" xml:space="preserve">
     <value>the plan end change</value>
+  </data>
+  <data name="Journal.TheType.PlanPaused" xml:space="preserve">
+    <value>the plan pause</value>
+  </data>
+  <data name="Journal.TheType.PlanPauseChanged" xml:space="preserve">
+    <value>the pause change</value>
+  </data>
+  <data name="Journal.TheType.ShortfallWaived" xml:space="preserve">
+    <value>the write-off</value>
   </data>
   <data name="Journal.TransferLine" xml:space="preserve">
     <value>{0} → {1}</value>

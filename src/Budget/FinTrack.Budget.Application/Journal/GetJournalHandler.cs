@@ -114,6 +114,9 @@ public sealed class GetJournalHandler(BudgetStateLoader loader) : IQueryHandler<
         PlanCreated created => created.BucketId == bucketId,
         PlanAmountChanged changed => JournalContractMapping.BucketOf(changed.PlanId, byId) == bucketId,
         PlanEndChanged ended => JournalContractMapping.BucketOf(ended.PlanId, byId) == bucketId,
+        PlanPaused paused => JournalContractMapping.BucketOf(paused.PlanId, byId) == bucketId,
+        PlanPauseChanged changed => JournalContractMapping.BucketOf(JournalContractMapping.PlanOf(changed.PauseId, byId), byId) == bucketId,
+        ShortfallWaived waived => JournalContractMapping.BucketOf(waived.PlanId, byId) == bucketId,
         Reversal reversal => byId.TryGetValue(reversal.ReversedEntryId.Value, out var reversed) && Touches(reversed, bucketId, byId),
         _ => throw new ArgumentOutOfRangeException(nameof(entry), entry?.GetType().Name, "Unknown journal entry type."),
     };

@@ -44,6 +44,26 @@ public sealed class FunctionTests(ApiFixture fixture)
         problem.Value.ShouldBeOfType<ProblemDetails>().Extensions["code"].ShouldBe(GetHealthHandler.DatabaseUnavailable);
     }
 
+    // A validator that is not registered never runs: the pipeline finds none and the handler sees unchecked input (found in plan 1b
+    // step 10: the plan commands' validators of step 9 were missing). Every validator of Budget's Application must be in the container.
+    [Fact]
+    public void EveryValidatorOfTheBudgetApplication_IsRegistered()
+    {
+        using var scope = fixture.Services.CreateScope();
+        var validators = typeof(FinTrack.Budget.Application.Journal.AddDepositValidator).Assembly.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && type.GetInterfaces().Any(contract => contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(FluentValidation.IValidator<>)))
+            .ToList();
+
+        validators.Count.ShouldBeGreaterThan(15);
+        foreach (var validator in validators)
+        {
+            var message = validator.GetInterfaces().Single(contract => contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(FluentValidation.IValidator<>))
+                .GetGenericArguments()[0];
+            var registered = scope.ServiceProvider.GetServices(typeof(FluentValidation.IValidator<>).MakeGenericType(message));
+            registered.ShouldContain(instance => instance!.GetType() == validator, $"{validator.Name} is not registered");
+        }
+    }
+
     [Fact]
     public async Task SweepOutbox_RunsAgainstTheDatabase()
     {

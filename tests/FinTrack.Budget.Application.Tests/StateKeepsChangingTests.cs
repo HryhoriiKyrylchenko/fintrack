@@ -42,7 +42,7 @@ public class StateKeepsChangingTests
     [
         "GetBuckets", "GetOwnerSettings", "GetBudgetOverview", "GetJournal", "GetLoans",
         "CreateBucket", "RenameBucket", "ArchiveBucket", "UnarchiveBucket", "SaveOwnerSettings", "AddDeposit", "AddAdjustment", "AddBorrow", "AddRepayment", "ReverseEntry",
-        "CreatePlan", "ChangePlanAmount", "SetPlanEnd",
+        "CreatePlan", "ChangePlanAmount", "SetPlanEnd", "PausePlan", "ChangePlanPause", "WaiveShortfall",
     ];
 
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
@@ -91,6 +91,12 @@ public class StateKeepsChangingTests
                 new ChangePlanAmount(Guid.CreateVersion7(), Guid.CreateVersion7(), Money.From(10m, Currency.Pln), new YearMonth(2026, 1), today, null, []), Cancellation),
             "SetPlanEnd" => await new SetPlanEndHandler(new JournalWriter(loader, ledger, owner, clock)).Handle(
                 new SetPlanEnd(Guid.CreateVersion7(), Guid.CreateVersion7(), null, today, null, []), Cancellation),
+            "PausePlan" => await new PausePlanHandler(new JournalWriter(loader, ledger, owner, clock)).Handle(
+                new PausePlan(Guid.CreateVersion7(), Guid.CreateVersion7(), new YearMonth(2026, 1), null, Contracts.V1.Plans.PauseMode.Skip, today, null, []), Cancellation),
+            "ChangePlanPause" => await new ChangePlanPauseHandler(new JournalWriter(loader, ledger, owner, clock)).Handle(
+                new ChangePlanPause(Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(), new YearMonth(2026, 1), null, Contracts.V1.Plans.PauseMode.Skip, today, null, []), Cancellation),
+            "WaiveShortfall" => await new WaiveShortfallHandler(new JournalWriter(loader, ledger, owner, clock)).Handle(
+                new WaiveShortfall(Guid.CreateVersion7(), Guid.CreateVersion7(), Money.From(10m, Currency.Pln), today, "Reason", []), Cancellation),
             _ => await new ReverseEntryHandler(new JournalWriter(loader, ledger, owner, clock), new JournalEntryDependencies()).Handle(
                 new ReverseEntry(Guid.CreateVersion7(), Guid.CreateVersion7(), today, null, []), Cancellation),
         };

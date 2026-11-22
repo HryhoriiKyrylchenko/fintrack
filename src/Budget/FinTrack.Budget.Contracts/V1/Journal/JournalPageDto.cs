@@ -1,3 +1,4 @@
+using FinTrack.Budget.Contracts.V1.Plans;
 using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Shared.Kernel.Time;
 
@@ -24,12 +25,13 @@ public sealed record JournalPageDto(IReadOnlyList<JournalEntryDto> Entries, stri
 /// <param name="ExternalId">The source's own ID of an imported entry, or <c>null</c> (always in phase 1a).</param>
 /// <param name="BucketId">
 /// The bucket of an <c>OpeningBalance</c>, <c>Deposit</c>, <c>Spend</c> or <c>Adjustment</c>; the plan's bucket of a <c>PlanCreated</c>,
-/// <c>PlanAmountChanged</c> or <c>PlanEndChanged</c>; <c>null</c> for other types.
+/// <c>PlanAmountChanged</c>, <c>PlanEndChanged</c>, <c>PlanPaused</c>, <c>PlanPauseChanged</c> or <c>ShortfallWaived</c>; <c>null</c> for other types.
 /// </param>
 /// <param name="Amount">
 /// The amount of an <c>OpeningBalance</c>, <c>Deposit</c>, <c>Spend</c> or <c>Adjustment</c>, in its bucket's currency; the principal of a
 /// <c>Borrow</c> and the amount of a <c>Repayment</c>, in the lender's currency; the monthly amount of a <c>PlanCreated</c> or
-/// <c>PlanAmountChanged</c> (an amount the plan asks for, not money moved); <c>null</c> for other types.
+/// <c>PlanAmountChanged</c> (an amount the plan asks for, not money moved); what a <c>ShortfallWaived</c> writes off (not money moved either);
+/// <c>null</c> for other types.
 /// </param>
 /// <param name="FromBucketId">
 /// The source of a <c>Transfer</c>; the lender of a <c>Borrow</c>; the source of a <c>Repayment</c>, or <c>null</c> when it was paid with
@@ -54,13 +56,20 @@ public sealed record JournalPageDto(IReadOnlyList<JournalEntryDto> Entries, stri
 /// <param name="Direction">Whether an <c>Adjustment</c> raised or lowered its bucket; <c>null</c> for other types (plan 1b B18).</param>
 /// <param name="LoanId">The loan of a <c>Borrow</c> (its own ID) or a <c>Repayment</c>; <c>null</c> for other types (plan 1b B18).</param>
 /// <param name="PlanId">
-/// The plan of a <c>PlanCreated</c> (its own ID), <c>PlanAmountChanged</c> or <c>PlanEndChanged</c>, and the plan a <c>Deposit</c> or a
+/// The plan of a <c>PlanCreated</c> (its own ID), <c>PlanAmountChanged</c>, <c>PlanEndChanged</c>, <c>PlanPaused</c>, <c>PlanPauseChanged</c>
+/// or <c>ShortfallWaived</c>, and the plan a <c>Deposit</c> or a
 /// <c>Transfer</c> counts towards (or <c>null</c> for a one-time contribution); <c>null</c> for other types (plan 1b B9, B18).
 /// </param>
-/// <param name="FromMonth">The first month of a <c>PlanCreated</c>, or the first month of a <c>PlanAmountChanged</c>'s amount; <c>null</c> for other types.</param>
-/// <param name="ToMonth">
-/// The last month of a <c>PlanCreated</c> or a <c>PlanEndChanged</c>, or <c>null</c> when the plan has no end; <c>null</c> for other types.
+/// <param name="FromMonth">
+/// The first month of a <c>PlanCreated</c>, of a <c>PlanAmountChanged</c>'s amount, or of a pause (<c>PlanPaused</c>, <c>PlanPauseChanged</c>);
+/// <c>null</c> for other types.
 /// </param>
+/// <param name="ToMonth">
+/// The last month of a <c>PlanCreated</c>, a <c>PlanEndChanged</c> or a pause, or <c>null</c> when there is none (no end, a pause until
+/// changed); <c>null</c> for other types.
+/// </param>
+/// <param name="PauseId">The pause of a <c>PlanPaused</c> (its own ID) or a <c>PlanPauseChanged</c>; <c>null</c> for other types (plan 1b B18).</param>
+/// <param name="PauseMode">The mode of a <c>PlanPaused</c> or a <c>PlanPauseChanged</c>; <c>null</c> for other types.</param>
 public sealed record JournalEntryDto(
     Guid Id,
     JournalEntryType Type,
@@ -85,7 +94,9 @@ public sealed record JournalEntryDto(
     Guid? LoanId = null,
     Guid? PlanId = null,
     YearMonth? FromMonth = null,
-    YearMonth? ToMonth = null);
+    YearMonth? ToMonth = null,
+    Guid? PauseId = null,
+    PauseMode? PauseMode = null);
 
 /// <summary>The type of a journal entry (ARCHITECTURE 4.2). JSON: the member's name, which is also the stored type name.</summary>
 public enum JournalEntryType
@@ -122,4 +133,13 @@ public enum JournalEntryType
 
     /// <summary>A plan's new last month, or no end; moves no money.</summary>
     PlanEndChanged,
+
+    /// <summary>A pause of a plan (months and mode); moves no money; its ID is the pause's.</summary>
+    PlanPaused,
+
+    /// <summary>New months or mode of a pause, for example a resume; moves no money.</summary>
+    PlanPauseChanged,
+
+    /// <summary>Part of a plan's shortfall written off, with its reason; moves no money and is never income.</summary>
+    ShortfallWaived,
 }

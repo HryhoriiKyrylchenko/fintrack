@@ -117,6 +117,20 @@ public sealed class PlanFunctionTests(ApiFixture fixture)
         (await StateAsync()).Journal.ShouldBeEmpty();
     }
 
+    // The plan commands' validators run in the pipeline (they were not registered in step 9, so such input reached the domain).
+    [Fact]
+    public async Task APlanWithANoteThatIsNotValid_OrNoBucket_Is400ValidationFailed()
+    {
+        await SaveSettingsAsync();
+
+        var note = Problem(await CreatePlanAsync($$"""{"id":"{{Guid.CreateVersion7()}}","bucketId":"{{Guid.CreateVersion7()}}","amount":{"amount":"1","currency":"PLN"},"validFrom":"{{Current}}","occurredOn":"{{Day(0)}}","note":" padded"}"""), 400);
+        (Params(note)["field"], Params(note)["rule"]).ShouldBe(("note", "NoSurroundingWhiteSpace"));
+        var bucket = Problem(await CreatePlanAsync($$"""{"id":"{{Guid.CreateVersion7()}}","bucketId":"{{Guid.Empty}}","amount":{"amount":"1","currency":"PLN"},"validFrom":"{{Current}}","occurredOn":"{{Day(0)}}"}"""), 400);
+        (Params(bucket)["field"], Params(bucket)["rule"]).ShouldBe(("bucketId", "NotEmptyValidator"));
+        var end = Problem(await SetEndAsync(Guid.CreateVersion7(), $$"""{"id":"{{Guid.CreateVersion7()}}","occurredOn":"{{Day(0)}}","tags":["a","A"]}"""), 400);
+        Params(end)["field"].ShouldBe("tags");
+    }
+
     [Fact]
     public async Task APlanIdThatIsNotAGuid_Is400RouteFormat()
     {
@@ -167,19 +181,141 @@ public sealed class PlanFunctionTests(ApiFixture fixture)
             "{\"id\":\"" + transfer + "\",\"type\":\"Transfer\",\"occurredOn\":\"" + day + "\",\"note\":null,\"tags\":[],\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,"
             + "\"bucketId\":null,\"amount\":null,\"fromBucketId\":\"" + cushion + "\",\"toBucketId\":\"" + holiday + "\",\"fromAmount\":{\"amount\":\"250.00\",\"currency\":\"PLN\"},"
             + "\"toAmount\":{\"amount\":\"250.00\",\"currency\":\"PLN\"},\"fee\":null,\"rate\":\"1\",\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":null,\"loanId\":null,"
-            + "\"planId\":\"" + plan + "\",\"fromMonth\":null,\"toMonth\":null}");
+            + "\"planId\":\"" + plan + "\",\"fromMonth\":null,\"toMonth\":null,\"pauseId\":null,\"pauseMode\":null}");
         Json(page.Entries[1]).ShouldBe(
             "{\"id\":\"" + ended + "\",\"type\":\"PlanEndChanged\",\"occurredOn\":\"" + day + "\",\"note\":null,\"tags\":[],\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,"
             + "\"bucketId\":\"" + holiday + "\",\"amount\":null,\"fromBucketId\":null,\"toBucketId\":null,\"fromAmount\":null,\"toAmount\":null,"
-            + "\"fee\":null,\"rate\":null,\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":null,\"loanId\":null,\"planId\":\"" + plan + "\",\"fromMonth\":null,\"toMonth\":null}");
+            + "\"fee\":null,\"rate\":null,\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":null,\"loanId\":null,\"planId\":\"" + plan + "\",\"fromMonth\":null,\"toMonth\":null,\"pauseId\":null,\"pauseMode\":null}");
         Json(page.Entries[2]).ShouldBe(
             "{\"id\":\"" + change + "\",\"type\":\"PlanAmountChanged\",\"occurredOn\":\"" + day + "\",\"note\":null,\"tags\":[],\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,"
             + "\"bucketId\":\"" + holiday + "\",\"amount\":{\"amount\":\"600.00\",\"currency\":\"PLN\"},\"fromBucketId\":null,\"toBucketId\":null,\"fromAmount\":null,\"toAmount\":null,"
-            + "\"fee\":null,\"rate\":null,\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":null,\"loanId\":null,\"planId\":\"" + plan + "\",\"fromMonth\":\"" + Current.Next() + "\",\"toMonth\":null}");
+            + "\"fee\":null,\"rate\":null,\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":null,\"loanId\":null,\"planId\":\"" + plan + "\",\"fromMonth\":\"" + Current.Next() + "\",\"toMonth\":null,\"pauseId\":null,\"pauseMode\":null}");
         Json(page.Entries[3]).ShouldBe(
             "{\"id\":\"" + plan + "\",\"type\":\"PlanCreated\",\"occurredOn\":\"" + day + "\",\"note\":\"Holiday fund\",\"tags\":[],\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,"
             + "\"bucketId\":\"" + holiday + "\",\"amount\":{\"amount\":\"500.00\",\"currency\":\"PLN\"},\"fromBucketId\":null,\"toBucketId\":null,\"fromAmount\":null,\"toAmount\":null,"
-            + "\"fee\":null,\"rate\":null,\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":null,\"loanId\":null,\"planId\":\"" + plan + "\",\"fromMonth\":\"" + Current + "\",\"toMonth\":\"" + end + "\"}");
+            + "\"fee\":null,\"rate\":null,\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":null,\"loanId\":null,\"planId\":\"" + plan + "\",\"fromMonth\":\"" + Current + "\",\"toMonth\":\"" + end + "\",\"pauseId\":null,\"pauseMode\":null}");
+    }
+
+    [Fact]
+    public async Task APause_AndAWaiver_AreRecorded_WithEveryRefusalOnTheWay()
+    {
+        await SaveSettingsAsync();
+        var holiday = await CreateBucketAsync("Holiday");
+        var plan = Guid.CreateVersion7();
+        var twoBack = Current.AddMonths(-2);
+        (await CreatePlanAsync($$"""{"id":"{{plan}}","bucketId":"{{holiday}}","amount":{"amount":"100","currency":"PLN"},"validFrom":"{{twoBack}}","occurredOn":"{{Day(0)}}"}"""))
+            .ShouldBeOfType<NoContentResult>();
+        var pause = Guid.CreateVersion7();
+
+        var past = Problem(await PauseAsync(plan, $$"""{"id":"{{Guid.CreateVersion7()}}","from":"{{Current.Previous()}}","mode":"Skip","occurredOn":"{{Day(0)}}"}"""), 422);
+        past.Extensions["code"].ShouldBe("plan.past_period_changed");
+        Params(past)["month"].ShouldBe(Current.Previous().ToString());
+        (await PauseAsync(plan, $$"""{"id":"{{pause}}","from":"{{Current}}","mode":"Shift","occurredOn":"{{Day(0)}}","note":"Car repair"}""")).ShouldBeOfType<NoContentResult>();
+        Code(await PauseAsync(plan, $$"""{"id":"{{Guid.CreateVersion7()}}","from":"{{Current.AddMonths(3)}}","mode":"Skip","occurredOn":"{{Day(0)}}"}"""), 422).ShouldBe("plan.pause_overlaps");
+        Code(await ChangePauseAsync(plan, Guid.CreateVersion7().ToString(), $$"""{"id":"{{Guid.CreateVersion7()}}","from":"{{Current}}","mode":"Shift","occurredOn":"{{Day(0)}}"}"""), 404)
+            .ShouldBe("plan.pause_not_found");
+        (await ChangePauseAsync(plan, pause.ToString(), $$"""{"id":"{{Guid.CreateVersion7()}}","from":"{{Current}}","to":"{{Current.Next()}}","mode":"Skip","occurredOn":"{{Day(0)}}"}"""))
+            .ShouldBeOfType<NoContentResult>();
+        (await StandingAsync(plan)).Status.ShouldBe(PlanStatus.Paused);
+
+        Code(await WaiveAsync(plan, $$"""{"id":"{{Guid.CreateVersion7()}}","amount":{"amount":"200.01","currency":"PLN"},"occurredOn":"{{Day(0)}}","note":"Agreed"}"""), 422)
+            .ShouldBe("plan.waiver_exceeds_shortfall");
+        var noReason = Problem(await WaiveAsync(plan, $$"""{"id":"{{Guid.CreateVersion7()}}","amount":{"amount":"1","currency":"PLN"},"occurredOn":"{{Day(0)}}"}"""), 400);
+        (Params(noReason)["field"], Params(noReason)["rule"]).ShouldBe(("note", "NotEmptyValidator"));
+        (await WaiveAsync(plan, $$"""{"id":"{{Guid.CreateVersion7()}}","amount":{"amount":"200","currency":"PLN"},"occurredOn":"{{Day(0)}}","note":"Agreed"}"""))
+            .ShouldBeOfType<NoContentResult>();
+        (await StandingAsync(plan)).Shortfall.ShouldBe(Pln(0m));
+        Code(await ReverseAsync(pause), 422).ShouldBe("entry.has_dependents");
+    }
+
+    [Theory]
+    [InlineData("""{"id":"ID","from":"2026-01","mode":"shift","occurredOn":"DAY"}""", "mode")]
+    [InlineData("""{"id":"ID","from":"2026-01","mode":1,"occurredOn":"DAY"}""", "mode")]
+    [InlineData("""{"id":"ID","from":"2026-01","occurredOn":"DAY"}""", null)]
+    [InlineData("""{"id":"ID","from":"2026-01-01","mode":"Skip","occurredOn":"DAY"}""", "from")]
+    public async Task APauseBody_ThatCannotBeRead_Is400JsonFormat(string template, string? field)
+    {
+        await SaveSettingsAsync();
+        var json = template.Replace("ID", Guid.CreateVersion7().ToString(), StringComparison.Ordinal).Replace("DAY", Day(0), StringComparison.Ordinal);
+
+        var problem = Problem(await PauseAsync(Guid.CreateVersion7(), json), 400);
+
+        Params(problem)["rule"].ShouldBe(RequestBody.UnreadableRule);
+        if (field is not null)
+        {
+            Params(problem)["field"].ShouldBe(field);
+        }
+    }
+
+    [Fact]
+    public async Task APauseIdThatIsNotAGuid_Is400RouteFormat()
+    {
+        await SaveSettingsAsync();
+
+        var problem = Problem(await ChangePauseAsync(Guid.CreateVersion7(), "nope", $$"""{"id":"{{Guid.CreateVersion7()}}","from":"{{Current}}","mode":"Skip","occurredOn":"{{Day(0)}}"}"""), 400);
+
+        (Params(problem)["field"], Params(problem)["rule"]).ShouldBe(("pauseId", "RouteFormat"));
+    }
+
+    [Fact]
+    public async Task TheJournal_ShowsPausesAndWaivers_InTheV1Shape()
+    {
+        await SaveSettingsAsync();
+        var holiday = await CreateBucketAsync("Holiday");
+        var plan = Guid.CreateVersion7();
+        var lastMonth = Current.Previous();
+        (await CreatePlanAsync($$"""{"id":"{{plan}}","bucketId":"{{holiday}}","amount":{"amount":"100","currency":"PLN"},"validFrom":"{{lastMonth}}","occurredOn":"{{Day(0)}}"}"""))
+            .ShouldBeOfType<NoContentResult>();
+        var pause = Guid.CreateVersion7();
+        (await PauseAsync(plan, $$"""{"id":"{{pause}}","from":"{{Current.Next()}}","mode":"Shift","occurredOn":"{{Day(0)}}"}""")).ShouldBeOfType<NoContentResult>();
+        var change = Guid.CreateVersion7();
+        (await ChangePauseAsync(plan, pause.ToString(), $$"""{"id":"{{change}}","from":"{{Current.Next()}}","to":"{{Current.AddMonths(2)}}","mode":"Skip","occurredOn":"{{Day(0)}}"}"""))
+            .ShouldBeOfType<NoContentResult>();
+        var waiver = Guid.CreateVersion7();
+        (await WaiveAsync(plan, $$"""{"id":"{{waiver}}","amount":{"amount":"40","currency":"PLN"},"occurredOn":"{{Day(0)}}","note":"Agreed"}""")).ShouldBeOfType<NoContentResult>();
+
+        var page = (await JournalAsync($"?bucketId={holiday}")).ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<JournalPageDto>();
+        var day = Day(0);
+        const string Empty = "\"fromBucketId\":null,\"toBucketId\":null,\"fromAmount\":null,\"toAmount\":null,\"fee\":null,\"rate\":null,\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":null,\"loanId\":null,";
+
+        page.Entries.Select(entry => entry.Id).ShouldBe([waiver, change, pause, plan]);
+        Json(page.Entries[0]).ShouldBe(
+            "{\"id\":\"" + waiver + "\",\"type\":\"ShortfallWaived\",\"occurredOn\":\"" + day + "\",\"note\":\"Agreed\",\"tags\":[],\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,"
+            + "\"bucketId\":\"" + holiday + "\",\"amount\":{\"amount\":\"40.00\",\"currency\":\"PLN\"}," + Empty
+            + "\"planId\":\"" + plan + "\",\"fromMonth\":null,\"toMonth\":null,\"pauseId\":null,\"pauseMode\":null}");
+        Json(page.Entries[1]).ShouldBe(
+            "{\"id\":\"" + change + "\",\"type\":\"PlanPauseChanged\",\"occurredOn\":\"" + day + "\",\"note\":null,\"tags\":[],\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,"
+            + "\"bucketId\":\"" + holiday + "\",\"amount\":null," + Empty
+            + "\"planId\":\"" + plan + "\",\"fromMonth\":\"" + Current.Next() + "\",\"toMonth\":\"" + Current.AddMonths(2) + "\",\"pauseId\":\"" + pause + "\",\"pauseMode\":\"Skip\"}");
+        Json(page.Entries[2]).ShouldBe(
+            "{\"id\":\"" + pause + "\",\"type\":\"PlanPaused\",\"occurredOn\":\"" + day + "\",\"note\":null,\"tags\":[],\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,"
+            + "\"bucketId\":\"" + holiday + "\",\"amount\":null," + Empty
+            + "\"planId\":\"" + plan + "\",\"fromMonth\":\"" + Current.Next() + "\",\"toMonth\":null,\"pauseId\":\"" + pause + "\",\"pauseMode\":\"Shift\"}");
+    }
+
+    private async Task<IActionResult> PauseAsync(Guid plan, string json)
+    {
+        await using var scope = await ScopeAsync();
+        return await ActivatorUtilities.CreateInstance<PausePlanFunction>(scope.ServiceProvider).Run(JsonRequest(json), plan.ToString(), Cancellation);
+    }
+
+    private async Task<IActionResult> ChangePauseAsync(Guid plan, string pause, string json)
+    {
+        await using var scope = await ScopeAsync();
+        return await ActivatorUtilities.CreateInstance<ChangePlanPauseFunction>(scope.ServiceProvider).Run(JsonRequest(json), plan.ToString(), pause, Cancellation);
+    }
+
+    private async Task<IActionResult> WaiveAsync(Guid plan, string json)
+    {
+        await using var scope = await ScopeAsync();
+        return await ActivatorUtilities.CreateInstance<WaiveShortfallFunction>(scope.ServiceProvider).Run(JsonRequest(json), plan.ToString(), Cancellation);
+    }
+
+    private async Task<IActionResult> ReverseAsync(Guid entry)
+    {
+        await using var scope = await ScopeAsync();
+        var request = JsonRequest($$"""{"id":"{{Guid.CreateVersion7()}}","reversedEntryId":"{{entry}}","occurredOn":"{{Day(0)}}"}""");
+        return await ActivatorUtilities.CreateInstance<ReverseEntryFunction>(scope.ServiceProvider).Run(request, Cancellation);
     }
 
     private static Money Pln(decimal amount) => Money.From(amount, Currency.Pln);

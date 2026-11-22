@@ -119,6 +119,40 @@ public sealed class PlanTests(BudgetFixture fixture)
         (await StateAsync(a)).StateAsOf(Today).Plans.ShouldHaveSingleItem().PlanId.Value.ShouldBe(plan);
     }
 
+    [Fact]
+    public async Task APause_AndAWaiver_ReplayFromTheStore_AndTheirRefusalsWriteNothing()
+    {
+        var owner = await NewOwnerAsync();
+        var holiday = await CreateBucketAsync(owner, "Holiday");
+        var plan = Guid.CreateVersion7();
+        (await SendAsync<CreatePlanHandler, CreatePlan>(owner, new CreatePlan(plan, holiday, Pln(100m), new YearMonth(2025, 11), new YearMonth(2026, 4), Today.AddDays(-60), null, [])))
+            .IsSuccess.ShouldBeTrue();
+        var pause = Guid.CreateVersion7();
+        (await SendAsync<PausePlanHandler, PausePlan>(owner, new PausePlan(pause, plan, new YearMonth(2026, 1), null, Contracts.V1.Plans.PauseMode.Shift, Today, null, [])))
+            .IsSuccess.ShouldBeTrue();
+        (await SendAsync<WaiveShortfallHandler, WaiveShortfall>(owner, new WaiveShortfall(Guid.CreateVersion7(), plan, Pln(150m), Today, "Agreed", []))).IsSuccess.ShouldBeTrue();
+
+        var standing = await StandingAsync(owner, plan);
+        standing.Status.ShouldBe(PlanStatus.Paused);
+        standing.EffectiveEnd.ShouldBeNull();
+        standing.Waived.ShouldBe(Pln(150m));
+        standing.Shortfall.ShouldBe(Pln(50m));
+        var before = await StateAsync(owner);
+
+        (await SendAsync<PausePlanHandler, PausePlan>(owner, new PausePlan(Guid.CreateVersion7(), plan, new YearMonth(2026, 3), null, Contracts.V1.Plans.PauseMode.Skip, Today, null, [])))
+            .ShouldFailWith(BudgetErrorCodes.PlanPauseOverlaps, ErrorKind.BusinessRule);
+        (await SendAsync<ChangePlanPauseHandler, ChangePlanPause>(owner, new ChangePlanPause(Guid.CreateVersion7(), plan, pause, new YearMonth(2025, 12), null, Contracts.V1.Plans.PauseMode.Shift, Today, null, [])))
+            .ShouldFailWith(BudgetErrorCodes.PlanPastPeriodChanged, ErrorKind.BusinessRule).Parameters["month"].ShouldBe("2025-12");
+        (await SendAsync<WaiveShortfallHandler, WaiveShortfall>(owner, new WaiveShortfall(Guid.CreateVersion7(), plan, Pln(50.01m), Today, "Agreed", [])))
+            .ShouldFailWith(BudgetErrorCodes.PlanWaiverExceedsShortfall, ErrorKind.BusinessRule);
+        (await StateAsync(owner)).Version.ShouldBe(before.Version);
+
+        // Resumed: paused in January only, so the four months of November to April end in May.
+        (await SendAsync<ChangePlanPauseHandler, ChangePlanPause>(owner, new ChangePlanPause(Guid.CreateVersion7(), plan, pause, new YearMonth(2026, 1), new YearMonth(2026, 1), Contracts.V1.Plans.PauseMode.Shift, Today, null, [])))
+            .IsSuccess.ShouldBeTrue();
+        (await StandingAsync(owner, plan)).EffectiveEnd.ShouldBe(new YearMonth(2026, 5));
+    }
+
     private static Money Pln(decimal amount) => Money.From(amount, Currency.Pln);
 
     private async Task<OwnerId> NewOwnerAsync()

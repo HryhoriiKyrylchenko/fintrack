@@ -25,7 +25,7 @@ namespace FinTrack.Budget.Application.Tests.Histories;
 /// The model test of plan 1a step 10: random sequences of every Budget command (buckets in three
 /// currencies, opening balances, deposits, spends, adjustments up and down (plan 1b step 4), borrows and repayments (step 5), transfers
 /// with and without fee and across currencies, contribution plans with versions and ends and deposits and transfers linked to them
-/// (step 9), reversals, archiving, unarchiving (plan 1b step 2), renaming, backdating, and repeats of earlier commands) run through
+/// (step 9), pauses, their changes and waivers (step 10), reversals, archiving, unarchiving (plan 1b step 2), renaming, backdating, and repeats of earlier commands) run through
 /// the real handlers. After every command and at the end, invariants 1, 2, 4, 5, 6, 10, 11 and 13 must hold. At the
 /// end, the read queries (step 12) must agree with the state: the overview's balances and totals, and the
 /// journal read page by page; and every plan's dues must equal an independent month-by-month sum.
@@ -51,6 +51,9 @@ public class BudgetModelTests
         CreatePlan,
         ChangePlanAmount,
         SetPlanEnd,
+        PausePlan,
+        ChangePlanPause,
+        WaiveShortfall,
         Reverse,
         Archive,
         Unarchive,
@@ -64,9 +67,16 @@ public class BudgetModelTests
     /// </summary>
     private sealed record Operation(Kind Kind, int A, int B, long Units, long OtherUnits, int DaysBack, int Fee, bool Unallocated, Guid IdSeed);
 
+    // Every kind, with plans created and paused, pauses changed and shortfalls waived somewhat more often than the rest: those need a
+    // plan (and a pause) made earlier in the same history, so they would rarely be accepted otherwise.
+    private static readonly Gen<Kind> Kinds = Gen.Frequency(
+        (20, Gen.Enum<Kind>()),
+        (2, Gen.Const(Kind.CreatePlan)),
+        (3, Gen.OneOf(Gen.Const(Kind.PausePlan), Gen.Const(Kind.ChangePlanPause), Gen.Const(Kind.WaiveShortfall))));
+
     private static readonly Gen<Operation> Operations =
         Gen.Select(
-            Gen.Select(Gen.Enum<Kind>(), Gen.Int[0, 50], Gen.Int[0, 50], Gen.Long[1, 30_000], Gen.Long[1, 30_000], Gen.Int[-1, 60], Gen.Int[0, 3], Gen.Bool,
+            Gen.Select(Kinds, Gen.Int[0, 50], Gen.Int[0, 50], Gen.Long[1, 30_000], Gen.Long[1, 30_000], Gen.Int[-1, 60], Gen.Int[0, 3], Gen.Bool,
                 (kind, a, b, units, otherUnits, daysBack, fee, unallocated) => (kind, a, b, units, otherUnits, daysBack, fee, unallocated)),
             Gen.Guid,
             (parts, id) => new Operation(parts.kind, parts.a, parts.b, parts.units, parts.otherUnits, parts.daysBack, parts.fee, parts.unallocated, id));
@@ -180,7 +190,7 @@ public class BudgetModelTests
         // that existed before accrued in each month before the current one unchanged. Money entries are not held to it (B8).
         private void CheckPastMonthsUnchanged(object command, List<JournalEntry> journalBefore)
         {
-            var isDefinitionChange = command is CreatePlan or ChangePlanAmount or SetPlanEnd
+            var isDefinitionChange = command is CreatePlan or ChangePlanAmount or SetPlanEnd or PausePlan or ChangePlanPause or WaiveShortfall
                 || (command is ReverseEntry reverse && journalBefore.Exists(entry => entry.Id == reverse.ReversedEntryId && entry is IDefinitionEntry));
             if (!isDefinitionChange)
             {
@@ -207,6 +217,12 @@ public class BudgetModelTests
             {
                 var versions = new List<(YearMonth From, decimal Amount)> { (created.ValidFrom, created.Amount.Amount) };
                 var validTo = created.ValidTo;
+                var pauses = new Dictionary<Guid, (YearMonth From, YearMonth? To, Domain.Plans.PauseMode Mode)>();
+                foreach (var paused in effective.OfType<PlanPaused>().Where(paused => paused.PlanId == created.PlanId))
+                {
+                    pauses[paused.Id] = (paused.From, paused.To, paused.Mode);
+                }
+
                 foreach (var entry in effective)
                 {
                     if (entry is PlanAmountChanged changed && changed.PlanId == created.PlanId)
@@ -217,10 +233,30 @@ public class BudgetModelTests
                     {
                         validTo = ended.ValidTo;
                     }
+                    else if (entry is PlanPauseChanged pauseChanged && pauses.ContainsKey(pauseChanged.PauseId.Value))
+                    {
+                        pauses[pauseChanged.PauseId.Value] = (pauseChanged.From, pauseChanged.To, pauseChanged.Mode);
+                    }
                 }
 
+                // Walk the months: a paused month accrues nothing; with an end, the plan has as many months as it defines, a
+                // skip-paused month uses one up and a shift-paused month none (an open shift pause never ends).
+                var left = validTo is { } definedEnd ? YearMonth.MonthsBetween(created.ValidFrom, definedEnd) + 1 : int.MaxValue;
                 for (var month = created.ValidFrom; month <= last; month = month.Next())
                 {
+                    var pause = pauses.Values.Where(candidate => month >= candidate.From && !(month > candidate.To)).Select(candidate => (Domain.Plans.PauseMode?)candidate.Mode).FirstOrDefault();
+                    var accrues = left > 0 && pause is null;
+                    if (left > 0 && pause != Domain.Plans.PauseMode.Shift && validTo is not null)
+                    {
+                        left--;
+                    }
+
+                    if (!accrues)
+                    {
+                        accruals[(created.Id, month)] = 0m;
+                        continue;
+                    }
+
                     decimal amount = 0m;
                     YearMonth? inForce = null;
                     foreach (var (from, value) in versions)
@@ -232,7 +268,7 @@ public class BudgetModelTests
                         }
                     }
 
-                    accruals[(created.Id, month)] = validTo is { } end && month > end ? 0m : amount;
+                    accruals[(created.Id, month)] = amount;
                 }
             }
 
@@ -333,8 +369,18 @@ public class BudgetModelTests
                 var standing = state.StandingOf(plan);
                 var before = accruals.Where(pair => pair.Key.Plan == plan.PlanId.Value && pair.Key.Month < CurrentMonth).Sum(pair => pair.Value);
                 var current = accruals.GetValueOrDefault((plan.PlanId.Value, CurrentMonth));
-                var credit = effective.OfType<Deposit>().Where(deposit => deposit.PlanId == plan.PlanId).Sum(deposit => deposit.Amount.Amount)
+                var contributed = effective.OfType<Deposit>().Where(deposit => deposit.PlanId == plan.PlanId).Sum(deposit => deposit.Amount.Amount)
                     + effective.OfType<Transfer>().Where(transfer => transfer.PlanId == plan.PlanId).Sum(transfer => transfer.ToAmount.Amount);
+                var waived = 0m;
+                foreach (var waiver in ReplayOrder.Sort(effective.OfType<ShortfallWaived>().Where(waiver => waiver.PlanId == plan.PlanId)).Cast<ShortfallWaived>())
+                {
+                    var month = YearMonth.FromDate(waiver.OccurredOn);
+                    var lacking = accruals.Where(pair => pair.Key.Plan == plan.PlanId.Value && pair.Key.Month < month).Sum(pair => pair.Value) - contributed - waived;
+                    waived += Math.Min(waiver.Amount.Amount, Math.Max(0m, lacking));
+                }
+
+                var credit = contributed + waived;
+                standing.Waived.Amount.ShouldBe(waived);
 
                 standing.Credit.Amount.ShouldBe(credit);
                 standing.Accrued.Amount.ShouldBe(before + current);
@@ -444,9 +490,21 @@ public class BudgetModelTests
             Borrow borrow => [(borrow.LenderBucketId, -borrow.Principal.Amount), .. (borrow.ToBucketId is { } to ? [(to, borrow.Principal.Amount)] : Array.Empty<(BucketId, decimal)>())],
             Repayment repayment => [(borrows[repayment.LoanId.Value].LenderBucketId, repayment.Amount.Amount),
                 .. (repayment.FromBucketId is { } from ? [(from, -repayment.Amount.Amount)] : Array.Empty<(BucketId, decimal)>())],
-            PlanCreated or PlanAmountChanged or PlanEndChanged => [],
+            PlanCreated or PlanAmountChanged or PlanEndChanged or PlanPaused or PlanPauseChanged or ShortfallWaived => [],
             _ => throw new InvalidOperationException($"The model does not know the entry type {entry.GetType().Name}."),
         };
+
+        // A plan to change: usually (Fee 0 to 2) one that exists (Fee 0 and 1: one that has not ended), otherwise any plan ever
+        // created or an unknown one.
+        private (Guid Id, Domain.Plans.Plan? Plan) PickPlan(Operation operation)
+        {
+            var state = BudgetState.Replay(budget.Buckets, budget.Journal, Today);
+            var running = state.Plans.Where(plan => operation.Fee >= 2 || state.StandingOf(plan).Status != Domain.Plans.PlanStatus.Ended).ToList();
+            var created = budget.Journal.OfType<PlanCreated>().ToList();
+            var picked = operation.Fee < 3 && running.Count > 0 ? running[operation.A % running.Count] : null;
+            var id = picked?.PlanId.Value ?? (created.Count > 0 && operation.Unallocated ? created[operation.A % created.Count].Id : Guid.CreateVersion7());
+            return (id, state.Plans.FirstOrDefault(plan => plan.PlanId.Value == id));
+        }
 
         private object Interpret(Operation operation)
         {
@@ -624,6 +682,47 @@ public class BudgetModelTests
                         ? new ChangePlanAmount(id, changedPlan, Money.From(operation.Units / 100m, planMoney), month, Today, null, [])
                         : new SetPlanEnd(id, changedPlan, operation.OtherUnits % 4 == 0 ? null : month, Today, null, []);
 
+                case Kind.PausePlan or Kind.ChangePlanPause:
+                    // A month from two back to three ahead and an optional length; a change usually names a pause of the plan.
+                    var (pausedPlan, pausedState) = PickPlan(operation);
+                    var pauseFrom = CurrentMonth.AddMonths((operation.B % 6) - 2);
+                    YearMonth? pauseTo = operation.OtherUnits % 3 == 0 ? null : pauseFrom.AddMonths((int)(operation.OtherUnits % 4) - 1);
+                    var pauseMode = operation.Units % 2 == 0 ? Contracts.V1.Plans.PauseMode.Shift : Contracts.V1.Plans.PauseMode.Skip;
+                    if (operation.Kind == Kind.PausePlan)
+                    {
+                        return new PausePlan(id, pausedPlan, pauseFrom, pauseTo, pauseMode, Today, null, []);
+                    }
+
+                    // Usually (Fee 0 to 2) a pause of a plan that has one; for Fee 0 and 1 it keeps its first month and mode and
+                    // ends last month, this month or later (a resume or an extension), so changes are accepted often.
+                    var withPauses = BudgetState.Replay(budget.Buckets, budget.Journal, Today).Plans.Where(plan => plan.Pauses.Count > 0).ToList();
+                    if (operation.Fee < 3 && withPauses.Count > 0)
+                    {
+                        var owner = withPauses[operation.A % withPauses.Count];
+                        var existing = owner.Pauses[operation.B % owner.Pauses.Count];
+                        if (operation.Fee < 2)
+                        {
+                            var resumeTo = CurrentMonth.AddMonths((operation.B % 3) - 1);
+                            return new ChangePlanPause(id, owner.PlanId.Value, existing.PauseId.Value, existing.From, resumeTo < existing.From ? existing.From : resumeTo,
+                                existing.Mode == Domain.Plans.PauseMode.Shift ? Contracts.V1.Plans.PauseMode.Shift : Contracts.V1.Plans.PauseMode.Skip, Today, null, []);
+                        }
+
+                        return new ChangePlanPause(id, owner.PlanId.Value, existing.PauseId.Value, pauseFrom, pauseTo, pauseMode, Today, null, []);
+                    }
+
+                    var pauses = pausedState?.Pauses ?? [];
+                    var pauseId = pauses.Count > 0 ? pauses[operation.A % pauses.Count].PauseId.Value : Guid.CreateVersion7();
+                    return new ChangePlanPause(id, pausedPlan, pauseId, pauseFrom, pauseTo, pauseMode, Today, null, []);
+
+                case Kind.WaiveShortfall:
+                    // Usually (Fee 0 and 1) at most the plan's shortfall today, otherwise the generated amount.
+                    var (waivedPlan, waivedState) = PickPlan(operation);
+                    var waiverCurrency = waivedState?.Currency ?? Currency.Pln;
+                    var shortfall = waivedState is null ? 0m : Domain.Plans.PlanSchedule.ShortfallAt(waivedState, CurrentMonth).Amount;
+                    var waiverUnits = operation.Units / 100m;
+                    var waiverAmount = operation.Fee < 2 && shortfall > 0m ? Math.Min(waiverUnits, shortfall) : waiverUnits;
+                    return new WaiveShortfall(id, waivedPlan, Money.From(waiverAmount, waiverCurrency), Today, "Agreed", []);
+
                 case Kind.Reverse:
                     var journal = budget.Journal;
                     var target = journal.Count == 0 ? Guid.CreateVersion7() : journal[operation.A % journal.Count].Id;
@@ -651,7 +750,7 @@ public class BudgetModelTests
                 default:
                     // A repeat of an earlier successful command that has a client ID (CreateBucket or an entry).
                     var repeatable = succeeded.Where(command => command is CreateBucket or IBucketEntryCommand or AddTransfer or AddBorrow or AddRepayment or ReverseEntry
-                        or CreatePlan or ChangePlanAmount or SetPlanEnd).ToList();
+                        or CreatePlan or ChangePlanAmount or SetPlanEnd or PausePlan or ChangePlanPause or WaiveShortfall).ToList();
                     return repeatable.Count == 0
                         ? new CreateBucket(id, "Repeatable", Currency.Pln, Contract.BucketKind.Savings, null)
                         : repeatable[operation.A % repeatable.Count];
@@ -704,6 +803,9 @@ public class BudgetModelTests
                 CreatePlan plan => new CreatePlanHandler(writer).Handle(plan, cancellation),
                 ChangePlanAmount change => new ChangePlanAmountHandler(writer).Handle(change, cancellation),
                 SetPlanEnd end => new SetPlanEndHandler(writer).Handle(end, cancellation),
+                PausePlan pause => new PausePlanHandler(writer).Handle(pause, cancellation),
+                ChangePlanPause change => new ChangePlanPauseHandler(writer).Handle(change, cancellation),
+                WaiveShortfall waive => new WaiveShortfallHandler(writer).Handle(waive, cancellation),
                 ReverseEntry reverse => new ReverseEntryHandler(writer, new JournalEntryDependencies()).Handle(reverse, cancellation),
                 _ => throw new InvalidOperationException($"Unknown command {command.GetType().Name}."),
             }).AsTask().GetAwaiter().GetResult();
