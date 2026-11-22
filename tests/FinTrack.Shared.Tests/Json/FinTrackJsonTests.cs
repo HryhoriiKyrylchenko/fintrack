@@ -1,7 +1,9 @@
 using System.Text.Json;
 using FinTrack.Shared.Kernel.Json;
 using FinTrack.Shared.Kernel.Monetary;
+using FinTrack.Shared.Kernel.Time;
 using FinTrack.Shared.Tests.Ids;
+using FinTrack.Shared.Tests.Time;
 
 namespace FinTrack.Shared.Tests.Json;
 
@@ -22,11 +24,12 @@ public class FinTrackJsonTests
         new DateOnly(2026, 1, 15),
         new DateTimeOffset(2026, 1, 15, 9, 30, 0, 123, TimeSpan.Zero),
         JsonContractKind.Deposit,
-        null);
+        null,
+        new YearMonth(2026, 1));
 
     private const string SampleJson =
         "{\"id\":\"" + IdText + "\",\"price\":{\"amount\":\"1234.50\",\"currency\":\"PLN\"},\"currency\":\"EUR\",\"rate\":\"4.2512\","
-        + "\"occurredOn\":\"2026-01-15\",\"recordedAt\":\"2026-01-15T09:30:00.123Z\",\"kind\":\"Deposit\",\"note\":null}";
+        + "\"occurredOn\":\"2026-01-15\",\"recordedAt\":\"2026-01-15T09:30:00.123Z\",\"kind\":\"Deposit\",\"note\":null,\"month\":\"2026-01\"}";
 
     [Fact]
     public void Write_HasTheContractShape() =>
@@ -210,6 +213,41 @@ public class FinTrackJsonTests
         Should.Throw<JsonException>(() => Deserialize<DateOnly>(json));
 
     [Theory]
+    [InlineData(2026, 11, "\"2026-11\"")]
+    [InlineData(1, 1, "\"0001-01\"")]
+    [InlineData(9999, 12, "\"9999-12\"")]
+    public void YearMonth_IsYearDashMonth(int year, int month, string json)
+    {
+        Serialize(new YearMonth(year, month)).ShouldBe(json);
+        Deserialize<YearMonth>(json).ShouldBe(new YearMonth(year, month));
+    }
+
+    [Fact]
+    public void YearMonth_Nullable_IsNullOrTheMonth()
+    {
+        Serialize<YearMonth?>(null).ShouldBe("null");
+        Deserialize<YearMonth?>("null").ShouldBeNull();
+        Deserialize<YearMonth?>("\"2026-11\"").ShouldBe(new YearMonth(2026, 11));
+    }
+
+    public static TheoryData<string> MonthsInAnyOtherForm()
+    {
+        // Every text YearMonth.TryParse refuses, as a JSON string, and every other JSON kind.
+        var data = new TheoryData<string> { "202611", "2026.11", "null", "true", "{}", "[\"2026-11\"]" };
+        foreach (var text in YearMonthTests.NotAMonth)
+        {
+            data.Add(JsonSerializer.Serialize(text.Data));
+        }
+
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(MonthsInAnyOtherForm))]
+    public void YearMonth_InAnyOtherForm_IsRejected(string json) =>
+        Should.Throw<JsonException>(() => Deserialize<YearMonth>(json));
+
+    [Theory]
     [InlineData(0, "\"2026-01-15T09:30:00Z\"")]
     [InlineData(123, "\"2026-01-15T09:30:00.123Z\"")]
     [InlineData(100, "\"2026-01-15T09:30:00.1Z\"")]
@@ -305,7 +343,8 @@ internal sealed record JsonContractSample(
     DateOnly OccurredOn,
     DateTimeOffset RecordedAt,
     JsonContractKind Kind,
-    string? Note);
+    string? Note,
+    YearMonth Month);
 
 internal enum JsonContractKind
 {

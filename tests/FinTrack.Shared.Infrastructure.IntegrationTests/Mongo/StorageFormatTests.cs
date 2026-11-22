@@ -1,5 +1,6 @@
 using System.Globalization;
 using FinTrack.Shared.Kernel.Monetary;
+using FinTrack.Shared.Kernel.Time;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
@@ -25,7 +26,7 @@ public sealed class StorageFormatTests(MongoDatabaseFixture fixture)
         stored.Names.ShouldBe(
         [
             "_id", "ownerId", "schemaVersion", "version", "createdAt", "updatedAt", "kind", "optionalKind",
-            "occurredOn", "balance", "currency", "rate", "optionalRate", "parentId",
+            "occurredOn", "balance", "currency", "rate", "optionalRate", "parentId", "month", "optionalMonth",
         ]);
 
         ShouldBeStandardUuid(stored["_id"], document.Id);
@@ -53,6 +54,28 @@ public sealed class StorageFormatTests(MongoDatabaseFixture fixture)
         stored["rate"].BsonType.ShouldBe(BsonType.Decimal128);
         stored["rate"].AsDecimal128.ShouldBe(new Decimal128(4.3215m));
         stored["optionalRate"].AsDecimal128.ShouldBe(new Decimal128(0.000000000000000001m));
+
+        stored["month"].ShouldBe(new BsonString("2026-01"));
+        stored["optionalMonth"].ShouldBe(new BsonString("9999-12"));
+    }
+
+    [Theory]
+    [InlineData(1, 1, "0001-01")]
+    [InlineData(1, 12, "0001-12")]
+    [InlineData(2026, 11, "2026-11")]
+    [InlineData(9999, 1, "9999-01")]
+    [InlineData(9999, 12, "9999-12")]
+    public async Task Month_IsStoredAsYearDashMonthAndRoundTrips(int year, int month, string text)
+    {
+        var (typed, raw) = fixture.NewCollection<SampleDocument>();
+        var document = SampleDocument.Create() with { Month = new YearMonth(year, month) };
+
+        await typed.InsertOneAsync(document, cancellationToken: Cancellation);
+        var stored = await raw.Find(FilterDefinition<BsonDocument>.Empty).SingleAsync(Cancellation);
+        var read = await typed.Find(FilterDefinition<SampleDocument>.Empty).SingleAsync(Cancellation);
+
+        stored["month"].ShouldBe(new BsonString(text));
+        read.Month.ShouldBe(new YearMonth(year, month));
     }
 
     [Fact]
@@ -71,12 +94,13 @@ public sealed class StorageFormatTests(MongoDatabaseFixture fixture)
     public async Task MissingOptionalValues_AreStoredAsNullAndRoundTrip()
     {
         var (typed, raw) = fixture.NewCollection<SampleDocument>();
-        var document = SampleDocument.Create() with { OptionalKind = null, OptionalRate = null, ParentId = null };
+        var document = SampleDocument.Create() with { OptionalKind = null, OptionalRate = null, ParentId = null, OptionalMonth = null };
 
         await typed.InsertOneAsync(document, cancellationToken: Cancellation);
         var stored = await raw.Find(FilterDefinition<BsonDocument>.Empty).SingleAsync(Cancellation);
         var read = await typed.Find(FilterDefinition<SampleDocument>.Empty).SingleAsync(Cancellation);
 
+        stored["optionalMonth"].ShouldBe(BsonNull.Value);
         stored["optionalKind"].ShouldBe(BsonNull.Value);
         stored["optionalRate"].ShouldBe(BsonNull.Value);
         stored["parentId"].ShouldBe(BsonNull.Value);

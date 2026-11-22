@@ -31,7 +31,7 @@ FinTrack (internal working name) is a personal finance tracker: budget planning 
 
 ```
 src/
-  Shared/FinTrack.Shared.Kernel           Money, Currency, Result helpers, IDs, IClock, document, event and ledger abstractions
+  Shared/FinTrack.Shared.Kernel           Money, Currency, Result helpers, IDs, IClock, YearMonth, document, event and ledger abstractions
   Shared/FinTrack.Shared.Infrastructure   MongoDB adapter, outbox dispatcher, mediator pipeline behaviours
   Budget/FinTrack.Budget.Domain
   Budget/FinTrack.Budget.Application

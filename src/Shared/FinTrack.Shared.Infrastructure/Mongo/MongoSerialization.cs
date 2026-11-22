@@ -17,7 +17,8 @@ namespace FinTrack.Shared.Infrastructure.Mongo;
 /// <item><description><see cref="Guid"/> and every strongly typed ID as a standard UUID (binary subtype 4);</description></item>
 /// <item><description><see cref="decimal"/> as <c>Decimal128</c>, exact; a stored double or integer is rejected;</description></item>
 /// <item><description>enums as their names; a stored number or unknown name is rejected;</description></item>
-/// <item><description><see cref="DateOnly"/> as an ISO string <c>yyyy-MM-dd</c>;</description></item>
+/// <item><description><see cref="DateOnly"/> as an ISO string <c>yyyy-MM-dd</c>; <c>YearMonth</c> as the string <c>yyyy-MM</c>,
+/// read in that spelling only;</description></item>
 /// <item><description><see cref="DateTimeOffset"/> as a BSON date: UTC, whole milliseconds (as <c>IClock</c> returns);</description></item>
 /// <item><description><c>Currency</c> as its code; <c>Money</c> as <c>{ amount, currency }</c>;</description></item>
 /// <item><description>an element the type does not know makes reading fail.</description></item>
@@ -49,6 +50,7 @@ public static class MongoSerialization
             BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
             BsonSerializer.RegisterSerializer(new StrictDecimalSerializer());
             BsonSerializer.RegisterSerializer(new IsoDateOnlySerializer());
+            BsonSerializer.RegisterSerializer(new YearMonthSerializer());
             BsonSerializer.RegisterSerializer(new UtcInstantSerializer());
             BsonSerializer.RegisterSerializer(new CurrencySerializer());
             BsonSerializer.RegisterSerializer(new MoneySerializer());
