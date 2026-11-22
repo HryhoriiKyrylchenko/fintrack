@@ -51,6 +51,34 @@ public static class BudgetErrorCodes
     /// <summary>The bucket is the lender of an open loan and cannot be archived (plan 1b B17); checked before <see cref="BucketNotEmpty"/>. No parameters.</summary>
     public const string BucketHasOpenLoan = "bucket.has_open_loan";
 
+    /// <summary>
+    /// The bucket has an active plan and cannot be archived (plan 1b B17): a plan that still accrues in the current month
+    /// or later, or that has money due. End the plan, then pay or waive its shortfall. Checked after
+    /// <see cref="BucketHasOpenLoan"/> and before <see cref="BucketNotEmpty"/>. No parameters.
+    /// </summary>
+    public const string BucketHasActivePlan = "bucket.has_active_plan";
+
+    /// <summary>No plan with this ID exists for the owner: no effective <c>PlanCreated</c> has it (plan 1b B7). No parameters.</summary>
+    public const string PlanNotFound = "plan.not_found";
+
+    /// <summary>
+    /// The change, or the reversal, would alter what a plan accrued in a month before the current month (invariant 6,
+    /// plan 1b B8). Parameter <c>month</c>: the first such month (<c>yyyy-MM</c>); never an amount.
+    /// </summary>
+    public const string PlanPastPeriodChanged = "plan.past_period_changed";
+
+    /// <summary>The plan's last accruing month has passed, so its amount can no longer change (plan 1b B7). No parameters.</summary>
+    public const string PlanEnded = "plan.ended";
+
+    /// <summary>A contribution names a plan of another bucket than the one receiving the money (plan 1b B9). No parameters.</summary>
+    public const string PlanBucketMismatch = "plan.bucket_mismatch";
+
+    /// <summary>
+    /// The months do not fit: an end before the start, or a new amount from a month outside the plan's months (plan 1b B7).
+    /// No parameters.
+    /// </summary>
+    public const string PlanMonthsInvalid = "plan.months_invalid";
+
     /// <summary>Money can be borrowed from a savings bucket only, never from an investment bucket (ARCHITECTURE 4.9, plan 1b B2). No parameters.</summary>
     public const string BucketBorrowNotAllowed = "bucket.borrow_not_allowed";
 

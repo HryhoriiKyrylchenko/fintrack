@@ -28,6 +28,10 @@ namespace FinTrack.Budget.Contracts.V1.Journal;
 /// <param name="Fee">Optional; part of <paramref name="FromAmount"/>, in the source's currency.</param>
 /// <param name="Note">Optional; at most 500 characters, line breaks allowed.</param>
 /// <param name="Tags">Optional; at most 10 distinct tags of up to 30 characters.</param>
+/// <param name="PlanId">
+/// Optional (plan 1b B9): the contribution plan of the destination that this transfer pays with <paramref name="ToAmount"/>; still never
+/// income. Failures: <c>plan.not_found</c> (404), <c>plan.bucket_mismatch</c> (422, the plan saves into another bucket).
+/// </param>
 public sealed record AddTransferRequest(
     Guid Id,
     Money FromAmount,
@@ -39,4 +43,5 @@ public sealed record AddTransferRequest(
     Currency? ToUnallocated = null,
     Money? Fee = null,
     string? Note = null,
-    IReadOnlyList<string>? Tags = null);
+    IReadOnlyList<string>? Tags = null,
+    Guid? PlanId = null);

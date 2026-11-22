@@ -19,7 +19,8 @@ public interface IEntryDependencies
 
 /// <summary>
 /// The dependency rule of the entry types that exist. A <c>Borrow</c> has dependents while an effective <c>Repayment</c>
-/// of its loan exists (plan 1b step 5). No type of phase 1a, no <c>Adjustment</c> (step 4) and no <c>Repayment</c> is
+/// of its loan exists (plan 1b step 5); a <c>PlanCreated</c> while an effective change of its plan or a deposit or transfer
+/// linked to it exists (step 9). No type of phase 1a, no <c>Adjustment</c> (step 4) and no <c>Repayment</c> is
 /// referred to by another entry except through a reversal (which is not effective), so none has dependents; the types that do get their case in the
 /// step that adds them (loans step 5, plans step 9, pauses step 10). An unknown type is a bug: every new type must
 /// decide here.
@@ -36,7 +37,8 @@ public sealed class JournalEntryDependencies : IEntryDependencies
         return entry switch
         {
             Borrow borrow => HasEffectiveRepayment(borrow, state),
-            OpeningBalance or Deposit or Spend or Transfer or Reversal or Adjustment or Repayment => false,
+            PlanCreated created => HasEffectivePlanEntry(created, state),
+            OpeningBalance or Deposit or Spend or Transfer or Reversal or Adjustment or Repayment or PlanAmountChanged or PlanEndChanged => false,
             _ => throw new InvalidOperationException($"The dependency rule does not know the entry type {entry.GetType().Name}."),
         };
     }
@@ -46,5 +48,19 @@ public sealed class JournalEntryDependencies : IEntryDependencies
     {
         var reversed = BudgetState.ReversedEntryIds(state.Journal);
         return state.Journal.OfType<Repayment>().Any(repayment => repayment.LoanId == borrow.LoanId && !reversed.Contains(repayment.Id));
+    }
+
+    // A plan with an effective change or linked contribution (B5); pauses and waivers (step 10) will count too.
+    private static bool HasEffectivePlanEntry(PlanCreated created, BudgetSnapshot state)
+    {
+        var reversed = BudgetState.ReversedEntryIds(state.Journal);
+        return state.Journal.Any(entry => !reversed.Contains(entry.Id) && entry switch
+        {
+            PlanAmountChanged changed => changed.PlanId == created.PlanId,
+            PlanEndChanged ended => ended.PlanId == created.PlanId,
+            Deposit deposit => deposit.PlanId == created.PlanId,
+            Transfer transfer => transfer.PlanId == created.PlanId,
+            _ => false,
+        });
     }
 }

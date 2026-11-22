@@ -1,6 +1,7 @@
 using FinTrack.Budget.Contracts.V1.Journal;
 using FinTrack.Budget.Domain.Buckets;
 using FinTrack.Budget.Domain.Journal;
+using FinTrack.Budget.Domain.Plans;
 using AdjustmentDirection = FinTrack.Budget.Contracts.V1.Journal.AdjustmentDirection;
 using Model = FinTrack.Budget.Domain.Journal;
 
@@ -32,8 +33,32 @@ internal static class JournalContractMapping
             Amount = repayment.Amount,
             LoanId = repayment.LoanId.Value,
         },
+        PlanCreated created => Common(created, JournalEntryType.PlanCreated, reversedBy) with
+        {
+            BucketId = created.BucketId.Value,
+            Amount = created.Amount,
+            PlanId = created.PlanId.Value,
+            FromMonth = created.ValidFrom,
+            ToMonth = created.ValidTo,
+        },
+        PlanAmountChanged changed => Common(changed, JournalEntryType.PlanAmountChanged, reversedBy) with
+        {
+            BucketId = BucketOf(changed.PlanId, journal).Value,
+            Amount = changed.Amount,
+            PlanId = changed.PlanId.Value,
+            FromMonth = changed.From,
+        },
+        PlanEndChanged ended => Common(ended, JournalEntryType.PlanEndChanged, reversedBy) with
+        {
+            BucketId = BucketOf(ended.PlanId, journal).Value,
+            PlanId = ended.PlanId.Value,
+            ToMonth = ended.ValidTo,
+        },
         OpeningBalance opening => Single(opening, JournalEntryType.OpeningBalance, reversedBy),
-        Deposit deposit => Single(deposit, JournalEntryType.Deposit, reversedBy),
+        Deposit deposit => Single(deposit, JournalEntryType.Deposit, reversedBy) with
+        {
+            PlanId = deposit.PlanId?.Value,
+        },
         Spend spend => Single(spend, JournalEntryType.Spend, reversedBy),
         Adjustment adjustment => Single(adjustment, JournalEntryType.Adjustment, reversedBy) with
         {
@@ -47,6 +72,7 @@ internal static class JournalContractMapping
             ToAmount = transfer.ToAmount,
             Fee = transfer.Fee,
             Rate = transfer.Rate,
+            PlanId = transfer.PlanId?.Value,
         },
         Reversal reversal => Common(reversal, JournalEntryType.Reversal, reversedBy) with
         {
@@ -61,6 +87,13 @@ internal static class JournalContractMapping
         journal.TryGetValue(repayment.LoanId.Value, out var entry) && entry is Borrow borrow
             ? borrow.LenderBucketId
             : throw new InvalidOperationException($"Repayment {repayment.Id} refers to loan {repayment.LoanId}, which has no borrow.");
+
+    /// <summary>The bucket of plan <paramref name="planId"/>: its <c>PlanCreated</c>'s. A stored plan change always has its plan.</summary>
+    /// <exception cref="InvalidOperationException">The journal has no <c>PlanCreated</c> with the plan's ID (a bug).</exception>
+    public static BucketId BucketOf(PlanId planId, IReadOnlyDictionary<Guid, JournalEntry> journal) =>
+        journal.TryGetValue(planId.Value, out var entry) && entry is PlanCreated created
+            ? created.BucketId
+            : throw new InvalidOperationException($"An entry refers to plan {planId}, which has no PlanCreated.");
 
     /// <summary>The contract's copy of <paramref name="direction"/>.</summary>
     public static AdjustmentDirection ToContract(Model.AdjustmentDirection direction) => direction switch

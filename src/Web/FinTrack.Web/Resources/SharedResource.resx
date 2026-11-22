@@ -265,6 +265,27 @@
   <data name="Error.repayment.from_lender" xml:space="preserve">
     <value>A loan cannot be paid back from the bucket that lent the money. Choose another bucket or "outside the app".</value>
   </data>
+  <data name="Error.bucket.has_active_plan" xml:space="preserve">
+    <value>This bucket still has an active plan. End the plan and pay what it still asks for, then archive the bucket.</value>
+  </data>
+  <data name="Error.plan.not_found" xml:space="preserve">
+    <value>This plan was not found. It may have been reversed.</value>
+  </data>
+  <data name="Error.plan.past_period_changed" xml:space="preserve">
+    <value>This would change what the plan asked for in a month that has already passed. Changes can start in the current month at the earliest.</value>
+  </data>
+  <data name="Error.plan.past_period_changed.WithParams" xml:space="preserve">
+    <value>This would change what the plan asked for in {month}, which has already passed. Changes can start in the current month at the earliest.</value>
+  </data>
+  <data name="Error.plan.ended" xml:space="preserve">
+    <value>This plan has ended. Its amount can no longer change.</value>
+  </data>
+  <data name="Error.plan.bucket_mismatch" xml:space="preserve">
+    <value>This plan saves into another bucket. Choose a plan of the bucket that receives the money.</value>
+  </data>
+  <data name="Error.plan.months_invalid" xml:space="preserve">
+    <value>The months do not fit the plan: the end cannot be before the start, and a new amount must start within the plan.</value>
+  </data>
   <data name="Error.fx.rate_unavailable" xml:space="preserve">
     <value>No exchange rate is available yet, so the total in your reporting currency cannot be shown. It appears once the app can reach the rate service.</value>
   </data>
@@ -739,6 +760,15 @@
   <data name="Journal.Type.Repayment" xml:space="preserve">
     <value>Repayment</value>
   </data>
+  <data name="Journal.Type.PlanCreated" xml:space="preserve">
+    <value>Plan created</value>
+  </data>
+  <data name="Journal.Type.PlanAmountChanged" xml:space="preserve">
+    <value>Plan amount changed</value>
+  </data>
+  <data name="Journal.Type.PlanEndChanged" xml:space="preserve">
+    <value>Plan end changed</value>
+  </data>
   <data name="Journal.TheType.OpeningBalance" xml:space="preserve">
     <value>the opening balance</value>
   </data>
@@ -762,6 +792,15 @@
   </data>
   <data name="Journal.TheType.Repayment" xml:space="preserve">
     <value>the repayment</value>
+  </data>
+  <data name="Journal.TheType.PlanCreated" xml:space="preserve">
+    <value>the plan</value>
+  </data>
+  <data name="Journal.TheType.PlanAmountChanged" xml:space="preserve">
+    <value>the plan amount change</value>
+  </data>
+  <data name="Journal.TheType.PlanEndChanged" xml:space="preserve">
+    <value>the plan end change</value>
   </data>
   <data name="Journal.TransferLine" xml:space="preserve">
     <value>{0} → {1}</value>

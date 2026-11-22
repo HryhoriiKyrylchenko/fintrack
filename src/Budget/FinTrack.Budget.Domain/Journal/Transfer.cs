@@ -1,4 +1,5 @@
 using FinTrack.Budget.Domain.Buckets;
+using FinTrack.Budget.Domain.Plans;
 using FinTrack.Shared.Kernel.Ids;
 using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Shared.Kernel.Results;
@@ -49,7 +50,8 @@ public sealed class Transfer : JournalEntry
         Money fromAmount,
         Money toAmount,
         Money? fee,
-        decimal rate)
+        decimal rate,
+        PlanId? planId)
         : base(id, ownerId, schemaVersion, recordedAt, occurredOn, note, tags, groupId, source, externalId)
     {
         FromBucketId = fromBucketId;
@@ -58,6 +60,7 @@ public sealed class Transfer : JournalEntry
         ToAmount = toAmount;
         Fee = fee;
         Rate = rate;
+        PlanId = planId;
     }
 
     /// <summary>The bucket the money leaves.</summary>
@@ -79,6 +82,12 @@ public sealed class Transfer : JournalEntry
     public decimal Rate { get; }
 
     /// <summary>
+    /// The contribution plan of the destination that this transfer counts towards with <see cref="ToAmount"/> (plan 1b B9),
+    /// or <c>null</c>. Still never income (invariant 5).
+    /// </summary>
+    public PlanId? PlanId { get; }
+
+    /// <summary>
     /// A new transfer. Fails, reporting every broken rule, with <see cref="ErrorCodes.MoneyAmountNotPositive"/>,
     /// <see cref="BudgetErrorCodes.BucketCurrencyMismatch"/> (a fee not in the source currency),
     /// <see cref="BudgetErrorCodes.TransferSameBucket"/>, <see cref="BudgetErrorCodes.TransferFeeExceedsAmount"/>,
@@ -96,6 +105,7 @@ public sealed class Transfer : JournalEntry
     /// <param name="today">Today in the owner's time zone.</param>
     /// <param name="info">Note, tags and source.</param>
     /// <param name="recordedAt">Now, from the clock.</param>
+    /// <param name="planId">The destination's contribution plan it counts towards, or <c>null</c>.</param>
     public static Result<Transfer> Create(
         JournalEntryId id,
         OwnerId ownerId,
@@ -107,7 +117,8 @@ public sealed class Transfer : JournalEntry
         DateOnly occurredOn,
         DateOnly today,
         EntryInfo info,
-        DateTimeOffset recordedAt)
+        DateTimeOffset recordedAt,
+        PlanId? planId = null)
     {
         ArgumentNullException.ThrowIfNull(fromAmount);
         ArgumentNullException.ThrowIfNull(toAmount);
@@ -154,7 +165,7 @@ public sealed class Transfer : JournalEntry
 
         return Result.Ok(new Transfer(
             id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, info.GroupId, info.Source, externalId: null,
-            fromBucketId, toBucketId, fromAmount, toAmount, fee, rate));
+            fromBucketId, toBucketId, fromAmount, toAmount, fee, rate, planId));
     }
 
     /// <inheritdoc />
@@ -165,5 +176,6 @@ public sealed class Transfer : JournalEntry
         && ToBucketId == transfer.ToBucketId
         && FromAmount == transfer.FromAmount
         && ToAmount == transfer.ToAmount
-        && Fee == transfer.Fee;
+        && Fee == transfer.Fee
+        && PlanId == transfer.PlanId;
 }

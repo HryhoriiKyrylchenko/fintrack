@@ -1,4 +1,5 @@
 using FinTrack.Budget.Domain.Buckets;
+using FinTrack.Budget.Domain.Plans;
 using FinTrack.Shared.Kernel.Ids;
 using FinTrack.Shared.Kernel.Monetary;
 using FinTrack.Shared.Kernel.Results;
@@ -10,7 +11,10 @@ namespace FinTrack.Budget.Domain.Journal;
 /// New money into one bucket (ARCHITECTURE 4.2, type name <c>Deposit</c>). Raises the bucket's
 /// <c>NetContributed</c>; the only entry that counts as income (invariant 5).
 /// </summary>
-/// <remarks>The link to a contribution plan (<c>PlanId</c>) is added in phase 1b as an optional field.</remarks>
+/// <remarks>
+/// A deposit may count towards a contribution plan of its bucket (<see cref="PlanId"/>, plan 1b B9); whether the plan
+/// exists and belongs to the bucket is checked by the caller against the state.
+/// </remarks>
 public sealed class Deposit : SingleBucketEntry
 {
     /// <summary>The stored shape's version.</summary>
@@ -29,10 +33,15 @@ public sealed class Deposit : SingleBucketEntry
         EntrySource source,
         string? externalId,
         BucketId bucketId,
-        Money amount)
+        Money amount,
+        PlanId? planId)
         : base(id, ownerId, schemaVersion, recordedAt, occurredOn, note, tags, groupId, source, externalId, bucketId, amount)
     {
+        PlanId = planId;
     }
+
+    /// <summary>The contribution plan this deposit counts towards (plan 1b B9), or <c>null</c> for a one-time deposit.</summary>
+    public PlanId? PlanId { get; }
 
     /// <summary>
     /// A new deposit. Fails with <see cref="ErrorCodes.MoneyAmountNotPositive"/> and/or
@@ -48,6 +57,7 @@ public sealed class Deposit : SingleBucketEntry
     /// <param name="today">Today in the owner's time zone.</param>
     /// <param name="info">Note, tags and source.</param>
     /// <param name="recordedAt">Now, from the clock.</param>
+    /// <param name="planId">The contribution plan it counts towards, or <c>null</c>.</param>
     public static Result<Deposit> Create(
         JournalEntryId id,
         OwnerId ownerId,
@@ -56,11 +66,18 @@ public sealed class Deposit : SingleBucketEntry
         DateOnly occurredOn,
         DateOnly today,
         EntryInfo info,
-        DateTimeOffset recordedAt)
+        DateTimeOffset recordedAt,
+        PlanId? planId = null)
     {
         var check = Check(amount, occurredOn, today, info);
         return check.IsFailed
             ? check.ToResult<Deposit>()
-            : Result.Ok(new Deposit(id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, info.GroupId, info.Source, externalId: null, bucketId, amount));
+            : Result.Ok(new Deposit(id.Value, ownerId, CurrentSchemaVersion, recordedAt, occurredOn, info.Note, info.Tags, info.GroupId, info.Source, externalId: null, bucketId, amount, planId));
     }
+
+    /// <inheritdoc />
+    public override bool HasSameContent(JournalEntry other) =>
+        base.HasSameContent(other)
+        && other is Deposit deposit
+        && PlanId == deposit.PlanId;
 }

@@ -61,6 +61,12 @@ public sealed class ErrorTextTests : IDisposable
         "loan.closed",
         "loan.repayment_exceeds_outstanding",
         "repayment.from_lender",
+        "bucket.has_active_plan",
+        "plan.not_found",
+        "plan.past_period_changed",
+        "plan.ended",
+        "plan.bucket_mismatch",
+        "plan.months_invalid",
         "settings.time_zone_unknown",
         "settings.locale_unknown",
         "fx.rate_unavailable",
@@ -125,6 +131,17 @@ public sealed class ErrorTextTests : IDisposable
         SharedResource.ErrorText(Localizer, error, CultureInfo.GetCultureInfo("pl-PL"))
             .ShouldBe("This would make the bucket's balance negative on 15.01.2026. Check the amount and the date, or add the money first.");
         SharedResource.ErrorText(Localizer, error, CultureInfo.GetCultureInfo("en-US")).ShouldContain("negative on 1/15/2026.");
+    }
+
+    [Fact]
+    public void AMonthParameter_IsFormattedInTheLocale()
+    {
+        var error = new ErrorInfo("plan.past_period_changed", new Dictionary<string, string> { ["month"] = "2026-02" });
+
+        SharedResource.ErrorText(Localizer, error, CultureInfo.GetCultureInfo("en-US"))
+            .ShouldBe("This would change what the plan asked for in February 2026, which has already passed. Changes can start in the current month at the earliest.");
+        SharedResource.ErrorText(Localizer, error, CultureInfo.GetCultureInfo("pl-PL"))
+            .ShouldContain("in " + new DateOnly(2026, 2, 1).ToString("Y", CultureInfo.GetCultureInfo("pl-PL")) + ",");
     }
 
     [Fact]

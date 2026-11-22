@@ -51,6 +51,9 @@ public static class BudgetMongoMapping
         [typeof(Adjustment)] = "Adjustment",
         [typeof(Borrow)] = "Borrow",
         [typeof(Repayment)] = "Repayment",
+        [typeof(PlanCreated)] = "PlanCreated",
+        [typeof(PlanAmountChanged)] = "PlanAmountChanged",
+        [typeof(PlanEndChanged)] = "PlanEndChanged",
         [typeof(Reversal)] = "Reversal",
     };
 
@@ -73,12 +76,15 @@ public static class BudgetMongoMapping
             BsonClassMap.RegisterClassMap<JournalEntry>(MapJournalEntry);
             BsonClassMap.RegisterClassMap<SingleBucketEntry>(MapSingleBucketEntry);
             BsonClassMap.RegisterClassMap<OpeningBalance>(MapEntryType);
-            BsonClassMap.RegisterClassMap<Deposit>(MapEntryType);
+            BsonClassMap.RegisterClassMap<Deposit>(MapDeposit);
             BsonClassMap.RegisterClassMap<Spend>(MapEntryType);
             BsonClassMap.RegisterClassMap<Adjustment>(MapAdjustment);
             BsonClassMap.RegisterClassMap<Transfer>(MapTransfer);
             BsonClassMap.RegisterClassMap<Borrow>(MapBorrow);
             BsonClassMap.RegisterClassMap<Repayment>(MapRepayment);
+            BsonClassMap.RegisterClassMap<PlanCreated>(MapPlanCreated);
+            BsonClassMap.RegisterClassMap<PlanAmountChanged>(MapPlanAmountChanged);
+            BsonClassMap.RegisterClassMap<PlanEndChanged>(MapPlanEndChanged);
             BsonClassMap.RegisterClassMap<Reversal>(MapReversal);
 
             registered = true;
@@ -151,6 +157,40 @@ public static class BudgetMongoMapping
         Map(map, transfer => transfer.ToAmount, "toAmount");
         MapOptional(map, transfer => transfer.Fee, "fee");
         Map(map, transfer => transfer.Rate, "rate");
+        MapOptional(map, transfer => transfer.PlanId, "planId");
+        MapEntryType(map);
+    }
+
+    // The single-bucket fields, then the plan only for a contribution to one (plan 1b B9): a 1a deposit reads unchanged.
+    private static void MapDeposit(BsonClassMap<Deposit> map)
+    {
+        MapOptional(map, deposit => deposit.PlanId, "planId");
+        MapEntryType(map);
+    }
+
+    // The bucket, the monthly amount, the first month, and the last month only when the plan has an end (plan 1b B7).
+    private static void MapPlanCreated(BsonClassMap<PlanCreated> map)
+    {
+        Map(map, created => created.BucketId, "bucketId");
+        Map(map, created => created.Amount, "amount");
+        Map(map, created => created.ValidFrom, "validFrom");
+        MapOptional(map, created => created.ValidTo, "validTo");
+        MapEntryType(map);
+    }
+
+    private static void MapPlanAmountChanged(BsonClassMap<PlanAmountChanged> map)
+    {
+        Map(map, changed => changed.PlanId, "planId");
+        Map(map, changed => changed.Amount, "amount");
+        Map(map, changed => changed.From, "from");
+        MapEntryType(map);
+    }
+
+    // The plan, and the last month only when the plan keeps an end (absent: the end is removed).
+    private static void MapPlanEndChanged(BsonClassMap<PlanEndChanged> map)
+    {
+        Map(map, ended => ended.PlanId, "planId");
+        MapOptional(map, ended => ended.ValidTo, "validTo");
         MapEntryType(map);
     }
 

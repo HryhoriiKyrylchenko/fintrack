@@ -121,11 +121,11 @@ public sealed class LoanFunctionTests(ApiFixture fixture)
         Json(page.Entries[0]).ShouldBe(
             "{\"id\":\"" + repayment + "\",\"type\":\"Repayment\",\"occurredOn\":\"" + Day(-1) + "\",\"note\":null,\"tags\":[],\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,"
             + "\"bucketId\":null,\"amount\":{\"amount\":\"20.00\",\"currency\":\"PLN\"},\"fromBucketId\":null,\"toBucketId\":\"" + cushion + "\",\"fromAmount\":null,\"toAmount\":null,"
-            + "\"fee\":null,\"rate\":null,\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":null,\"loanId\":\"" + loan + "\"}");
+            + "\"fee\":null,\"rate\":null,\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":null,\"loanId\":\"" + loan + "\",\"planId\":null,\"fromMonth\":null,\"toMonth\":null}");
         Json(page.Entries[1]).ShouldBe(
             "{\"id\":\"" + loan + "\",\"type\":\"Borrow\",\"occurredOn\":\"" + Day(-5) + "\",\"note\":\"Repair\",\"tags\":[],\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,"
             + "\"bucketId\":null,\"amount\":{\"amount\":\"200.00\",\"currency\":\"PLN\"},\"fromBucketId\":\"" + cushion + "\",\"toBucketId\":\"" + car + "\",\"fromAmount\":null,\"toAmount\":null,"
-            + "\"fee\":null,\"rate\":null,\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":null,\"loanId\":\"" + loan + "\"}");
+            + "\"fee\":null,\"rate\":null,\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":null,\"loanId\":\"" + loan + "\",\"planId\":null,\"fromMonth\":null,\"toMonth\":null}");
     }
 
     [Fact]

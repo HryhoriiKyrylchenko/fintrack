@@ -1,4 +1,5 @@
 using FinTrack.Shared.Kernel.Monetary;
+using FinTrack.Shared.Kernel.Time;
 
 namespace FinTrack.Budget.Contracts.V1.Journal;
 
@@ -21,10 +22,14 @@ public sealed record JournalPageDto(IReadOnlyList<JournalEntryDto> Entries, stri
 /// <param name="GroupId">The entries created by one user action share it; <c>null</c> for an entry on its own (always in phase 1a).</param>
 /// <param name="Source">Where the entry came from: <c>Manual</c>, <c>Import:&lt;connector&gt;</c> or <c>Agent:&lt;name&gt;</c>.</param>
 /// <param name="ExternalId">The source's own ID of an imported entry, or <c>null</c> (always in phase 1a).</param>
-/// <param name="BucketId">The bucket of an <c>OpeningBalance</c>, <c>Deposit</c>, <c>Spend</c> or <c>Adjustment</c>; <c>null</c> for other types.</param>
+/// <param name="BucketId">
+/// The bucket of an <c>OpeningBalance</c>, <c>Deposit</c>, <c>Spend</c> or <c>Adjustment</c>; the plan's bucket of a <c>PlanCreated</c>,
+/// <c>PlanAmountChanged</c> or <c>PlanEndChanged</c>; <c>null</c> for other types.
+/// </param>
 /// <param name="Amount">
 /// The amount of an <c>OpeningBalance</c>, <c>Deposit</c>, <c>Spend</c> or <c>Adjustment</c>, in its bucket's currency; the principal of a
-/// <c>Borrow</c> and the amount of a <c>Repayment</c>, in the lender's currency; <c>null</c> for other types.
+/// <c>Borrow</c> and the amount of a <c>Repayment</c>, in the lender's currency; the monthly amount of a <c>PlanCreated</c> or
+/// <c>PlanAmountChanged</c> (an amount the plan asks for, not money moved); <c>null</c> for other types.
 /// </param>
 /// <param name="FromBucketId">
 /// The source of a <c>Transfer</c>; the lender of a <c>Borrow</c>; the source of a <c>Repayment</c>, or <c>null</c> when it was paid with
@@ -48,6 +53,14 @@ public sealed record JournalPageDto(IReadOnlyList<JournalEntryDto> Entries, stri
 /// </param>
 /// <param name="Direction">Whether an <c>Adjustment</c> raised or lowered its bucket; <c>null</c> for other types (plan 1b B18).</param>
 /// <param name="LoanId">The loan of a <c>Borrow</c> (its own ID) or a <c>Repayment</c>; <c>null</c> for other types (plan 1b B18).</param>
+/// <param name="PlanId">
+/// The plan of a <c>PlanCreated</c> (its own ID), <c>PlanAmountChanged</c> or <c>PlanEndChanged</c>, and the plan a <c>Deposit</c> or a
+/// <c>Transfer</c> counts towards (or <c>null</c> for a one-time contribution); <c>null</c> for other types (plan 1b B9, B18).
+/// </param>
+/// <param name="FromMonth">The first month of a <c>PlanCreated</c>, or the first month of a <c>PlanAmountChanged</c>'s amount; <c>null</c> for other types.</param>
+/// <param name="ToMonth">
+/// The last month of a <c>PlanCreated</c> or a <c>PlanEndChanged</c>, or <c>null</c> when the plan has no end; <c>null</c> for other types.
+/// </param>
 public sealed record JournalEntryDto(
     Guid Id,
     JournalEntryType Type,
@@ -69,7 +82,10 @@ public sealed record JournalEntryDto(
     Guid? ReversedEntryId,
     Guid? ReversedBy,
     AdjustmentDirection? Direction = null,
-    Guid? LoanId = null);
+    Guid? LoanId = null,
+    Guid? PlanId = null,
+    YearMonth? FromMonth = null,
+    YearMonth? ToMonth = null);
 
 /// <summary>The type of a journal entry (ARCHITECTURE 4.2). JSON: the member's name, which is also the stored type name.</summary>
 public enum JournalEntryType
@@ -97,4 +113,13 @@ public enum JournalEntryType
 
     /// <summary>Loan principal paid back to its lender; never income.</summary>
     Repayment,
+
+    /// <summary>A new contribution plan for one bucket (bucket, monthly amount, months); moves no money; its ID is the plan's.</summary>
+    PlanCreated,
+
+    /// <summary>A plan's new monthly amount from a month on; moves no money.</summary>
+    PlanAmountChanged,
+
+    /// <summary>A plan's new last month, or no end; moves no money.</summary>
+    PlanEndChanged,
 }

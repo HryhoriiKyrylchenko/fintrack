@@ -92,13 +92,17 @@ public sealed class ReverseEntryHandler(JournalWriter writer, IEntryDependencies
             : Result.Ok();
     }
 
-    // The buckets whose balances the entry changes: for a repayment also its loan's lender (found by its borrow).
+    // The buckets whose balances the entry changes: for a repayment also its loan's lender (found by its borrow); for a plan entry, its
+    // plan's bucket (an archived bucket accepts no change to its plans either).
     private static IEnumerable<BucketId> BucketsOf(JournalEntry entry, BudgetSnapshot state) => entry switch
     {
         SingleBucketEntry single => [single.BucketId],
         Transfer transfer => [transfer.FromBucketId, transfer.ToBucketId],
         Borrow borrow => [borrow.LenderBucketId, .. Optional(borrow.ToBucketId)],
         Repayment repayment => [.. Optional(repayment.FromBucketId), .. Optional((state.FindEntry(repayment.LoanId.Value) as Borrow)?.LenderBucketId)],
+        PlanCreated created => [created.BucketId],
+        PlanAmountChanged changed => Optional((state.FindEntry(changed.PlanId.Value) as PlanCreated)?.BucketId),
+        PlanEndChanged ended => Optional((state.FindEntry(ended.PlanId.Value) as PlanCreated)?.BucketId),
         _ => throw new InvalidOperationException($"The reversal does not know the buckets of entry type {entry.GetType().Name}."),
     };
 

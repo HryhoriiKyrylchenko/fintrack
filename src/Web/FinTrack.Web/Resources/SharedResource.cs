@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using FinTrack.Shared.Kernel.Time;
 using Microsoft.Extensions.Localization;
 
 namespace FinTrack.Web.Resources;
@@ -31,7 +32,8 @@ public sealed partial class SharedResource
     /// The text for <paramref name="error"/> with its parameters: the template <c>Error.&lt;code&gt;.WithParams</c>
     /// when the code has one and every <c>{name}</c> in it has a parameter; otherwise the plain text
     /// (<see cref="ErrorText(IStringLocalizer{SharedResource}, string)"/>). A parameter written as a business date
-    /// (<c>yyyy-MM-dd</c>) is shown in <paramref name="culture"/>'s short date; any other value as it is.
+    /// (<c>yyyy-MM-dd</c>) is shown in <paramref name="culture"/>'s short date, a month (<c>yyyy-MM</c>) in its year-month
+    /// pattern; any other value as it is.
     /// </summary>
     public static string ErrorText(IStringLocalizer<SharedResource> localizer, ErrorInfo error, CultureInfo culture)
     {
@@ -54,9 +56,12 @@ public sealed partial class SharedResource
                 return match.Value;
             }
 
-            return DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
-                ? date.ToString("d", culture)
-                : value;
+            if (DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+            {
+                return date.ToString("d", culture);
+            }
+
+            return YearMonth.TryParse(value, out var month) ? month.FirstDay.ToString("Y", culture) : value;
         });
 
         return complete ? text : ErrorText(localizer, error.Code);

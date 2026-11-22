@@ -20,7 +20,8 @@ namespace FinTrack.Budget.Application.Journal;
 /// recognised before any rule because it was valid when written; the bucket rules; the entries' own rules;
 /// invariants 4 and 1, in this order, on one replay that includes every new entry
 /// (<see cref="BudgetErrorCodes.LoanRepaymentExceedsOutstanding"/>, plan 1b B3; <see cref="BudgetErrorCodes.BucketInsufficientFunds"/>,
-/// D2; each with the first day it breaks); then one commit with the entries and any <c>Unallocated</c> bucket the draft created (D5).
+/// D2; each with the first day it breaks); for a definition entry or its reversal, invariant 6 on the same replay
+/// (<see cref="BudgetErrorCodes.PlanPastPeriodChanged"/> with the first month whose accrual would change, B8); then one commit with the entries and any <c>Unallocated</c> bucket the draft created (D5).
 /// </summary>
 /// <remarks>
 /// A repeat: when any of the command's entry IDs exists, or its group ID is already stored, the command writes
@@ -112,6 +113,12 @@ public sealed class JournalWriter(BudgetStateLoader loader, ILedger ledger, IOwn
                 ("date", overdraft.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))));
         }
 
+        // Invariant 6 (B8): a definition entry, or the reversal of one, never changes a month before the current one.
+        if (written.Any(entry => IsDefinitionChange(entry, state)) && context.Balances.FirstPastPeriodChange(replayed) is { } month)
+        {
+            return Result.Fail(AppError.BusinessRule(BudgetErrorCodes.PlanPastPeriodChanged, ("month", month.ToString())));
+        }
+
         var commit = new LedgerCommit(BudgetLedger.Name, state.Version, appends: written, saves: [.. context.NewBuckets]);
         return (await ledger.CommitAsync(commit, cancellationToken).ConfigureAwait(false)).ToResult();
     }
@@ -144,6 +151,12 @@ public sealed class JournalWriter(BudgetStateLoader loader, ILedger ledger, IOwn
             throw new InvalidOperationException("The draft's entries must have the command's entry IDs, in order, and its group.");
         }
     }
+
+    // A definition entry (a plan, later a pause, a limit or a repayment plan), or a reversal of one. Money entries are not held to
+    // invariant 6: a backdated deposit corrects what a bucket held (B8).
+    private static bool IsDefinitionChange(JournalEntry entry, BudgetSnapshot state) =>
+        entry is IDefinitionEntry
+        || (entry is Reversal reversal && state.FindEntry(reversal.ReversedEntryId.Value) is IDefinitionEntry);
 
     private static bool IsRepeatCandidate(BudgetSnapshot state, IReadOnlyList<Guid> entryIds, Guid? groupId) =>
         entryIds.Any(id => state.FindEntry(id) is not null) || (groupId is { } group && state.FindGroup(group).Count > 0);

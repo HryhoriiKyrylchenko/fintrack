@@ -14,7 +14,8 @@ namespace FinTrack.Budget.Application.Buckets;
 /// its name and accepts no new entries. Archiving an archived bucket succeeds and writes nothing. Fails
 /// with <see cref="BudgetErrorCodes.SettingsNotFound"/> (404, before the first run: the balance is for today in the
 /// owner's time zone, plan 1b B20), <see cref="BudgetErrorCodes.BucketNotFound"/> (404),
-/// <see cref="BudgetErrorCodes.BucketSystemBucket"/>, <see cref="BudgetErrorCodes.BucketHasOpenLoan"/> (it lends to a loan open today) or
+/// <see cref="BudgetErrorCodes.BucketSystemBucket"/>, <see cref="BudgetErrorCodes.BucketHasOpenLoan"/> (it lends to a loan open today),
+/// <see cref="BudgetErrorCodes.BucketHasActivePlan"/> (a plan of it accrues this month or later, or has money due) or
 /// <see cref="BudgetErrorCodes.BucketNotEmpty"/> (its <c>NetContributed</c> is not zero; 422 each, plan 1b B17).
 /// </summary>
 /// <param name="Id">The bucket's ID.</param>
@@ -53,7 +54,8 @@ public sealed class ArchiveBucketHandler(BudgetStateLoader loader, ILedger ledge
 
         var today = state.StateAsOf(settings.Today(clock.UtcNow));
         var lendsToAnOpenLoan = today.Loans.Any(loan => loan.LenderBucketId == bucket.BucketId && loan.Status == LoanStatus.Open);
-        var archived = bucket.Archive(today.BalanceOf(bucket.BucketId), lendsToAnOpenLoan);
+        var hasActivePlan = today.Plans.Any(plan => plan.BucketId == bucket.BucketId && today.StandingOf(plan).IsActive);
+        var archived = bucket.Archive(today.BalanceOf(bucket.BucketId), lendsToAnOpenLoan, hasActivePlan);
         if (archived.IsFailed)
         {
             return archived.ToResult();

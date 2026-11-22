@@ -104,13 +104,16 @@ public sealed class GetJournalHandler(BudgetStateLoader loader) : IQueryHandler<
         _ => false,
     };
 
-    // Whether an entry moves money of the bucket; a reversal touches what the entry it cancels touches.
+    // Whether an entry moves money of the bucket, or defines one of its plans; a reversal touches what the entry it cancels touches.
     private static bool Touches(JournalEntry entry, BucketId bucketId, IReadOnlyDictionary<Guid, JournalEntry> byId) => entry switch
     {
         SingleBucketEntry single => single.BucketId == bucketId,
         Transfer transfer => transfer.FromBucketId == bucketId || transfer.ToBucketId == bucketId,
         Borrow borrow => borrow.LenderBucketId == bucketId || borrow.ToBucketId == bucketId,
         Repayment repayment => repayment.FromBucketId == bucketId || JournalContractMapping.LenderOf(repayment, byId) == bucketId,
+        PlanCreated created => created.BucketId == bucketId,
+        PlanAmountChanged changed => JournalContractMapping.BucketOf(changed.PlanId, byId) == bucketId,
+        PlanEndChanged ended => JournalContractMapping.BucketOf(ended.PlanId, byId) == bucketId,
         Reversal reversal => byId.TryGetValue(reversal.ReversedEntryId.Value, out var reversed) && Touches(reversed, bucketId, byId),
         _ => throw new ArgumentOutOfRangeException(nameof(entry), entry?.GetType().Name, "Unknown journal entry type."),
     };
