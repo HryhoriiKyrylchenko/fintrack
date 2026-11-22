@@ -13,4 +13,8 @@ public class JournalContractEnumTests
     [Fact]
     public void AdjustmentDirections_Match() =>
         Enum.GetNames<Contract.AdjustmentDirection>().ShouldBe(Enum.GetNames<Model.AdjustmentDirection>());
+
+    [Fact]
+    public void PauseModes_Match() =>
+        Enum.GetNames<FinTrack.Budget.Contracts.V1.Plans.PauseMode>().ShouldBe(Enum.GetNames<FinTrack.Budget.Domain.Plans.PauseMode>());
 }

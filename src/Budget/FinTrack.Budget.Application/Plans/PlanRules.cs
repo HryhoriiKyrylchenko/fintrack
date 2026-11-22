@@ -35,6 +35,15 @@ internal static class PlanRules
     }
 
     /// <summary>
+    /// A pause (new, or new values of an existing one) shares no month with another pause of <paramref name="plan"/>
+    /// (<see cref="BudgetErrorCodes.PlanPauseOverlaps"/>, B10); a pause is not compared with itself.
+    /// </summary>
+    public static Result CheckOverlap(Plan plan, PlanPause pause) =>
+        plan.Pauses.Any(other => other.PauseId != pause.PauseId && other.Overlaps(pause))
+            ? Result.Fail(AppError.BusinessRule(BudgetErrorCodes.PlanPauseOverlaps))
+            : Result.Ok();
+
+    /// <summary>
     /// The plan a change names: an effective plan (<see cref="BudgetErrorCodes.PlanNotFound"/>) whose bucket is not archived
     /// (<see cref="BudgetErrorCodes.BucketArchived"/>: an archived bucket accepts no change).
     /// </summary>

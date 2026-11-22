@@ -168,7 +168,7 @@ public sealed class BudgetState
             .WithPlanEntry(transfer.PlanId is null ? null : transfer),
         Borrow borrow => Borrowed(borrow),
         Repayment repayment => Repaid(repayment),
-        PlanCreated or PlanAmountChanged or PlanEndChanged => WithPlanEntry(entry),
+        PlanCreated or PlanAmountChanged or PlanEndChanged or PlanPaused or PlanPauseChanged or ShortfallWaived => WithPlanEntry(entry),
         Reversal => this,
         _ => throw new InvalidOperationException($"The state builder does not know the entry type {entry?.GetType().Name}."),
     };
@@ -199,9 +199,10 @@ public sealed class BudgetState
         return PlanSchedule.FirstChangedPastMonth(Plans, after.Plans, CurrentMonth);
     }
 
-    // A plan's creation, versions and end, and its contributions, gathered by plan ID. The entries are in replay order, so
-    // the latest end and the later of two versions from the same month win. An entry of a plan that no effective
-    // PlanCreated has is left out: the handlers never write one, and a plan with such entries cannot be reversed (B5).
+    // A plan's creation, versions, end, pauses and waivers, and its contributions, gathered by plan ID. Creations and pauses come
+    // first, so a change replayed before what it changes (dated earlier) still belongs to it; the rest are in replay order, so the
+    // latest end, the latest change of a pause and the later of two versions from the same month win. An entry of a plan or a pause
+    // that no effective entry created is left out: the handlers never write one, and an entry with dependents cannot be reversed (B5).
     private static List<Plan> BuildPlans(IReadOnlyList<JournalEntry> entries)
     {
         var built = entries.OfType<PlanCreated>()
@@ -215,36 +216,53 @@ public sealed class BudgetState
                 Money.Zero(created.Amount.Currency)))
             .ToList();
 
+        foreach (var paused in entries.OfType<PlanPaused>())
+        {
+            Change(built, paused.PlanId, plan => plan with { Pauses = [.. plan.Pauses, new PlanPause(paused.PauseId, paused.From, paused.To, paused.Mode)] });
+        }
+
         foreach (var entry in entries)
         {
-            Func<Plan, Plan>? change = entry switch
+            switch (entry)
             {
-                PlanAmountChanged changed => plan => plan with { Versions = [.. plan.Versions, new PlanVersion(changed.From, changed.Amount)] },
-                PlanEndChanged ended => plan => plan with { ValidTo = ended.ValidTo },
-                Deposit deposit => plan => plan with { Contributed = plan.Contributed + deposit.Amount },
-                Transfer transfer => plan => plan with { Contributed = plan.Contributed + transfer.ToAmount },
-                _ => null,
-            };
-
-            var index = PlanOf(entry) is { } planId ? built.FindIndex(plan => plan.PlanId == planId) : -1;
-            if (change is not null && index >= 0)
-            {
-                built[index] = change(built[index]);
+                case PlanAmountChanged changed:
+                    Change(built, changed.PlanId, plan => plan with { Versions = [.. plan.Versions, new PlanVersion(changed.From, changed.Amount)] });
+                    break;
+                case PlanEndChanged ended:
+                    Change(built, ended.PlanId, plan => plan with { ValidTo = ended.ValidTo });
+                    break;
+                case PlanPauseChanged pauseChanged when built.Find(plan => plan.Pauses.Any(pause => pause.PauseId == pauseChanged.PauseId)) is { } owner:
+                    Change(built, owner.PlanId, plan => plan with
+                    {
+                        Pauses = [.. plan.Pauses.Select(pause => pause.PauseId == pauseChanged.PauseId
+                            ? pause with { From = pauseChanged.From, To = pauseChanged.To, Mode = pauseChanged.Mode }
+                            : pause)],
+                    });
+                    break;
+                case ShortfallWaived waived:
+                    Change(built, waived.PlanId, plan => plan with { Waivers = [.. plan.Waivers, new PlanWaiver(YearMonth.FromDate(waived.OccurredOn), waived.Amount)] });
+                    break;
+                case Deposit { PlanId: { } linked } deposit:
+                    Change(built, linked, plan => plan with { Contributed = plan.Contributed + deposit.Amount });
+                    break;
+                case Transfer { PlanId: { } linked } transfer:
+                    Change(built, linked, plan => plan with { Contributed = plan.Contributed + transfer.ToAmount });
+                    break;
             }
         }
 
         return built;
     }
 
-    // The plan a recorded entry belongs to; a creation has no plan to change.
-    private static PlanId? PlanOf(JournalEntry entry) => entry switch
+    // Applies a change to the plan with this ID, if there is one.
+    private static void Change(List<Plan> plans, PlanId planId, Func<Plan, Plan> change)
     {
-        PlanAmountChanged changed => changed.PlanId,
-        PlanEndChanged ended => ended.PlanId,
-        Deposit deposit => deposit.PlanId,
-        Transfer transfer => transfer.PlanId,
-        _ => null,
-    };
+        var index = plans.FindIndex(plan => plan.PlanId == planId);
+        if (index >= 0)
+        {
+            plans[index] = change(plans[index]);
+        }
+    }
 
     private BudgetState WithPlanEntry(JournalEntry? entry) =>
         entry is null ? this : new BudgetState(balances, loans, [.. planEntries, entry], FirstOverRepayment, Today);

@@ -103,6 +103,11 @@ public sealed class ReverseEntryHandler(JournalWriter writer, IEntryDependencies
         PlanCreated created => [created.BucketId],
         PlanAmountChanged changed => Optional((state.FindEntry(changed.PlanId.Value) as PlanCreated)?.BucketId),
         PlanEndChanged ended => Optional((state.FindEntry(ended.PlanId.Value) as PlanCreated)?.BucketId),
+        PlanPaused paused => Optional((state.FindEntry(paused.PlanId.Value) as PlanCreated)?.BucketId),
+        PlanPauseChanged changed => Optional(state.FindEntry(changed.PauseId.Value) is PlanPaused pause
+            ? (state.FindEntry(pause.PlanId.Value) as PlanCreated)?.BucketId
+            : null),
+        ShortfallWaived waived => Optional((state.FindEntry(waived.PlanId.Value) as PlanCreated)?.BucketId),
         _ => throw new InvalidOperationException($"The reversal does not know the buckets of entry type {entry.GetType().Name}."),
     };
 

@@ -54,6 +54,9 @@ public static class BudgetMongoMapping
         [typeof(PlanCreated)] = "PlanCreated",
         [typeof(PlanAmountChanged)] = "PlanAmountChanged",
         [typeof(PlanEndChanged)] = "PlanEndChanged",
+        [typeof(PlanPaused)] = "PlanPaused",
+        [typeof(PlanPauseChanged)] = "PlanPauseChanged",
+        [typeof(ShortfallWaived)] = "ShortfallWaived",
         [typeof(Reversal)] = "Reversal",
     };
 
@@ -85,6 +88,9 @@ public static class BudgetMongoMapping
             BsonClassMap.RegisterClassMap<PlanCreated>(MapPlanCreated);
             BsonClassMap.RegisterClassMap<PlanAmountChanged>(MapPlanAmountChanged);
             BsonClassMap.RegisterClassMap<PlanEndChanged>(MapPlanEndChanged);
+            BsonClassMap.RegisterClassMap<PlanPaused>(MapPlanPaused);
+            BsonClassMap.RegisterClassMap<PlanPauseChanged>(MapPlanPauseChanged);
+            BsonClassMap.RegisterClassMap<ShortfallWaived>(MapShortfallWaived);
             BsonClassMap.RegisterClassMap<Reversal>(MapReversal);
 
             registered = true;
@@ -191,6 +197,33 @@ public static class BudgetMongoMapping
     {
         Map(map, ended => ended.PlanId, "planId");
         MapOptional(map, ended => ended.ValidTo, "validTo");
+        MapEntryType(map);
+    }
+
+    // The plan, the first month, the last month only when the pause has one (plan 1b B10), and the mode by name.
+    private static void MapPlanPaused(BsonClassMap<PlanPaused> map)
+    {
+        Map(map, paused => paused.PlanId, "planId");
+        Map(map, paused => paused.From, "from");
+        MapOptional(map, paused => paused.To, "to");
+        Map(map, paused => paused.Mode, "mode");
+        MapEntryType(map);
+    }
+
+    private static void MapPlanPauseChanged(BsonClassMap<PlanPauseChanged> map)
+    {
+        Map(map, changed => changed.PauseId, "pauseId");
+        Map(map, changed => changed.From, "from");
+        MapOptional(map, changed => changed.To, "to");
+        Map(map, changed => changed.Mode, "mode");
+        MapEntryType(map);
+    }
+
+    // The plan and the amount; the reason is the common note, always written for this type (plan 1b B11).
+    private static void MapShortfallWaived(BsonClassMap<ShortfallWaived> map)
+    {
+        Map(map, waived => waived.PlanId, "planId");
+        Map(map, waived => waived.Amount, "amount");
         MapEntryType(map);
     }
 

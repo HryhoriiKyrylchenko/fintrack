@@ -101,7 +101,7 @@ public sealed class AdjustmentFunctionTests(ApiFixture fixture)
             "{\"id\":\"" + id + "\",\"type\":\"Adjustment\",\"occurredOn\":\"" + Day(-2) + "\",\"note\":\"Counted the cash box\",\"tags\":[\"cash\"],"
             + "\"groupId\":null,\"source\":\"Manual\",\"externalId\":null,\"bucketId\":\"" + bucket + "\",\"amount\":{\"amount\":\"7.50\",\"currency\":\"PLN\"},"
             + "\"fromBucketId\":null,\"toBucketId\":null,\"fromAmount\":null,\"toAmount\":null,\"fee\":null,\"rate\":null,"
-            + "\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":\"Decrease\",\"loanId\":null,\"planId\":null,\"fromMonth\":null,\"toMonth\":null}");
+            + "\"reversedEntryId\":null,\"reversedBy\":null,\"direction\":\"Decrease\",\"loanId\":null,\"planId\":null,\"fromMonth\":null,\"toMonth\":null,\"pauseId\":null,\"pauseMode\":null}");
         page.Entries[1].Direction.ShouldBe(AdjustmentDirection.Increase);
     }
 

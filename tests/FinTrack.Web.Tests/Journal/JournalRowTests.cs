@@ -73,6 +73,9 @@ public sealed class JournalRowTests : IDisposable
     [InlineData(JournalEntryType.PlanCreated, "Plan created")]
     [InlineData(JournalEntryType.PlanAmountChanged, "Plan amount changed")]
     [InlineData(JournalEntryType.PlanEndChanged, "Plan end changed")]
+    [InlineData(JournalEntryType.PlanPaused, "Plan paused")]
+    [InlineData(JournalEntryType.PlanPauseChanged, "Plan pause changed")]
+    [InlineData(JournalEntryType.ShortfallWaived, "Shortfall written off")]
     public void PlanEntry_ReadsAsItsTypeAndBucket_WithoutAnAmount(JournalEntryType type, string label)
     {
         var row = Row(Single(type, Cushion, 500m) with { PlanId = Guid.CreateVersion7() });

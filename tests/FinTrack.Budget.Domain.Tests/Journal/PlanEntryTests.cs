@@ -150,6 +150,68 @@ public class PlanEntryTests
         transfer.HasSameContent(Transfer.Create(EntryId, Owner, Cushion, Holiday, Pln(10m), Pln(10m), null, Today, Today, Info, FakeClock.DefaultStart.AddDays(1), Plan).Value).ShouldBeTrue();
     }
 
+    [Fact]
+    public void PlanPausedAndPlanPauseChanged_HoldTheValues_AndCheckTheirMonthsAndDate()
+    {
+        var paused = PlanPaused.Create(EntryId, Owner, Plan, January, December, PauseMode.Skip, Today, Today, Info, FakeClock.DefaultStart).Value;
+
+        paused.PauseId.ShouldBe(PauseId.From(EntryId.Value));
+        (paused.PlanId, paused.From, paused.To, paused.Mode).ShouldBe((Plan, January, (YearMonth?)December, PauseMode.Skip));
+        paused.SchemaVersion.ShouldBe(PlanPaused.CurrentSchemaVersion);
+        paused.ShouldBeAssignableTo<IDefinitionEntry>();
+        PlanPaused.Create(EntryId, Owner, Plan, January, null, PauseMode.Shift, Today, Today, Info, FakeClock.DefaultStart).Value.To.ShouldBeNull();
+        PlanPaused.Create(EntryId, Owner, Plan, January, January, PauseMode.Shift, Today, Today, Info, FakeClock.DefaultStart).IsSuccess.ShouldBeTrue();
+        PlanPaused.Create(EntryId, Owner, Plan, December, January, PauseMode.Shift, Today, Today, Info, FakeClock.DefaultStart)
+            .ShouldFailWith(BudgetErrorCodes.PlanMonthsInvalid, ErrorKind.Validation);
+        PlanPaused.Create(EntryId, Owner, Plan, January, null, PauseMode.Shift, Today.AddDays(1), Today, Info, FakeClock.DefaultStart)
+            .ShouldFailWith(BudgetErrorCodes.EntryDateInFuture, ErrorKind.BusinessRule);
+        Should.Throw<ArgumentOutOfRangeException>(() => PlanPaused.Create(EntryId, Owner, Plan, January, null, (PauseMode)9, Today, Today, Info, FakeClock.DefaultStart));
+
+        var pause = PauseId.From(Guid.CreateVersion7());
+        var changed = PlanPauseChanged.Create(EntryId, Owner, pause, January, December, PauseMode.Shift, Today, Today, Info, FakeClock.DefaultStart).Value;
+        (changed.PauseId, changed.From, changed.To, changed.Mode).ShouldBe((pause, January, (YearMonth?)December, PauseMode.Shift));
+        changed.ShouldBeAssignableTo<IDefinitionEntry>();
+        PlanPauseChanged.Create(EntryId, Owner, pause, December, January, PauseMode.Shift, Today, Today, Info, FakeClock.DefaultStart)
+            .ShouldFailWith(BudgetErrorCodes.PlanMonthsInvalid, ErrorKind.Validation);
+        PlanPauseChanged.Create(EntryId, Owner, pause, January, null, PauseMode.Shift, Today.AddDays(1), Today, Info, FakeClock.DefaultStart)
+            .ShouldFailWith(BudgetErrorCodes.EntryDateInFuture, ErrorKind.BusinessRule);
+    }
+
+    [Fact]
+    public void ShortfallWaived_HoldsTheValues_NeedsAReason_AndChecksItsRules()
+    {
+        var waived = ShortfallWaived.Create(EntryId, Owner, Plan, Pln(150m), Today, Today, Info, FakeClock.DefaultStart).Value;
+
+        (waived.PlanId, waived.Amount, waived.Note).ShouldBe((Plan, Pln(150m), "Holiday fund"));
+        waived.ShouldBeAssignableTo<IDefinitionEntry>();
+        Should.Throw<ArgumentException>(() => ShortfallWaived.Create(EntryId, Owner, Plan, Pln(1m), Today, Today, EntryInfo.None, FakeClock.DefaultStart));
+        ShortfallWaived.Create(EntryId, Owner, Plan, Pln(0m), Today, Today, Info, FakeClock.DefaultStart).ShouldFailWith(ErrorCodes.MoneyAmountNotPositive, ErrorKind.Validation);
+        ShortfallWaived.Create(EntryId, Owner, Plan, Pln(1m), Today.AddDays(1), Today, Info, FakeClock.DefaultStart)
+            .ShouldFailWith(BudgetErrorCodes.EntryDateInFuture, ErrorKind.BusinessRule);
+    }
+
+    [Fact]
+    public void ARepeat_ComparesEveryFieldOfPausesAndWaivers()
+    {
+        var paused = PlanPaused.Create(EntryId, Owner, Plan, January, December, PauseMode.Skip, Today, Today, Info, FakeClock.DefaultStart).Value;
+        paused.HasSameContent(PlanPaused.Create(EntryId, Owner, Plan, January, December, PauseMode.Skip, Today, Today, Info, FakeClock.DefaultStart.AddDays(1)).Value).ShouldBeTrue();
+        paused.HasSameContent(PlanPaused.Create(EntryId, Owner, Plan, January, December, PauseMode.Shift, Today, Today, Info, FakeClock.DefaultStart).Value).ShouldBeFalse();
+        paused.HasSameContent(PlanPaused.Create(EntryId, Owner, Plan, January, null, PauseMode.Skip, Today, Today, Info, FakeClock.DefaultStart).Value).ShouldBeFalse();
+        paused.HasSameContent(PlanPaused.Create(EntryId, Owner, Plan, new YearMonth(2026, 2), December, PauseMode.Skip, Today, Today, Info, FakeClock.DefaultStart).Value).ShouldBeFalse();
+        paused.HasSameContent(PlanPaused.Create(EntryId, Owner, PlanId.From(Holiday.Value), January, December, PauseMode.Skip, Today, Today, Info, FakeClock.DefaultStart).Value).ShouldBeFalse();
+
+        var pause = PauseId.From(Guid.CreateVersion7());
+        var changed = PlanPauseChanged.Create(EntryId, Owner, pause, January, December, PauseMode.Skip, Today, Today, Info, FakeClock.DefaultStart).Value;
+        changed.HasSameContent(PlanPauseChanged.Create(EntryId, Owner, pause, January, December, PauseMode.Skip, Today, Today, Info, FakeClock.DefaultStart.AddDays(1)).Value).ShouldBeTrue();
+        changed.HasSameContent(PlanPauseChanged.Create(EntryId, Owner, pause, January, new YearMonth(2026, 11), PauseMode.Skip, Today, Today, Info, FakeClock.DefaultStart).Value).ShouldBeFalse();
+        changed.HasSameContent(PlanPauseChanged.Create(EntryId, Owner, PauseId.From(Guid.CreateVersion7()), January, December, PauseMode.Skip, Today, Today, Info, FakeClock.DefaultStart).Value).ShouldBeFalse();
+
+        var waived = ShortfallWaived.Create(EntryId, Owner, Plan, Pln(150m), Today, Today, Info, FakeClock.DefaultStart).Value;
+        waived.HasSameContent(ShortfallWaived.Create(EntryId, Owner, Plan, Pln(150m), Today, Today, Info, FakeClock.DefaultStart.AddDays(1)).Value).ShouldBeTrue();
+        waived.HasSameContent(ShortfallWaived.Create(EntryId, Owner, Plan, Pln(151m), Today, Today, Info, FakeClock.DefaultStart).Value).ShouldBeFalse();
+        waived.HasSameContent(ShortfallWaived.Create(EntryId, Owner, PlanId.From(Holiday.Value), Pln(150m), Today, Today, Info, FakeClock.DefaultStart).Value).ShouldBeFalse();
+    }
+
     private static PlanCreated Created(Money amount, YearMonth from, YearMonth? to, DateTimeOffset? recordedAt = null) =>
         PlanCreated.Create(EntryId, Owner, Cushion, amount, from, to, Today, Today, Info, recordedAt ?? FakeClock.DefaultStart).Value;
 

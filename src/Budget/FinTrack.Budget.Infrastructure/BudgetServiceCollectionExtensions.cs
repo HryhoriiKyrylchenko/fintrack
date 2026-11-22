@@ -1,6 +1,7 @@
 using FinTrack.Budget.Application;
 using FinTrack.Budget.Application.Buckets;
 using FinTrack.Budget.Application.Journal;
+using FinTrack.Budget.Application.Plans;
 using FinTrack.Budget.Application.Settings;
 using FinTrack.Budget.Contracts.V1.Journal;
 using FinTrack.Budget.Domain.Buckets;
@@ -56,6 +57,12 @@ public static class BudgetServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<AddRepayment>, AddRepaymentValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<AddTransfer>, AddTransferValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<ReverseEntry>, ReverseEntryValidator>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<CreatePlan>, CreatePlanValidator>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<ChangePlanAmount>, ChangePlanAmountValidator>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<SetPlanEnd>, SetPlanEndValidator>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<PausePlan>, PausePlanValidator>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<ChangePlanPause>, ChangePlanPauseValidator>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<WaiveShortfall>, WaiveShortfallValidator>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IValidator<GetJournal>, GetJournalValidator>());
 
         return services;

@@ -1,5 +1,6 @@
 using FinTrack.Budget.Contracts.V1.Journal;
 using FinTrack.Budget.Domain.Buckets;
+using FinTrack.Budget.Application.Plans;
 using FinTrack.Budget.Domain.Journal;
 using FinTrack.Budget.Domain.Plans;
 using AdjustmentDirection = FinTrack.Budget.Contracts.V1.Journal.AdjustmentDirection;
@@ -54,6 +55,30 @@ internal static class JournalContractMapping
             PlanId = ended.PlanId.Value,
             ToMonth = ended.ValidTo,
         },
+        PlanPaused paused => Common(paused, JournalEntryType.PlanPaused, reversedBy) with
+        {
+            BucketId = BucketOf(paused.PlanId, journal).Value,
+            PlanId = paused.PlanId.Value,
+            PauseId = paused.PauseId.Value,
+            FromMonth = paused.From,
+            ToMonth = paused.To,
+            PauseMode = PlanContractMapping.ToContract(paused.Mode),
+        },
+        PlanPauseChanged changed => Common(changed, JournalEntryType.PlanPauseChanged, reversedBy) with
+        {
+            BucketId = BucketOf(PlanOf(changed.PauseId, journal), journal).Value,
+            PlanId = PlanOf(changed.PauseId, journal).Value,
+            PauseId = changed.PauseId.Value,
+            FromMonth = changed.From,
+            ToMonth = changed.To,
+            PauseMode = PlanContractMapping.ToContract(changed.Mode),
+        },
+        ShortfallWaived waived => Common(waived, JournalEntryType.ShortfallWaived, reversedBy) with
+        {
+            BucketId = BucketOf(waived.PlanId, journal).Value,
+            PlanId = waived.PlanId.Value,
+            Amount = waived.Amount,
+        },
         OpeningBalance opening => Single(opening, JournalEntryType.OpeningBalance, reversedBy),
         Deposit deposit => Single(deposit, JournalEntryType.Deposit, reversedBy) with
         {
@@ -94,6 +119,13 @@ internal static class JournalContractMapping
         journal.TryGetValue(planId.Value, out var entry) && entry is PlanCreated created
             ? created.BucketId
             : throw new InvalidOperationException($"An entry refers to plan {planId}, which has no PlanCreated.");
+
+    /// <summary>The plan of pause <paramref name="pauseId"/>: its <c>PlanPaused</c>'s. A stored pause change always has its pause.</summary>
+    /// <exception cref="InvalidOperationException">The journal has no <c>PlanPaused</c> with the pause's ID (a bug).</exception>
+    public static PlanId PlanOf(PauseId pauseId, IReadOnlyDictionary<Guid, JournalEntry> journal) =>
+        journal.TryGetValue(pauseId.Value, out var entry) && entry is PlanPaused paused
+            ? paused.PlanId
+            : throw new InvalidOperationException($"An entry refers to pause {pauseId}, which has no PlanPaused.");
 
     /// <summary>The contract's copy of <paramref name="direction"/>.</summary>
     public static AdjustmentDirection ToContract(Model.AdjustmentDirection direction) => direction switch

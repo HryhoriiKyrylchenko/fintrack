@@ -1,5 +1,6 @@
 using FinTrack.Budget.Domain.Buckets;
 using FinTrack.Budget.Domain.Journal;
+using FinTrack.Budget.Domain.Plans;
 using FinTrack.Budget.Domain.State;
 using FinTrack.Shared.Kernel.Ids;
 using FinTrack.Shared.Kernel.Monetary;
@@ -38,6 +39,15 @@ internal sealed class PlanJournal(DateOnly today)
 
     public PlanEndChanged End(PlanCreated plan, YearMonth? to, int day = 0) =>
         PlanEndChanged.Create(NewId(), Owner, plan.PlanId, to, Today.AddDays(day), Today, EntryInfo.None, NextRecordedAt()).Value;
+
+    public PlanPaused Pause(PlanCreated plan, YearMonth from, YearMonth? to, PauseMode mode, int day = 0) =>
+        PlanPaused.Create(NewId(), Owner, plan.PlanId, from, to, mode, Today.AddDays(day), Today, EntryInfo.None, NextRecordedAt()).Value;
+
+    public PlanPauseChanged ChangePause(PlanPaused pause, YearMonth from, YearMonth? to, PauseMode mode, int day = 0) =>
+        PlanPauseChanged.Create(NewId(), Owner, pause.PauseId, from, to, mode, Today.AddDays(day), Today, EntryInfo.None, NextRecordedAt()).Value;
+
+    public ShortfallWaived Waive(PlanCreated plan, decimal amount, int day = 0) =>
+        ShortfallWaived.Create(NewId(), Owner, plan.PlanId, Pln(amount), Today.AddDays(day), Today, new EntryInfo("Agreed", [], EntrySource.Manual), NextRecordedAt()).Value;
 
     public Deposit Pay(Bucket bucket, decimal amount, PlanCreated? plan, int day = 0) =>
         Deposit.Create(NewId(), Owner, bucket.BucketId, Pln(amount), Today.AddDays(day), Today, EntryInfo.None, NextRecordedAt(), plan?.PlanId).Value;

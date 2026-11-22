@@ -224,6 +224,120 @@ public sealed class PlanStorageTests(BudgetFixture fixture)
         (await ReadAsync(owner)).ShouldHaveSingleItem().GetType().Name.ShouldBe(type);
     }
 
+    [Fact]
+    public async Task PlanPausedAndPlanPauseChanged_HaveThePinnedShapes_ModeByName_AndToOnlyWhenSet()
+    {
+        var owner = BudgetFixture.NewOwner();
+        var plan = PlanId.From(Guid.CreateVersion7());
+        var paused = PlanPaused.Create(NewId(), owner, plan, new YearMonth(2026, 2), null, PauseMode.Shift, Day, Day, EntryInfo.None, FakeClock.DefaultStart).Value;
+        var changed = PlanPauseChanged.Create(NewId(), owner, paused.PauseId, new YearMonth(2026, 2), new YearMonth(2026, 4), PauseMode.Skip, Day, Day,
+            EntryInfo.None, FakeClock.DefaultStart.AddMilliseconds(1)).Value;
+        await AppendAsync(owner, paused, changed);
+
+        (await RawAsync(paused.Id)).ShouldBe(new BsonDocument
+        {
+            { "_id", Uuid(paused.Id) },
+            { "type", "PlanPaused" },
+            { "ownerId", Uuid(owner.Value) },
+            { "schemaVersion", 1 },
+            { "recordedAt", new BsonDateTime(FakeClock.DefaultStart.UtcDateTime) },
+            { "occurredOn", "2026-01-15" },
+            { "tags", new BsonArray() },
+            { "source", "Manual" },
+            { "planId", Uuid(plan.Value) },
+            { "from", "2026-02" },
+            { "mode", "Shift" },
+        });
+        (await RawAsync(changed.Id)).ShouldBe(new BsonDocument
+        {
+            { "_id", Uuid(changed.Id) },
+            { "type", "PlanPauseChanged" },
+            { "ownerId", Uuid(owner.Value) },
+            { "schemaVersion", 1 },
+            { "recordedAt", new BsonDateTime(FakeClock.DefaultStart.AddMilliseconds(1).UtcDateTime) },
+            { "occurredOn", "2026-01-15" },
+            { "tags", new BsonArray() },
+            { "source", "Manual" },
+            { "pauseId", Uuid(paused.Id) },
+            { "from", "2026-02" },
+            { "to", "2026-04" },
+            { "mode", "Skip" },
+        });
+
+        var read = await ReadAsync(owner);
+        read.OfType<PlanPaused>().ShouldHaveSingleItem().HasSameContent(paused).ShouldBeTrue();
+        read.OfType<PlanPauseChanged>().ShouldHaveSingleItem().HasSameContent(changed).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task ShortfallWaived_HasThePinnedShape_WithItsReason()
+    {
+        var owner = BudgetFixture.NewOwner();
+        var plan = PlanId.From(Guid.CreateVersion7());
+        var waived = ShortfallWaived.Create(NewId(), owner, plan, Money.From(150m, Currency.Pln), Day, Day, new EntryInfo("Goal changed", [], EntrySource.Manual), FakeClock.DefaultStart).Value;
+        await AppendAsync(owner, waived);
+
+        (await RawAsync(waived.Id)).ShouldBe(new BsonDocument
+        {
+            { "_id", Uuid(waived.Id) },
+            { "type", "ShortfallWaived" },
+            { "ownerId", Uuid(owner.Value) },
+            { "schemaVersion", 1 },
+            { "recordedAt", new BsonDateTime(FakeClock.DefaultStart.UtcDateTime) },
+            { "occurredOn", "2026-01-15" },
+            { "note", "Goal changed" },
+            { "tags", new BsonArray() },
+            { "source", "Manual" },
+            { "planId", Uuid(plan.Value) },
+            { "amount", new BsonDocument { { "amount", new BsonDecimal128(150.00m) }, { "currency", "PLN" } } },
+        });
+        (await ReadAsync(owner)).OfType<ShortfallWaived>().ShouldHaveSingleItem().HasSameContent(waived).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("PlanPaused", "planId")]
+    [InlineData("PlanPaused", "from")]
+    [InlineData("PlanPaused", "mode")]
+    [InlineData("PlanPauseChanged", "pauseId")]
+    [InlineData("PlanPauseChanged", "mode")]
+    [InlineData("ShortfallWaived", "planId")]
+    [InlineData("ShortfallWaived", "amount")]
+    public async Task StoredPauseOrWaiver_WithoutARequiredElement_FailsToRead(string type, string element)
+    {
+        var owner = BudgetFixture.NewOwner();
+        var document = PlanDocument(owner, type);
+        document.Remove(element);
+        await fixture.Raw(BudgetCollections.Journal).InsertOneAsync(document, cancellationToken: Cancellation);
+
+        await Should.ThrowAsync<Exception>(() => ReadAsync(owner));
+    }
+
+    [Theory]
+    [InlineData("PlanPaused")]
+    [InlineData("PlanPauseChanged")]
+    [InlineData("ShortfallWaived")]
+    public async Task StoredPauseOrWaiver_WrittenByHand_IsRead(string type)
+    {
+        var owner = BudgetFixture.NewOwner();
+        await fixture.Raw(BudgetCollections.Journal).InsertOneAsync(PlanDocument(owner, type), cancellationToken: Cancellation);
+
+        (await ReadAsync(owner)).ShouldHaveSingleItem().GetType().Name.ShouldBe(type);
+    }
+
+    [Theory]
+    [InlineData("shift")]
+    [InlineData("1")]
+    [InlineData("Pause")]
+    public async Task StoredPause_WithAModeThatIsNotAName_FailsToRead(string mode)
+    {
+        var owner = BudgetFixture.NewOwner();
+        var document = PlanDocument(owner, "PlanPaused");
+        document["mode"] = mode;
+        await fixture.Raw(BudgetCollections.Journal).InsertOneAsync(document, cancellationToken: Cancellation);
+
+        await Should.ThrowAsync<FormatException>(() => ReadAsync(owner));
+    }
+
     private static JournalEntryId NewId() => JournalEntryId.From(Guid.CreateVersion7());
 
     private async Task AppendAsync(OwnerId owner, params JournalEntry[] entries)
@@ -273,6 +387,22 @@ public sealed class PlanStorageTests(BudgetFixture fixture)
                 document.Add("planId", Uuid(Guid.CreateVersion7()));
                 document.Add("amount", money);
                 document.Add("from", "2026-02");
+                break;
+            case "PlanPaused":
+                document.Add("planId", Uuid(Guid.CreateVersion7()));
+                document.Add("from", "2026-02");
+                document.Add("to", "2026-03");
+                document.Add("mode", "Skip");
+                break;
+            case "PlanPauseChanged":
+                document.Add("pauseId", Uuid(Guid.CreateVersion7()));
+                document.Add("from", "2026-02");
+                document.Add("mode", "Shift");
+                break;
+            case "ShortfallWaived":
+                document.InsertAt(document.IndexOfName("tags"), new BsonElement("note", "Agreed"));
+                document.Add("planId", Uuid(Guid.CreateVersion7()));
+                document.Add("amount", money);
                 break;
             default:
                 document.Add("planId", Uuid(Guid.CreateVersion7()));
